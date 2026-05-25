@@ -3,11 +3,9 @@
 import { useState, useEffect, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSearchParams, useRouter } from 'next/navigation'
-import {
-  Search, Plus, ChevronRight, Dumbbell, X, Loader2, Check,
-  ArrowLeft,
-} from 'lucide-react'
+import { Search, Plus, ChevronRight, Dumbbell, X, Loader2, Check, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
+import { MUSCLE_GROUPS } from '@gymflow/database'
 
 import { cn, MUSCLE_GROUP_COLORS } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -19,38 +17,33 @@ const fadeUp = {
   show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] } },
 }
 
-const DIFFICULTY_LABELS = { beginner: 'Iniciante', intermediate: 'Intermediário', advanced: 'Avançado' }
-const DIFFICULTY_COLORS = {
-  beginner: 'badge-success',
-  intermediate: 'badge-warning',
-  advanced: 'badge-danger',
-}
+const DIFFICULTY_LABELS = { beginner: 'Iniciante', intermediate: 'Intermediário', advanced: 'Avançado' } as const
+const DIFFICULTY_COLORS = { beginner: 'badge-success', intermediate: 'badge-warning', advanced: 'badge-danger' } as const
+
+type Difficulty = 'beginner' | 'intermediate' | 'advanced'
 
 interface Exercise {
   id: string
   name_pt: string
   muscle_groups: string[]
   equipment: string[]
-  difficulty: string
+  difficulty: Difficulty
   is_global: boolean
+  created_by: string | null
+  academy_id: string | null
 }
 
-interface NewExerciseForm {
+interface ExerciseForm {
   name_pt: string
-  difficulty: string
+  difficulty: Difficulty
   muscle_groups: string[]
   equipment: string
 }
 
-const MUSCLE_OPTIONS = [
-  'Peito', 'Costas', 'Ombros', 'Bíceps', 'Tríceps',
-  'Quadríceps', 'Glúteos', 'Isquiotibiais', 'Abdômen', 'Lombar', 'Panturrilhas',
-]
-
 function NewExerciseModal({ onClose, onCreated }: { onClose: () => void; onCreated: (ex: Exercise) => void }) {
   const { currentAcademy } = useAuthStore()
   const supabase = createClient()
-  const [form, setForm] = useState<NewExerciseForm>({ name_pt: '', difficulty: 'beginner', muscle_groups: [], equipment: '' })
+  const [form, setForm] = useState<ExerciseForm>({ name_pt: '', difficulty: 'beginner', muscle_groups: [], equipment: '' })
   const [saving, setSaving] = useState(false)
 
   async function handleSave() {
@@ -61,25 +54,24 @@ function NewExerciseModal({ onClose, onCreated }: { onClose: () => void; onCreat
     setSaving(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('exercises')
         .insert({
           name: form.name_pt,
           name_pt: form.name_pt,
           muscle_groups: form.muscle_groups,
-          equipment: form.equipment ? form.equipment.split(',').map((e: string) => e.trim()).filter(Boolean) : [],
+          equipment: form.equipment ? form.equipment.split(',').map((e) => e.trim()).filter(Boolean) : [],
           difficulty: form.difficulty,
           is_global: false,
           academy_id: currentAcademy.id,
           created_by: user?.id,
         })
-        .select('id, name_pt, muscle_groups, equipment, difficulty, is_global')
+        .select('id, name_pt, muscle_groups, equipment, difficulty, is_global, created_by, academy_id')
         .single()
 
       if (error) throw error
       toast.success('Exercício criado!')
-      onCreated(data)
+      onCreated(data as Exercise)
     } catch (err: unknown) {
       toast.error((err as Error).message ?? 'Erro ao criar exercício.')
     } finally {
@@ -90,25 +82,19 @@ function NewExerciseModal({ onClose, onCreated }: { onClose: () => void; onCreat
   function toggleMuscle(m: string) {
     setForm((f) => ({
       ...f,
-      muscle_groups: f.muscle_groups.includes(m)
-        ? f.muscle_groups.filter((x) => x !== m)
-        : [...f.muscle_groups, m],
+      muscle_groups: f.muscle_groups.includes(m) ? f.muscle_groups.filter((x) => x !== m) : [...f.muscle_groups, m],
     }))
   }
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 40 }}
-        className="glass w-full max-w-md rounded-2xl p-6 space-y-5 border border-border/60"
+        initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }}
+        className="glass w-full max-w-md rounded-2xl p-6 space-y-5 border border-border/60 max-h-[90vh] overflow-y-auto"
       >
         <div className="flex items-center justify-between">
           <h3 className="font-display font-bold">Novo exercício</h3>
@@ -132,17 +118,10 @@ function NewExerciseModal({ onClose, onCreated }: { onClose: () => void; onCreat
             <label className="text-sm font-medium">Dificuldade</label>
             <div className="grid grid-cols-3 gap-2">
               {(['beginner', 'intermediate', 'advanced'] as const).map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setForm((f) => ({ ...f, difficulty: d }))}
-                  className={cn(
-                    'py-2 rounded-xl border text-xs font-medium transition-all',
-                    form.difficulty === d
-                      ? 'border-brand-500/50 bg-brand-500/10 text-brand-300'
-                      : 'border-border/60 text-muted-foreground hover:bg-surface-100'
-                  )}
-                >
+                <button key={d} type="button" onClick={() => setForm((f) => ({ ...f, difficulty: d }))}
+                  className={cn('py-2 rounded-xl border text-xs font-medium transition-all',
+                    form.difficulty === d ? 'border-brand-500/50 bg-brand-500/10 text-brand-300' : 'border-border/60 text-muted-foreground hover:bg-surface-100'
+                  )}>
                   {DIFFICULTY_LABELS[d]}
                 </button>
               ))}
@@ -151,21 +130,14 @@ function NewExerciseModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Grupos musculares <span className="text-red-400">*</span></label>
-            <div className="flex flex-wrap gap-1.5">
-              {MUSCLE_OPTIONS.map((m) => {
+            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+              {MUSCLE_GROUPS.map((m) => {
                 const active = form.muscle_groups.includes(m)
                 const color = MUSCLE_GROUP_COLORS[m] ?? '#6366F1'
                 return (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => toggleMuscle(m)}
+                  <button key={m} type="button" onClick={() => toggleMuscle(m)}
                     className="px-2.5 py-1 rounded-full text-xs font-medium border transition-all"
-                    style={active
-                      ? { background: color, borderColor: color, color: '#fff' }
-                      : { borderColor: 'hsl(var(--border) / 0.6)', color: 'hsl(var(--muted-foreground))' }
-                    }
-                  >
+                    style={active ? { background: color, borderColor: color, color: '#fff' } : { borderColor: 'hsl(var(--border) / 0.6)', color: 'hsl(var(--muted-foreground))' }}>
                     {m}
                   </button>
                 )
@@ -186,11 +158,7 @@ function NewExerciseModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
         <div className="flex gap-3 pt-1">
           <button onClick={onClose} className="flex-1 btn-secondary py-2.5 rounded-xl text-sm">Cancelar</button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex-1 btn-primary py-2.5 rounded-xl text-sm"
-          >
+          <button onClick={handleSave} disabled={saving} className="flex-1 btn-primary py-2.5 rounded-xl text-sm">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Criar exercício'}
           </button>
         </div>
@@ -211,6 +179,7 @@ function ExerciciosContent() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selectedMuscle, setSelectedMuscle] = useState<string | null>(null)
+  const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty | null>(null)
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [showModal, setShowModal] = useState(false)
   const [adding, setAdding] = useState<string | null>(null)
@@ -219,10 +188,9 @@ function ExerciciosContent() {
 
   useEffect(() => {
     async function load() {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let query = (supabase as any)
+      let query = supabase
         .from('exercises')
-        .select('id, name_pt, muscle_groups, equipment, difficulty, is_global')
+        .select('id, name_pt, muscle_groups, equipment, difficulty, is_global, created_by, academy_id')
         .order('name_pt')
 
       if (currentAcademy) {
@@ -233,48 +201,30 @@ function ExerciciosContent() {
 
       const { data, error } = await query
       if (error) { toast.error('Erro ao carregar exercícios.'); setLoading(false); return }
-      setExercises(data ?? [])
+      setExercises((data ?? []) as Exercise[])
       setLoading(false)
     }
     load()
 
     if (addTo) {
-      async function fetchSheetName() {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data } = await (supabase as any)
-          .from('workout_sheets')
-          .select('name')
-          .eq('id', addTo)
-          .single()
-        if (data) setSheetName(data.name)
-      }
-      fetchSheetName()
+      supabase.from('workout_sheets').select('name').eq('id', addTo).single()
+        .then(({ data }) => { if (data) setSheetName(data.name) })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentAcademy, addTo])
 
   async function handleAddToSheet(exerciseId: string) {
     if (!addTo || addedIds.has(exerciseId)) return
     setAdding(exerciseId)
     try {
-      // Get next order_index
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { count } = await (supabase as any)
+      const { count } = await supabase
         .from('sheet_exercises')
         .select('id', { count: 'exact', head: true })
         .eq('sheet_id', addTo)
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('sheet_exercises')
-        .insert({
-          sheet_id: addTo,
-          exercise_id: exerciseId,
-          order_index: count ?? 0,
-          sets: 3,
-          reps: '12',
-          rest_seconds: 60,
-        })
+        .insert({ sheet_id: addTo, exercise_id: exerciseId, order_index: count ?? 0, sets: 3, reps: '12', rest_seconds: 60 })
 
       if (error) throw error
       setAddedIds((prev) => new Set([...prev, exerciseId]))
@@ -290,18 +240,18 @@ function ExerciciosContent() {
     const matchSearch = ex.name_pt.toLowerCase().includes(search.toLowerCase()) ||
       ex.muscle_groups.some((m) => m.toLowerCase().includes(search.toLowerCase()))
     const matchMuscle = !selectedMuscle || ex.muscle_groups.includes(selectedMuscle)
-    return matchSearch && matchMuscle
+    const matchDifficulty = !selectedDifficulty || ex.difficulty === selectedDifficulty
+    return matchSearch && matchMuscle && matchDifficulty
   })
+
+  const hasActiveFilter = search || selectedMuscle || selectedDifficulty
 
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6">
       {/* addTo banner */}
       {addTo && (
         <motion.div variants={fadeUp} className="glass rounded-2xl p-4 border border-brand-500/20 bg-brand-500/5 flex items-center gap-3">
-          <button
-            onClick={() => router.push(`/treinos/${addTo}`)}
-            className="p-1.5 rounded-lg hover:bg-brand-500/15 transition-all text-brand-400"
-          >
+          <button onClick={() => router.push(`/treinos/${addTo}`)} className="p-1.5 rounded-lg hover:bg-brand-500/15 transition-all text-brand-400">
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div className="flex-1 min-w-0">
@@ -311,10 +261,7 @@ function ExerciciosContent() {
           {addedIds.size > 0 && (
             <span className="badge-success text-[10px]">{addedIds.size} adicionado{addedIds.size > 1 ? 's' : ''}</span>
           )}
-          <button
-            onClick={() => router.push(`/treinos/${addTo}`)}
-            className="btn-primary text-xs py-2 px-4 rounded-xl"
-          >
+          <button onClick={() => router.push(`/treinos/${addTo}`)} className="btn-primary text-xs py-2 px-4 rounded-xl">
             Concluir
           </button>
         </motion.div>
@@ -335,8 +282,9 @@ function ExerciciosContent() {
         )}
       </motion.div>
 
-      {/* Search + view toggle */}
+      {/* Filtros */}
       <motion.div variants={fadeUp} className="space-y-3">
+        {/* Search + view toggle */}
         <div className="flex gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -349,47 +297,50 @@ function ExerciciosContent() {
           </div>
           <div className="flex gap-2">
             {(['grid', 'list'] as const).map((v) => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                className={cn(
-                  'px-3 py-2 rounded-xl border text-sm transition-all',
-                  view === v
-                    ? 'border-brand-500/40 bg-brand-500/10 text-brand-300'
-                    : 'border-border/60 text-muted-foreground hover:bg-surface-100'
-                )}
-              >
+              <button key={v} onClick={() => setView(v)}
+                className={cn('px-3 py-2 rounded-xl border text-sm transition-all',
+                  view === v ? 'border-brand-500/40 bg-brand-500/10 text-brand-300' : 'border-border/60 text-muted-foreground hover:bg-surface-100'
+                )}>
                 {v === 'grid' ? '⊞' : '≡'}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Muscle filter chips */}
-        <div className="flex gap-2 flex-wrap">
+        {/* Muscle chips — todos os 15, scroll horizontal */}
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
           <button
             onClick={() => setSelectedMuscle(null)}
-            className={cn(
-              'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
+            className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap flex-shrink-0',
               !selectedMuscle ? 'bg-brand-500/15 text-brand-300 border-brand-500/30' : 'border-border/60 text-muted-foreground hover:border-border'
-            )}
-          >
+            )}>
             Todos
           </button>
-          {(['Peito', 'Costas', 'Ombros', 'Bíceps', 'Tríceps', 'Quadríceps', 'Glúteos', 'Abdômen'] as const).map((m) => {
+          {MUSCLE_GROUPS.map((m) => {
             const color = MUSCLE_GROUP_COLORS[m] ?? '#6366F1'
             const active = selectedMuscle === m
             return (
-              <button
-                key={m}
-                onClick={() => setSelectedMuscle(active ? null : m)}
-                className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-all', active ? 'text-white' : 'text-muted-foreground hover:text-foreground')}
-                style={active ? { background: color, borderColor: color } : { borderColor: 'hsl(var(--border) / 0.6)' }}
-              >
+              <button key={m} onClick={() => setSelectedMuscle(active ? null : m)}
+                className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap flex-shrink-0',
+                  active ? 'text-white' : 'text-muted-foreground hover:text-foreground'
+                )}
+                style={active ? { background: color, borderColor: color } : { borderColor: 'hsl(var(--border) / 0.6)' }}>
                 {m}
               </button>
             )
           })}
+        </div>
+
+        {/* Difficulty filter */}
+        <div className="flex gap-2 flex-wrap">
+          {([null, 'beginner', 'intermediate', 'advanced'] as const).map((d) => (
+            <button key={d ?? 'all'} onClick={() => setSelectedDifficulty(d)}
+              className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
+                selectedDifficulty === d ? 'bg-brand-500/15 text-brand-300 border-brand-500/30' : 'border-border/60 text-muted-foreground hover:border-border'
+              )}>
+              {d === null ? 'Qualquer nível' : DIFFICULTY_LABELS[d]}
+            </button>
+          ))}
         </div>
       </motion.div>
 
@@ -413,24 +364,24 @@ function ExerciciosContent() {
             const isAddingThis = adding === ex.id
             return (
               <motion.div key={ex.id} variants={fadeUp}>
-                <div className={cn(
-                  'glass rounded-2xl p-4 group hover:border-brand-500/20 hover:-translate-y-0.5 transition-all duration-300 hover:shadow-card-hover',
-                  isAdded && 'border-emerald-500/20 bg-emerald-500/3'
-                )}>
+                <div
+                  onClick={() => !addTo && router.push(`/exercicios/${ex.id}`)}
+                  className={cn(
+                    'glass rounded-2xl p-4 group hover:border-brand-500/20 hover:-translate-y-0.5 transition-all duration-300 hover:shadow-card-hover',
+                    !addTo && 'cursor-pointer',
+                    isAdded && 'border-emerald-500/20 bg-emerald-500/3'
+                  )}
+                >
                   <div className="flex items-start justify-between gap-2 mb-3">
-                    <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110"
-                      style={{ background: `${color}15`, border: `1px solid ${color}25` }}
-                    >
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110"
+                      style={{ background: `${color}15`, border: `1px solid ${color}25` }}>
                       <Dumbbell style={{ color, width: '1.125rem', height: '1.125rem' }} />
                     </div>
-                    <span className={cn(DIFFICULTY_COLORS[ex.difficulty as keyof typeof DIFFICULTY_COLORS] ?? 'badge', 'text-[10px]')}>
-                      {DIFFICULTY_LABELS[ex.difficulty as keyof typeof DIFFICULTY_LABELS] ?? ex.difficulty}
+                    <span className={cn(DIFFICULTY_COLORS[ex.difficulty] ?? 'badge', 'text-[10px]')}>
+                      {DIFFICULTY_LABELS[ex.difficulty] ?? ex.difficulty}
                     </span>
                   </div>
-
                   <h3 className="font-semibold text-sm leading-snug mb-2">{ex.name_pt}</h3>
-
                   <div className="flex flex-wrap gap-1">
                     {ex.muscle_groups.map((m) => (
                       <span key={m} className="px-2 py-0.5 rounded-full text-[10px] font-medium"
@@ -439,10 +390,9 @@ function ExerciciosContent() {
                       </span>
                     ))}
                   </div>
-
                   {addTo && (
                     <button
-                      onClick={() => handleAddToSheet(ex.id)}
+                      onClick={(e) => { e.stopPropagation(); handleAddToSheet(ex.id) }}
                       disabled={isAdded || isAddingThis}
                       className={cn(
                         'w-full mt-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5',
@@ -451,7 +401,11 @@ function ExerciciosContent() {
                           : 'bg-brand-500/15 text-brand-400 border border-brand-500/20 hover:bg-brand-500/25'
                       )}
                     >
-                      {isAddingThis ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : isAdded ? <><Check className="w-3.5 h-3.5" /> Adicionado</> : <><Plus className="w-3.5 h-3.5" /> Adicionar</>}
+                      {isAddingThis
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : isAdded
+                          ? <><Check className="w-3.5 h-3.5" /> Adicionado</>
+                          : <><Plus className="w-3.5 h-3.5" /> Adicionar</>}
                     </button>
                   )}
                 </div>
@@ -471,7 +425,13 @@ function ExerciciosContent() {
             const isAddingThis = adding === ex.id
             return (
               <motion.div key={ex.id} variants={fadeUp}>
-                <div className="glass rounded-xl px-4 py-3 flex items-center gap-4 hover:border-brand-500/20 transition-all group">
+                <div
+                  onClick={() => !addTo && router.push(`/exercicios/${ex.id}`)}
+                  className={cn(
+                    'glass rounded-xl px-4 py-3 flex items-center gap-4 hover:border-brand-500/20 transition-all group',
+                    !addTo && 'cursor-pointer'
+                  )}
+                >
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                     style={{ background: `${color}15`, border: `1px solid ${color}25` }}>
                     <Dumbbell className="w-3.5 h-3.5" style={{ color }} />
@@ -480,12 +440,14 @@ function ExerciciosContent() {
                     <p className="font-semibold text-sm">{ex.name_pt}</p>
                     <p className="text-xs text-muted-foreground">{ex.muscle_groups.join(' · ')}</p>
                   </div>
+                  <span className={cn(DIFFICULTY_COLORS[ex.difficulty] ?? 'badge', 'text-[10px] hidden sm:inline-flex')}>
+                    {DIFFICULTY_LABELS[ex.difficulty] ?? ex.difficulty}
+                  </span>
                   {addTo ? (
                     <button
-                      onClick={() => handleAddToSheet(ex.id)}
+                      onClick={(e) => { e.stopPropagation(); handleAddToSheet(ex.id) }}
                       disabled={isAdded || isAddingThis}
-                      className={cn(
-                        'p-2 rounded-lg transition-all',
+                      className={cn('p-2 rounded-lg transition-all',
                         isAdded ? 'text-emerald-400 bg-emerald-500/10 cursor-default' : 'text-brand-400 hover:bg-brand-500/15'
                       )}
                     >
@@ -508,15 +470,17 @@ function ExerciciosContent() {
             <Dumbbell className="w-7 h-7 text-muted-foreground/40" />
           </div>
           <p className="font-semibold text-muted-foreground">Nenhum exercício encontrado</p>
-          {search && (
-            <button onClick={() => setSearch('')} className="text-sm text-brand-400 mt-2 hover:underline">
-              Limpar busca
+          {hasActiveFilter && (
+            <button
+              onClick={() => { setSearch(''); setSelectedMuscle(null); setSelectedDifficulty(null) }}
+              className="text-sm text-brand-400 mt-2 hover:underline"
+            >
+              Limpar filtros
             </button>
           )}
         </motion.div>
       )}
 
-      {/* Modal */}
       <AnimatePresence>
         {showModal && (
           <NewExerciseModal
