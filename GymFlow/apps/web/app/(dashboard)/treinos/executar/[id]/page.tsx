@@ -35,7 +35,7 @@ interface SetData {
 export default function ExecutarTreinoPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const { currentAcademy } = useAuthStore()
+  const { currentAcademy, profile } = useAuthStore()
   const supabase = createClient()
 
   const [exercises, setExercises] = useState<ExerciseSlot[]>([])
@@ -49,6 +49,7 @@ export default function ExecutarTreinoPage() {
   const [restTimer, setRestTimer] = useState<number | null>(null)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [isCompleted, setIsCompleted] = useState(false)
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -97,18 +98,38 @@ export default function ExecutarTreinoPage() {
       }
 
       setExercises(slots)
-      setSetData(
-        Object.fromEntries(
-          slots.map((ex) => [
-            ex.sheetExerciseId,
-            Array.from({ length: ex.sets }, () => ({
-              weight: ex.weightSuggestion ?? '',
-              reps: '' as number | '',
-              done: false,
-            })),
-          ])
-        )
+
+      const defaultSetData = Object.fromEntries(
+        slots.map((ex) => [
+          ex.sheetExerciseId,
+          Array.from({ length: ex.sets }, () => ({
+            weight: ex.weightSuggestion ?? '',
+            reps: '' as number | '',
+            done: false,
+          })),
+        ])
       )
+
+      const draftKey = profile?.id ? `gymflow_draft_${profile.id}_${id}` : null
+      let restored = false
+      if (draftKey) {
+        try {
+          const raw = localStorage.getItem(draftKey)
+          if (raw) {
+            const draft = JSON.parse(raw) as { setData: Record<string, SetData[]>; timer: number; exerciseIdx: number }
+            const compatible = slots.every((s) => draft.setData[s.sheetExerciseId] !== undefined)
+            if (compatible) {
+              setSetData(draft.setData)
+              setTimer(draft.timer)
+              setExerciseIdx(Math.min(draft.exerciseIdx, slots.length - 1))
+              setHasRestoredDraft(true)
+              restored = true
+            }
+          }
+        } catch { /* draft inválido — ignorar */ }
+      }
+      if (!restored) setSetData(defaultSetData)
+
       setLoading(false)
     }
     load()
@@ -134,6 +155,25 @@ export default function ExecutarTreinoPage() {
     }),
     restTimer !== null ? 1000 : null
   )
+
+  const draftKey = profile?.id ? `gymflow_draft_${profile.id}_${id}` : null
+
+  // Persist draft on set data / navigation changes
+  useEffect(() => {
+    if (!draftKey || exercises.length === 0 || isCompleted) return
+    localStorage.setItem(draftKey, JSON.stringify({ setData, timer, exerciseIdx }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setData, exerciseIdx])
+
+  // Keep timer in sync every 10s
+  useInterval(() => {
+    if (!draftKey || exercises.length === 0 || isCompleted) return
+    const raw = localStorage.getItem(draftKey)
+    if (!raw) return
+    try {
+      localStorage.setItem(draftKey, JSON.stringify({ ...JSON.parse(raw), timer }))
+    } catch { /* ignore */ }
+  }, !loading && !isCompleted && !!draftKey && exercises.length > 0 ? 10000 : null)
 
   const exercise = exercises[exerciseIdx]
   const exerciseSets = exercise ? (setData[exercise.sheetExerciseId] ?? []) : []
@@ -209,6 +249,7 @@ export default function ExecutarTreinoPage() {
         if (setsError) throw setsError
       }
 
+      if (draftKey) localStorage.removeItem(draftKey)
       setIsCompleted(true)
     } catch (err: unknown) {
       toast.error((err as Error).message ?? 'Erro ao salvar treino.')
@@ -230,7 +271,7 @@ export default function ExecutarTreinoPage() {
       <WorkoutComplete
         timer={timer}
         completedSets={completedSets}
-        onViewProgress={() => router.push('/frequencia')}
+        onViewProgress={() => router.push('/evolucao')}
         onExit={() => router.push('/treinos')}
       />
     )
@@ -261,6 +302,26 @@ export default function ExecutarTreinoPage() {
           {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
         </button>
       </div>
+
+      {/* Draft restored banner */}
+      <AnimatePresence>
+        {hasRestoredDraft && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="flex items-center justify-between px-4 py-2.5 rounded-xl border border-amber-500/20 bg-amber-500/8 text-sm"
+          >
+            <span className="text-amber-400 font-medium">↩ Treino anterior restaurado</span>
+            <button
+              onClick={() => setHasRestoredDraft(false)}
+              className="text-muted-foreground hover:text-foreground text-xs ml-3"
+            >
+              ok
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Progress */}
       <div className="glass rounded-2xl p-4">

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -43,6 +44,10 @@ const strengthColors = ['bg-red-500', 'bg-red-400', 'bg-amber-400', 'bg-amber-30
 
 export default function CadastroPage() {
   const { signUp } = useAuth()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const inviteToken = searchParams.get('token')
+
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
@@ -58,6 +63,10 @@ export default function CadastroPage() {
     defaultValues: { type: 'owner' },
   })
 
+  useEffect(() => {
+    if (inviteToken) setValue('type', 'student')
+  }, [inviteToken, setValue])
+
   const password = watch('password', '')
   const selectedType = watch('type')
   const strength = passwordStrength(password)
@@ -67,6 +76,10 @@ export default function CadastroPage() {
     setServerError(null)
     try {
       await signUp(data.email, data.password, data.fullName, data.type)
+      if (inviteToken) {
+        router.push(`/convite/${inviteToken}`)
+        return
+      }
     } catch (err: unknown) {
       const msg = (err as Error).message
       if (msg.includes('already registered')) {
@@ -94,9 +107,19 @@ export default function CadastroPage() {
       <motion.div variants={fadeUp} custom={0} className="space-y-1.5">
         <h1 className="text-2xl font-display font-bold">Criar sua conta</h1>
         <p className="text-sm text-muted-foreground">
-          Grátis para sempre, sem cartão de crédito
+          {inviteToken ? 'Crie sua conta para aceitar o convite' : 'Grátis para sempre, sem cartão de crédito'}
         </p>
       </motion.div>
+
+      {/* Invite banner */}
+      {inviteToken && (
+        <motion.div variants={fadeUp} custom={0.5}
+          className="flex items-center gap-2.5 p-3.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 text-sm"
+        >
+          <Check className="w-4 h-4 flex-shrink-0" />
+          Convite válido — após criar a conta você entrará automaticamente para a academia.
+        </motion.div>
+      )}
 
       {/* Account type */}
       <motion.div variants={fadeUp} custom={1} className="space-y-2">

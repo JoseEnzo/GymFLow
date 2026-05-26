@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, Dumbbell, Clock, Target, Users, Play,
   Plus, Trash2, ChevronRight, Loader2, Edit2, Check,
-  ClipboardList,
+  ClipboardList, CalendarDays,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -45,8 +45,44 @@ interface WorkoutSheet {
   description: string | null
   is_active: boolean
   created_at: string
+  scheduled_days: number[]
   student?: { full_name: string | null } | null
   exercises: SheetExercise[]
+}
+
+const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+
+function DayPicker({ days, onChange, saving }: {
+  days: number[]
+  onChange: (days: number[]) => void
+  saving: boolean
+}) {
+  function toggle(d: number) {
+    onChange(days.includes(d) ? days.filter((x) => x !== d) : [...days, d].sort())
+  }
+
+  return (
+    <div className="flex gap-1.5 flex-wrap">
+      {DAY_LABELS.map((label, i) => {
+        const active = days.includes(i)
+        return (
+          <button
+            key={i}
+            onClick={() => toggle(i)}
+            disabled={saving}
+            className={cn(
+              'w-10 h-10 rounded-xl text-xs font-bold transition-all',
+              active
+                ? 'bg-brand-500 text-white shadow-[0_0_12px_rgba(29,158,117,0.3)]'
+                : 'bg-surface-200 text-muted-foreground hover:text-foreground hover:bg-surface-300'
+            )}
+          >
+            {label}
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 function ExerciseRow({ ex, isPersonal, onDelete }: {
@@ -126,6 +162,7 @@ export default function WorkoutSheetDetailPage() {
   const [sheet, setSheet] = useState<WorkoutSheet | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [savingDays, setSavingDays] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -135,7 +172,7 @@ export default function WorkoutSheetDetailPage() {
       const { data, error } = await (supabase as any)
         .from('workout_sheets')
         .select(`
-          id, name, goal, description, is_active, created_at,
+          id, name, goal, description, is_active, created_at, scheduled_days,
           sheet_exercises (
             id, sets, reps, rest_seconds, weight_suggestion, notes, order_index,
             exercise:exercises ( id, name_pt, muscle_groups )
@@ -149,6 +186,7 @@ export default function WorkoutSheetDetailPage() {
 
       setSheet({
         ...data,
+        scheduled_days: data.scheduled_days ?? [],
         exercises: (data.sheet_exercises ?? []).sort(
           (a: SheetExercise, b: SheetExercise) => a.order_index - b.order_index
         ),
@@ -157,6 +195,20 @@ export default function WorkoutSheetDetailPage() {
     }
     load()
   }, [id, currentAcademy])
+
+  async function handleScheduledDaysChange(days: number[]) {
+    if (!sheet) return
+    setSheet((prev) => prev ? { ...prev, scheduled_days: days } : prev)
+    setSavingDays(true)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
+      .from('workout_sheets')
+      .update({ scheduled_days: days })
+      .eq('id', sheet.id)
+    setSavingDays(false)
+    if (error) { toast.error('Erro ao salvar dias.'); return }
+    toast.success('Dias atualizados.')
+  }
 
   async function handleDeleteExercise(exerciseId: string) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -246,8 +298,34 @@ export default function WorkoutSheetDetailPage() {
         )}
       </motion.div>
 
+      {/* Scheduled days — personal only */}
+      {isPersonal && (
+        <motion.div custom={3} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-brand-400" />
+              <h3 className="font-display font-bold text-sm">Dias da semana</h3>
+            </div>
+            {savingDays && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Selecione os dias em que o aluno deve realizar este treino.
+          </p>
+          <DayPicker
+            days={sheet.scheduled_days}
+            onChange={handleScheduledDaysChange}
+            saving={savingDays}
+          />
+          {sheet.scheduled_days.length === 0 && (
+            <p className="text-[11px] text-muted-foreground/60 italic mt-3">
+              Nenhum dia selecionado — este treino não aparecerá na agenda do aluno.
+            </p>
+          )}
+        </motion.div>
+      )}
+
       {/* Exercises */}
-      <motion.div custom={3} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5">
+      <motion.div custom={4} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-display font-bold text-sm">
             Exercícios ({sheet.exercises.length})
