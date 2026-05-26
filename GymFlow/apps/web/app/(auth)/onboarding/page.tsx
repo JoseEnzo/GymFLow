@@ -1,19 +1,31 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Dumbbell, ArrowRight, Check, Loader2, Building2, Users } from 'lucide-react'
+import { Dumbbell, ArrowRight, Check, Loader2, Building2, Users, Search, AlertCircle, CheckCircle2, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
+import type { CNPJData } from '@/lib/cnpj'
+import { searchPlaces } from '@/lib/places'
+import type { PlaceDetails } from '@/lib/places'
 import { cn } from '@/lib/utils'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
   show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] } },
   exit: { opacity: 0, y: -12, transition: { duration: 0.25 } },
+}
+
+function maskCNPJ(value: string): string {
+  const d = value.replace(/\D/g, '').slice(0, 14)
+  if (d.length <= 2) return d
+  if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`
+  if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`
+  if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
 }
 
 const GOALS = [
@@ -48,6 +60,56 @@ function OnboardingContent() {
 
   // Owner state
   const [academyName, setAcademyName] = useState('')
+  const [cnpj, setCnpj] = useState('')
+  const [cnpjData, setCnpjData] = useState<CNPJData | null>(null)
+  const [cnpjLoading, setCnpjLoading] = useState(false)
+  const [cnpjError, setCnpjError] = useState<string | null>(null)
+  const [placesResults, setPlacesResults] = useState<PlaceDetails[]>([])
+  const [placesLoading, setPlacesLoading] = useState(false)
+  const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null)
+
+  useEffect(() => {
+    const digits = cnpj.replace(/\D/g, '')
+    if (digits.length !== 14) {
+      setCnpjData(null)
+      setCnpjError(null)
+      return
+    }
+    let cancelled = false
+    setCnpjLoading(true)
+    setCnpjError(null)
+    fetch(`/api/cnpj?cnpj=${digits}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return
+        if (data.error) {
+          setCnpjError(data.error)
+          setCnpjData(null)
+        } else {
+          setCnpjData(data as CNPJData)
+          setAcademyName(data.nomeFantasia || data.razaoSocial)
+          setCnpjError(null)
+        }
+      })
+      .catch(() => { if (!cancelled) setCnpjError('Erro ao consultar CNPJ. Tente novamente.') })
+      .finally(() => { if (!cancelled) setCnpjLoading(false) })
+    return () => { cancelled = true }
+  }, [cnpj])
+
+  useEffect(() => {
+    if (accountType !== 'owner') return
+    if (academyName.trim().length < 3) { setPlacesResults([]); return }
+    setPlacesLoading(true)
+    const query = cnpjData ? `${academyName} ${cnpjData.endereco.municipio}` : academyName
+    let cancelled = false
+    const timer = setTimeout(() => {
+      searchPlaces(query)
+        .then((r) => { if (!cancelled) setPlacesResults(r.slice(0, 4)) })
+        .catch(() => {})
+        .finally(() => { if (!cancelled) setPlacesLoading(false) })
+    }, 700)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [academyName, cnpjData, accountType])
 
   const totalSteps = accountType === 'student' ? 2 : 1
 
@@ -94,6 +156,18 @@ function OnboardingContent() {
         name: academyName,
         slug: `${slug}-${Date.now().toString(36)}`,
         plan: 'free',
+        ...(cnpjData ? {
+          cnpj: cnpjData.cnpj,
+          email: cnpjData.email,
+          phone: cnpjData.telefone,
+          address_city: cnpjData.endereco.municipio,
+          address_state: cnpjData.endereco.uf,
+        } : {}),
+        ...(selectedPlace ? {
+          place_id: selectedPlace.placeId,
+          latitude: selectedPlace.geometry?.lat ?? null,
+          longitude: selectedPlace.geometry?.lng ?? null,
+        } : {}),
       })
 
       if (error) throw error
@@ -309,8 +383,41 @@ function OnboardingContent() {
               </div>
 
               <div className="space-y-4">
+                {/* CNPJ */}
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Nome da academia</label>
+                  <label className="text-sm font-medium">CNPJ</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={cnpj}
+                      onChange={(e) => setCnpj(maskCNPJ(e.target.value))}
+                      placeholder="00.000.000/0000-00"
+                      inputMode="numeric"
+                      className="field pr-10"
+                    />
+                    <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                      {cnpjLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                      {!cnpjLoading && cnpjData && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                      {!cnpjLoading && cnpjError && <AlertCircle className="w-4 h-4 text-red-400" />}
+                      {!cnpjLoading && !cnpjData && !cnpjError && cnpj.replace(/\D/g, '').length < 14 && (
+                        <Search className="w-4 h-4 text-muted-foreground/40" />
+                      )}
+                    </div>
+                  </div>
+                  {cnpjError && <p className="text-xs text-red-400">{cnpjError}</p>}
+                  {cnpjData && (
+                    <p className="text-xs text-emerald-400">
+                      {cnpjData.situacao === 'ATIVA' ? '✓ CNPJ ativo' : `Situação: ${cnpjData.situacao}`} — {cnpjData.razaoSocial}
+                    </p>
+                  )}
+                </div>
+
+                {/* Academy name — preenchido automaticamente ou manual */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">
+                    Nome da academia
+                    {cnpjData && <span className="ml-2 text-[10px] text-brand-400 font-normal">preenchido automaticamente</span>}
+                  </label>
                   <input
                     type="text"
                     value={academyName}
@@ -319,6 +426,86 @@ function OnboardingContent() {
                     className="field"
                   />
                 </div>
+
+                {/* Google Places results */}
+                {!selectedPlace && (placesLoading || placesResults.length > 0) && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      {placesLoading ? 'Buscando no Google Maps...' : 'Selecione sua academia para vincular ao Google:'}
+                    </p>
+                    {placesLoading && (
+                      <div className="flex justify-center py-3">
+                        <Loader2 className="w-4 h-4 animate-spin text-brand-400" />
+                      </div>
+                    )}
+                    {!placesLoading && placesResults.map((place) => (
+                      <button
+                        key={place.placeId}
+                        onClick={() => {
+                          setSelectedPlace(place)
+                          setPlacesResults([])
+                          setAcademyName(place.name)
+                        }}
+                        className="w-full flex items-start gap-3 p-3 rounded-xl border border-border/60 hover:border-brand-500/40 hover:bg-brand-500/5 text-left transition-all"
+                      >
+                        <MapPin className="w-4 h-4 text-brand-400 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate">{place.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{place.formattedAddress}</p>
+                          {place.rating && (
+                            <p className="text-[11px] text-amber-400 mt-0.5">★ {place.rating}</p>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Selected place confirmation */}
+                {selectedPlace && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="glass rounded-2xl p-4 space-y-1.5 border border-brand-500/20 bg-brand-500/5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-brand-400">Academia vinculada ao Google Maps</p>
+                      <button
+                        onClick={() => setSelectedPlace(null)}
+                        className="text-[11px] text-muted-foreground hover:text-foreground"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                    <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                      <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-brand-400" />
+                      <span>{selectedPlace.formattedAddress}</span>
+                    </div>
+                    {selectedPlace.rating && (
+                      <p className="text-[11px] text-amber-400">★ {selectedPlace.rating} no Google</p>
+                    )}
+                  </motion.div>
+                )}
+
+                {/* CNPJ enriched info card */}
+                {cnpjData && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="glass rounded-2xl p-4 space-y-2 border border-emerald-500/20 bg-emerald-500/5"
+                  >
+                    <p className="text-xs font-semibold text-emerald-400">Dados preenchidos via Receita Federal</p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      {cnpjData.email && <span>✉ {cnpjData.email}</span>}
+                      {cnpjData.telefone && <span>📞 {cnpjData.telefone}</span>}
+                      {cnpjData.endereco.municipio && (
+                        <span className="col-span-2">
+                          📍 {cnpjData.endereco.municipio}, {cnpjData.endereco.uf}
+                        </span>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
 
                 <div className="glass rounded-2xl p-4 flex gap-3">
                   <div className="w-9 h-9 rounded-xl bg-brand-500/15 flex items-center justify-center flex-shrink-0">

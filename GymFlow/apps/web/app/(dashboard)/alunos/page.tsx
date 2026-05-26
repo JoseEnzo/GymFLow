@@ -100,7 +100,7 @@ function StudentCard({ student }: { student: Student }) {
   )
 }
 
-function InvitePanel({ onClose, academyId }: { onClose: () => void; academyId: string }) {
+function InvitePanel({ onClose, academyId, role }: { onClose: () => void; academyId: string; role: 'student' | 'personal' }) {
   const [inviteCode, setInviteCode] = useState<string | null>(null)
   const [inviteLink, setInviteLink] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
@@ -122,7 +122,7 @@ function InvitePanel({ onClose, academyId }: { onClose: () => void; academyId: s
         created_by: user.id,
         code,
         token,
-        role: 'student',
+        role,
         expires_at: expiresAt,
         uses_limit: 1,
       })
@@ -138,6 +138,8 @@ function InvitePanel({ onClose, academyId }: { onClose: () => void; academyId: s
 
   useEffect(() => { generateInvite() }, [])
 
+  const label = role === 'personal' ? 'personal' : 'aluno'
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -146,7 +148,7 @@ function InvitePanel({ onClose, academyId }: { onClose: () => void; academyId: s
       className="glass rounded-2xl p-5 border border-brand-500/20 shadow-glow-sm"
     >
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-display font-bold">Convidar aluno</h3>
+        <h3 className="font-display font-bold">Convidar {label}</h3>
         <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xs">
           Fechar
         </button>
@@ -159,7 +161,7 @@ function InvitePanel({ onClose, academyId }: { onClose: () => void; academyId: s
       ) : (
         <div className="space-y-3">
           <div>
-            <p className="text-xs text-muted-foreground mb-2">Código de convite (válido por 7 dias)</p>
+            <p className="text-xs text-muted-foreground mb-2">Código de convite de {label} (válido por 7 dias)</p>
             <div className="flex items-center gap-2">
               <div className="flex-1 font-mono font-black text-2xl text-center tracking-[0.3em] py-3 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-300">
                 {inviteCode}
@@ -197,11 +199,11 @@ function InvitePanel({ onClose, academyId }: { onClose: () => void; academyId: s
 
 export default function AlunosPage() {
   const [search, setSearch] = useState('')
-  const [showInvite, setShowInvite] = useState(false)
+  const [inviteRole, setInviteRole] = useState<'student' | 'personal' | null>(null)
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
-  const { currentAcademy } = useAuthStore()
+  const { currentAcademy, currentRole } = useAuthStore()
   const supabase = createClient()
 
   useEffect(() => {
@@ -272,19 +274,30 @@ export default function AlunosPage() {
           </p>
         </div>
         {currentAcademy && (
-          <button
-            onClick={() => setShowInvite(!showInvite)}
-            className="btn-primary text-sm py-2.5 px-5 rounded-xl"
-          >
-            <UserPlus className="w-4 h-4" />
-            Convidar aluno
-          </button>
+          <div className="flex items-center gap-2">
+            {currentRole === 'owner' && (
+              <button
+                onClick={() => setInviteRole(inviteRole === 'personal' ? null : 'personal')}
+                className="btn-secondary text-sm py-2.5 px-5 rounded-xl"
+              >
+                <Dumbbell className="w-4 h-4" />
+                Convidar personal
+              </button>
+            )}
+            <button
+              onClick={() => setInviteRole(inviteRole === 'student' ? null : 'student')}
+              className="btn-primary text-sm py-2.5 px-5 rounded-xl"
+            >
+              <UserPlus className="w-4 h-4" />
+              Convidar aluno
+            </button>
+          </div>
         )}
       </motion.div>
 
       {/* Invite panel */}
-      {showInvite && currentAcademy && (
-        <InvitePanel onClose={() => setShowInvite(false)} academyId={currentAcademy.id} />
+      {inviteRole && currentAcademy && (
+        <InvitePanel onClose={() => setInviteRole(null)} academyId={currentAcademy.id} role={inviteRole} />
       )}
 
       {/* Filters */}
@@ -348,7 +361,7 @@ export default function AlunosPage() {
           </p>
           {currentAcademy && (
             <button
-              onClick={() => setShowInvite(true)}
+              onClick={() => setInviteRole('student')}
               className="btn-primary text-sm py-2.5 px-5 rounded-xl mt-4 inline-flex items-center gap-2"
             >
               <UserPlus className="w-4 h-4" /> Convidar primeiro aluno
