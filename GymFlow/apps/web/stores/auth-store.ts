@@ -30,16 +30,21 @@ export const useAuthStore = create<AuthState>()(
           set({ currentAcademy: academy, currentRole: role }),
 
         setAcademies: (academies) => {
-          set({ academies })
-          // Auto-select first academy if none selected
           set((state) => {
-            if (!state.currentAcademy && academies.length > 0) {
-              return {
-                currentAcademy: academies[0]!.academy,
-                currentRole: academies[0]!.role,
+            // If current academy is in the list, always sync the role from DB
+            if (state.currentAcademy) {
+              const match = academies.find((a) => a.academy.id === state.currentAcademy!.id)
+              if (match) {
+                return { academies, currentAcademy: match.academy, currentRole: match.role }
               }
             }
-            return {}
+            // No current selection or current academy not found — select first or clear
+            const first = academies[0]
+            return {
+              academies,
+              currentAcademy: first?.academy ?? null,
+              currentRole: first?.role ?? null,
+            }
           })
         },
 

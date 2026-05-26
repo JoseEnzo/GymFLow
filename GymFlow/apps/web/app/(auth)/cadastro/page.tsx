@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Eye, EyeOff, Loader2, AlertCircle, Check } from 'lucide-react'
+import { Eye, EyeOff, Loader2, AlertCircle, Check, Building2, Dumbbell, ArrowLeft } from 'lucide-react'
 
 import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
@@ -21,7 +21,6 @@ const schema = z.object({
     .regex(/[A-Z]/, 'Deve conter letra maiúscula')
     .regex(/[0-9]/, 'Deve conter número'),
   confirmPassword: z.string(),
-  type: z.enum(['owner', 'student']),
 }).refine((d) => d.password === d.confirmPassword, {
   message: 'Senhas não coincidem',
   path: ['confirmPassword'],
@@ -42,12 +41,48 @@ const passwordStrength = (pwd: string) => {
 const strengthLabels = ['Muito fraca', 'Fraca', 'Regular', 'Boa', 'Forte', 'Excelente']
 const strengthColors = ['bg-red-500', 'bg-red-400', 'bg-amber-400', 'bg-amber-300', 'bg-emerald-400', 'bg-emerald-500']
 
-export default function CadastroPage() {
+const fadeUp = {
+  hidden: { opacity: 0, y: 14 },
+  show: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.06, duration: 0.45, ease: [0.16, 1, 0.3, 1] },
+  }),
+}
+
+const TYPES = [
+  {
+    value: 'owner' as const,
+    icon: Building2,
+    title: 'Tenho uma academia',
+    description: 'Gerencie alunos, personais e fichas de treino',
+    color: '#1D9E75',
+    bg: 'bg-brand-500/8',
+    border: 'border-brand-500/40',
+    iconBg: 'bg-brand-500/15',
+    iconColor: 'text-brand-400',
+  },
+  {
+    value: 'student' as const,
+    icon: Dumbbell,
+    title: 'Sou aluno',
+    description: 'Acesse seus treinos e acompanhe sua evolução',
+    color: '#6366F1',
+    bg: 'bg-indigo-500/8',
+    border: 'border-indigo-500/40',
+    iconBg: 'bg-indigo-500/15',
+    iconColor: 'text-indigo-400',
+  },
+]
+
+function CadastroInner() {
   const { signUp } = useAuth()
-  const router = useRouter()
   const searchParams = useSearchParams()
   const inviteToken = searchParams.get('token')
 
+  // If arriving via invite, skip type selection — they're always a student
+  const [step, setStep] = useState<0 | 1>(inviteToken ? 1 : 0)
+  const [accountType, setAccountType] = useState<'owner' | 'student'>(inviteToken ? 'student' : 'owner')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
@@ -56,19 +91,10 @@ export default function CadastroPage() {
     register,
     handleSubmit,
     watch,
-    setValue,
     formState: { errors },
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: { type: 'owner' },
-  })
-
-  useEffect(() => {
-    if (inviteToken) setValue('type', 'student')
-  }, [inviteToken, setValue])
+  } = useForm<FormData>({ resolver: zodResolver(schema) })
 
   const password = watch('password', '')
-  const selectedType = watch('type')
   const strength = passwordStrength(password)
 
   async function onSubmit(data: FormData) {
@@ -76,7 +102,7 @@ export default function CadastroPage() {
     setServerError(null)
     try {
       const redirectTo = inviteToken ? `/convite/${inviteToken}` : undefined
-      await signUp(data.email, data.password, data.fullName, data.type, redirectTo)
+      await signUp(data.email, data.password, data.fullName, accountType, redirectTo)
     } catch (err: unknown) {
       const msg = (err as Error).message
       if (msg.includes('already registered')) {
@@ -89,206 +115,262 @@ export default function CadastroPage() {
     }
   }
 
-  const fadeUp = {
-    hidden: { opacity: 0, y: 14 },
-    show: (i: number) => ({
-      opacity: 1,
-      y: 0,
-      transition: { delay: i * 0.06, duration: 0.45, ease: [0.16, 1, 0.3, 1] },
-    }),
-  }
+  const selectedType = TYPES.find((t) => t.value === accountType)!
 
   return (
     <motion.div initial="hidden" animate="show" className="space-y-6">
-      {/* Header */}
-      <motion.div variants={fadeUp} custom={0} className="space-y-1.5">
-        <h1 className="text-2xl font-display font-bold">Criar sua conta</h1>
-        <p className="text-sm text-muted-foreground">
-          {inviteToken ? 'Crie sua conta para aceitar o convite' : 'Grátis para sempre, sem cartão de crédito'}
-        </p>
-      </motion.div>
+      <AnimatePresence mode="wait">
 
-      {/* Invite banner */}
-      {inviteToken && (
-        <motion.div variants={fadeUp} custom={0.5}
-          className="flex items-center gap-2.5 p-3.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 text-sm"
-        >
-          <Check className="w-4 h-4 flex-shrink-0" />
-          Convite válido — após criar a conta você entrará automaticamente para a academia.
-        </motion.div>
-      )}
-
-      {/* Account type */}
-      <motion.div variants={fadeUp} custom={1} className="space-y-2">
-        <label className="text-sm font-medium">Tipo de conta</label>
-        <div className="grid grid-cols-2 gap-2">
-          {([
-            { value: 'owner', label: '🏢 Academia', desc: 'Dono ou gestor' },
-            { value: 'student', label: '🎯 Aluno', desc: 'Via convite' },
-          ] as const).map(({ value, label, desc }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setValue('type', value)}
-              className={cn(
-                'p-3 rounded-xl border text-left transition-all duration-200',
-                selectedType === value
-                  ? 'border-brand-500/50 bg-brand-500/8 text-foreground shadow-glow-sm'
-                  : 'border-border/60 hover:border-border text-muted-foreground hover:bg-surface-100'
-              )}
-            >
-              <p className="text-sm font-semibold">{label}</p>
-              <p className="text-xs mt-0.5 opacity-70">{desc}</p>
-            </button>
-          ))}
-        </div>
-      </motion.div>
-
-      {/* Error */}
-      <AnimatePresence>
-        {serverError && (
+        {/* ── Etapa 0: escolha de tipo ── */}
+        {step === 0 && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.97 }}
-            className="flex items-center gap-2.5 p-3.5 rounded-xl bg-destructive/10 border border-destructive/20 text-red-400 text-sm"
+            key="step-type"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-6"
           >
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            {serverError}
+            <div className="space-y-1.5">
+              <h1 className="text-2xl font-display font-bold">Como você vai usar o GymFlow?</h1>
+              <p className="text-sm text-muted-foreground">Escolha o perfil que melhor descreve você</p>
+            </div>
+
+            <div className="space-y-3">
+              {TYPES.map((type) => {
+                const Icon = type.icon
+                const selected = accountType === type.value
+                return (
+                  <button
+                    key={type.value}
+                    type="button"
+                    onClick={() => {
+                      setAccountType(type.value)
+                      setStep(1)
+                    }}
+                    className={cn(
+                      'w-full flex items-center gap-4 p-5 rounded-2xl border-2 text-left transition-all duration-200 group',
+                      selected
+                        ? `${type.bg} ${type.border}`
+                        : 'border-border/60 hover:border-border bg-surface-100/50 hover:bg-surface-100'
+                    )}
+                  >
+                    <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-all', type.iconBg)}>
+                      <Icon className={cn('w-5 h-5', type.iconColor)} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-base">{type.title}</p>
+                      <p className="text-sm text-muted-foreground mt-0.5">{type.description}</p>
+                    </div>
+                    <div className={cn(
+                      'w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all',
+                      selected ? `border-current ${type.iconColor}` : 'border-border'
+                    )}>
+                      {selected && <div className="w-2.5 h-2.5 rounded-full bg-current" />}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            <p className="text-center text-sm text-muted-foreground">
+              Já tem uma conta?{' '}
+              <Link href="/login" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
+                Fazer login
+              </Link>
+            </p>
           </motion.div>
         )}
-      </AnimatePresence>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        {/* Name */}
-        <motion.div variants={fadeUp} custom={2} className="space-y-1.5">
-          <label className="text-sm font-medium">Nome completo</label>
-          <input
-            {...register('fullName')}
-            type="text"
-            placeholder="João da Silva"
-            autoComplete="name"
-            className={cn('field', errors.fullName && 'border-destructive/60')}
-          />
-          {errors.fullName && (
-            <p className="text-xs text-red-400">{errors.fullName.message}</p>
-          )}
-        </motion.div>
-
-        {/* Email */}
-        <motion.div variants={fadeUp} custom={3} className="space-y-1.5">
-          <label className="text-sm font-medium">E-mail</label>
-          <input
-            {...register('email')}
-            type="email"
-            placeholder="seu@email.com"
-            autoComplete="email"
-            className={cn('field', errors.email && 'border-destructive/60')}
-          />
-          {errors.email && (
-            <p className="text-xs text-red-400">{errors.email.message}</p>
-          )}
-        </motion.div>
-
-        {/* Password */}
-        <motion.div variants={fadeUp} custom={4} className="space-y-1.5">
-          <label className="text-sm font-medium">Senha</label>
-          <div className="relative">
-            <input
-              {...register('password')}
-              type={showPassword ? 'text' : 'password'}
-              placeholder="••••••••"
-              autoComplete="new-password"
-              className={cn('field pr-11', errors.password && 'border-destructive/60')}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-
-          {/* Strength indicator */}
-          {password && (
+        {/* ── Etapa 1: formulário ── */}
+        {step === 1 && (
+          <motion.div
+            key="step-form"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-5"
+          >
+            {/* Header */}
             <div className="space-y-1.5">
-              <div className="flex gap-1">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      'flex-1 h-1 rounded-full transition-all duration-300',
-                      i <= strength ? strengthColors[strength] ?? 'bg-surface-300' : 'bg-surface-200'
-                    )}
-                  />
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Força: <span className="text-foreground font-medium">{strengthLabels[strength]}</span>
+              {!inviteToken && (
+                <button
+                  type="button"
+                  onClick={() => setStep(0)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-3"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Voltar
+                </button>
+              )}
+              <h1 className="text-2xl font-display font-bold">Criar sua conta</h1>
+              <p className="text-sm text-muted-foreground">
+                {inviteToken ? 'Crie sua conta para aceitar o convite' : 'Grátis para sempre, sem cartão de crédito'}
               </p>
             </div>
-          )}
 
-          {errors.password && (
-            <p className="text-xs text-red-400">{errors.password.message}</p>
-          )}
-        </motion.div>
-
-        {/* Confirm Password */}
-        <motion.div variants={fadeUp} custom={5} className="space-y-1.5">
-          <label className="text-sm font-medium">Confirmar senha</label>
-          <div className="relative">
-            <input
-              {...register('confirmPassword')}
-              type="password"
-              placeholder="••••••••"
-              autoComplete="new-password"
-              className={cn('field pr-11', errors.confirmPassword && 'border-destructive/60')}
-            />
-            {password && watch('confirmPassword') === password && (
-              <div className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                <Check className="w-3 h-3 text-emerald-400" />
+            {/* Type badge */}
+            {!inviteToken && (
+              <div className={cn(
+                'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border',
+                selectedType.bg, selectedType.border, selectedType.iconColor
+              )}>
+                <selectedType.icon className="w-3.5 h-3.5" />
+                {selectedType.title}
               </div>
             )}
-          </div>
-          {errors.confirmPassword && (
-            <p className="text-xs text-red-400">{errors.confirmPassword.message}</p>
-          )}
-        </motion.div>
 
-        {/* Terms */}
-        <motion.div variants={fadeUp} custom={6}>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Ao criar a conta você aceita nossos{' '}
-            <a href="#" className="text-brand-400 hover:underline">Termos de Uso</a>
-            {' '}e{' '}
-            <a href="#" className="text-brand-400 hover:underline">Política de Privacidade</a>.
-          </p>
-        </motion.div>
-
-        {/* Submit */}
-        <motion.div variants={fadeUp} custom={7}>
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm"
-          >
-            {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              'Criar conta gratuita'
+            {/* Invite banner */}
+            {inviteToken && (
+              <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 text-sm">
+                <Check className="w-4 h-4 flex-shrink-0" />
+                Convite válido — após criar a conta você entrará automaticamente para a academia.
+              </div>
             )}
-          </button>
-        </motion.div>
-      </form>
 
-      <motion.p variants={fadeUp} custom={8} className="text-center text-sm text-muted-foreground">
-        Já tem uma conta?{' '}
-        <Link href="/login" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
-          Fazer login
-        </Link>
-      </motion.p>
+            {/* Error */}
+            <AnimatePresence>
+              {serverError && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.97 }}
+                  className="flex items-center gap-2.5 p-3.5 rounded-xl bg-destructive/10 border border-destructive/20 text-red-400 text-sm"
+                >
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  {serverError}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              {/* Name */}
+              <motion.div variants={fadeUp} custom={0} className="space-y-1.5">
+                <label className="text-sm font-medium">Nome completo</label>
+                <input
+                  {...register('fullName')}
+                  type="text"
+                  placeholder="João da Silva"
+                  autoComplete="name"
+                  className={cn('field', errors.fullName && 'border-destructive/60')}
+                />
+                {errors.fullName && <p className="text-xs text-red-400">{errors.fullName.message}</p>}
+              </motion.div>
+
+              {/* Email */}
+              <motion.div variants={fadeUp} custom={1} className="space-y-1.5">
+                <label className="text-sm font-medium">E-mail</label>
+                <input
+                  {...register('email')}
+                  type="email"
+                  placeholder="seu@email.com"
+                  autoComplete="email"
+                  className={cn('field', errors.email && 'border-destructive/60')}
+                />
+                {errors.email && <p className="text-xs text-red-400">{errors.email.message}</p>}
+              </motion.div>
+
+              {/* Password */}
+              <motion.div variants={fadeUp} custom={2} className="space-y-1.5">
+                <label className="text-sm font-medium">Senha</label>
+                <div className="relative">
+                  <input
+                    {...register('password')}
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    className={cn('field pr-11', errors.password && 'border-destructive/60')}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {password && (
+                  <div className="space-y-1.5">
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <div
+                          key={i}
+                          className={cn(
+                            'flex-1 h-1 rounded-full transition-all duration-300',
+                            i <= strength ? strengthColors[strength] ?? 'bg-surface-300' : 'bg-surface-200'
+                          )}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Força: <span className="text-foreground font-medium">{strengthLabels[strength]}</span>
+                    </p>
+                  </div>
+                )}
+                {errors.password && <p className="text-xs text-red-400">{errors.password.message}</p>}
+              </motion.div>
+
+              {/* Confirm Password */}
+              <motion.div variants={fadeUp} custom={3} className="space-y-1.5">
+                <label className="text-sm font-medium">Confirmar senha</label>
+                <div className="relative">
+                  <input
+                    {...register('confirmPassword')}
+                    type="password"
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    className={cn('field pr-11', errors.confirmPassword && 'border-destructive/60')}
+                  />
+                  {password && watch('confirmPassword') === password && (
+                    <div className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                      <Check className="w-3 h-3 text-emerald-400" />
+                    </div>
+                  )}
+                </div>
+                {errors.confirmPassword && <p className="text-xs text-red-400">{errors.confirmPassword.message}</p>}
+              </motion.div>
+
+              {/* Terms */}
+              <motion.div variants={fadeUp} custom={4}>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Ao criar a conta você aceita nossos{' '}
+                  <a href="#" className="text-brand-400 hover:underline">Termos de Uso</a>
+                  {' '}e{' '}
+                  <a href="#" className="text-brand-400 hover:underline">Política de Privacidade</a>.
+                </p>
+              </motion.div>
+
+              {/* Submit */}
+              <motion.div variants={fadeUp} custom={5}>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm"
+                >
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Criar conta gratuita'}
+                </button>
+              </motion.div>
+            </form>
+
+            <p className="text-center text-sm text-muted-foreground">
+              Já tem uma conta?{' '}
+              <Link href="/login" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
+                Fazer login
+              </Link>
+            </p>
+          </motion.div>
+        )}
+
+      </AnimatePresence>
     </motion.div>
+  )
+}
+
+export default function CadastroPage() {
+  return (
+    <Suspense>
+      <CadastroInner />
+    </Suspense>
   )
 }

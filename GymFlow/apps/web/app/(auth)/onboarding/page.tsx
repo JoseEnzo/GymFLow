@@ -151,7 +151,7 @@ function OnboardingContent() {
         .replace(/(^-|-$)/g, '')
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from('academies') as any).insert({
+      const { data: newAcademy, error } = await (supabase.from('academies') as any).insert({
         owner_id: user.id,
         name: academyName,
         slug: `${slug}-${Date.now().toString(36)}`,
@@ -168,9 +168,20 @@ function OnboardingContent() {
           latitude: selectedPlace.geometry?.lat ?? null,
           longitude: selectedPlace.geometry?.lng ?? null,
         } : {}),
-      })
+      }).select('id').single()
 
       if (error) throw error
+
+      // Insere o owner em academy_members (RLS permite auto-ingresso com auth.uid() = user_id)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: memberError } = await (supabase.from('academy_members') as any).insert({
+        academy_id: newAcademy.id,
+        user_id: user.id,
+        role: 'owner',
+        joined_at: new Date().toISOString(),
+      })
+
+      if (memberError) throw memberError
 
       // Reload academies
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

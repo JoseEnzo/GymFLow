@@ -32,6 +32,17 @@ export async function POST(request: Request) {
 
   const supabase = await createAdminClient()
 
+  // Idempotência: ignorar eventos já processados
+  const { data: existing } = await supabase
+    .from('stripe_processed_events')
+    .select('event_id')
+    .eq('event_id', event.id)
+    .maybeSingle()
+
+  if (existing) {
+    return NextResponse.json({ received: true })
+  }
+
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session
@@ -84,6 +95,10 @@ export async function POST(request: Request) {
       break
     }
   }
+
+  await supabase
+    .from('stripe_processed_events')
+    .insert({ event_id: event.id })
 
   return NextResponse.json({ received: true })
 }

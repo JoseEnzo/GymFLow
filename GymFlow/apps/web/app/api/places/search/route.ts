@@ -1,11 +1,19 @@
 import { NextResponse } from 'next/server'
 
+import { createClient } from '@/lib/supabase/server'
+
 export async function GET(request: Request) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  }
+
   const { searchParams } = new URL(request.url)
   const query = searchParams.get('query')
 
-  if (!query) {
-    return NextResponse.json({ error: 'Query obrigatória' }, { status: 400 })
+  if (!query || query.length > 100) {
+    return NextResponse.json({ error: 'Query obrigatória (máx. 100 chars)' }, { status: 400 })
   }
 
   const apiKey = process.env.GOOGLE_PLACES_API_KEY

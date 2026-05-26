@@ -49,11 +49,11 @@ export function useAuth() {
     return () => subscription.unsubscribe()
   }, [loadUserData, reset, router, supabase.auth])
 
-  async function signIn(email: string, password: string) {
+  async function signIn(email: string, password: string, redirectTo?: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
     await loadUserData()
-    router.push('/dashboard')
+    router.push(redirectTo ?? '/dashboard')
   }
 
   async function signUp(email: string, password: string, fullName: string, accountType: 'owner' | 'student' = 'owner', redirectTo?: string) {

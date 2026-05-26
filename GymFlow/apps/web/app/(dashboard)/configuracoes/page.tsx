@@ -341,11 +341,115 @@ function NotificacoesTab() {
 }
 
 // ── Plano ─────────────────────────────────────────────────
+interface StripeInvoice {
+  id: string
+  date: number
+  amount: number
+  status: string | null
+  pdfUrl: string | null
+}
+
+const PLAN_ORDER = ['free', 'starter', 'pro'] as const
+
 function PlanTab() {
   const { currentAcademy } = useAuthStore()
   const currentPlan = currentAcademy?.plan ?? 'free'
+  const status = currentAcademy?.subscription_status
+  const hasSubscription = !!currentAcademy?.stripe_subscription_id
 
-  const plans = [
+  const [loadingCheckout, setLoadingCheckout] = useState<string | null>(null)
+  const [loadingPortal, setLoadingPortal] = useState(false)
+  const [invoices, setInvoices] = useState<StripeInvoice[]>([])
+  const [periodEnd, setPeriodEnd] = useState<string | null>(null)
+  const [trialEnd, setTrialEnd] = useState<string | null>(null)
+  const [loadingInvoices, setLoadingInvoices] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('success') === '1') {
+      toast.success('Assinatura ativada! Bem-vindo ao plano pago.')
+      window.history.replaceState({}, '', '/configuracoes?tab=plano')
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!currentAcademy?.id) return
+    setLoadingInvoices(true)
+    fetch(`/api/billing/invoices?academyId=${currentAcademy.id}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setInvoices(d.invoices ?? [])
+        setPeriodEnd(d.periodEnd ?? null)
+        setTrialEnd(d.trialEnd ?? null)
+      })
+      .catch(() => {})
+      .finally(() => setLoadingInvoices(false))
+  }, [currentAcademy?.id])
+
+  async function handleUpgrade(planId: 'starter' | 'pro') {
+    if (!currentAcademy) return
+    setLoadingCheckout(planId)
+    try {
+      const res = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ academyId: currentAcademy.id, planId }),
+      })
+      const { url, error } = await res.json()
+      if (error) throw new Error(error)
+      window.location.href = url
+    } catch (err: unknown) {
+      toast.error((err as Error).message)
+      setLoadingCheckout(null)
+    }
+  }
+
+  async function handlePortal() {
+    if (!currentAcademy) return
+    setLoadingPortal(true)
+    try {
+      const res = await fetch('/api/billing/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ academyId: currentAcademy.id }),
+      })
+      const { url, error } = await res.json()
+      if (error) throw new Error(error)
+      window.location.href = url
+    } catch (err: unknown) {
+      toast.error((err as Error).message)
+    } finally {
+      setLoadingPortal(false)
+    }
+  }
+
+  function statusLabel() {
+    if (status === 'trialing') {
+      const endDate = trialEnd ?? currentAcademy?.trial_ends_at ?? null
+      if (endDate) {
+        const days = Math.ceil((new Date(endDate).getTime() - Date.now()) / 86_400_000)
+        if (days > 0) return `Trial — ${days} dia${days !== 1 ? 's' : ''} restante${days !== 1 ? 's' : ''}`
+        return 'Trial expirado'
+      }
+      return 'Em período de trial'
+    }
+    if (status === 'past_due') return 'Pagamento pendente'
+    if (status === 'canceled') return 'Cancelado'
+    if (status === 'active' && periodEnd) {
+      return `Renova em ${new Date(periodEnd).toLocaleDateString('pt-BR')}`
+    }
+    return 'Plano gratuito'
+  }
+
+  function statusColor() {
+    if (status === 'trialing') return 'text-blue-400'
+    if (status === 'past_due') return 'text-red-400'
+    if (status === 'canceled') return 'text-muted-foreground'
+    if (status === 'active') return 'text-emerald-400'
+    return 'text-muted-foreground'
+  }
+
+  const plans: { id: string; name: string; price: string; limit: string; color: string }[] = [
     { id: 'free', name: 'Free', price: 'R$ 0', limit: '30 alunos · 1 personal', color: '#6366F1' },
     { id: 'starter', name: 'Starter', price: 'R$ 99/mês', limit: '100 alunos · 3 personais', color: '#06B6D4' },
     { id: 'pro', name: 'Pro', price: 'R$ 199/mês', limit: 'Ilimitado', color: '#10B981' },
@@ -353,46 +457,146 @@ function PlanTab() {
 
   return (
     <div className="space-y-5 max-w-lg">
+      {/* Status card */}
       <div className="glass rounded-2xl p-5 border border-brand-500/15">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between">
           <div>
             <p className="text-xs text-muted-foreground">Plano atual</p>
             <p className="font-display font-bold text-lg capitalize">{currentPlan}</p>
+            <p className={cn('text-xs mt-0.5', statusColor())}>{statusLabel()}</p>
           </div>
-          <span className="badge-primary capitalize">{currentPlan}</span>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        {plans.map((plan) => (
-          <div
-            key={plan.id}
-            className={cn(
-              'glass rounded-xl p-4 flex items-center gap-4 transition-all',
-              currentPlan === plan.id ? 'border-brand-500/30 bg-brand-500/5' : 'hover:border-border'
-            )}
-          >
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-sm"
-              style={{ background: `${plan.color}15`, color: plan.color, border: `1px solid ${plan.color}25` }}>
-              {plan.name[0]}
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-sm">{plan.name} — {plan.price}</p>
-              <p className="text-xs text-muted-foreground">{plan.limit}</p>
-            </div>
-            {currentPlan === plan.id ? (
-              <span className="badge-success text-[10px]">Atual</span>
-            ) : (
+          <div className="flex flex-col items-end gap-2">
+            <span className="badge-primary capitalize">{currentPlan}</span>
+            {currentAcademy?.stripe_customer_id && (
               <button
-                onClick={() => toast.info('Integração de pagamentos em breve.')}
-                className="text-xs text-brand-400 font-semibold flex items-center gap-1 hover:underline"
+                onClick={handlePortal}
+                disabled={loadingPortal}
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors disabled:opacity-50"
               >
-                Upgrade <ExternalLink className="w-3 h-3" />
+                {loadingPortal
+                  ? <Loader2 className="w-3 h-3 animate-spin" />
+                  : <ExternalLink className="w-3 h-3" />}
+                Gerenciar assinatura
               </button>
             )}
           </div>
-        ))}
+        </div>
+        {status === 'past_due' && (
+          <div className="mt-3 p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+            Pagamento pendente — atualize seu cartão para manter o acesso.
+          </div>
+        )}
       </div>
+
+      {/* Plan cards */}
+      <div className="space-y-3">
+        {plans.map((plan) => {
+          const isCurrentPlan = currentPlan === plan.id
+          const planRank = PLAN_ORDER.indexOf(plan.id as typeof PLAN_ORDER[number])
+          const currentRank = PLAN_ORDER.indexOf(currentPlan as typeof PLAN_ORDER[number])
+          const isUpgrade = planRank > currentRank && plan.id !== 'free'
+          const isDowngrade = planRank < currentRank && plan.id !== 'free'
+
+          return (
+            <div
+              key={plan.id}
+              className={cn(
+                'glass rounded-xl p-4 flex items-center gap-4 transition-all',
+                isCurrentPlan ? 'border-brand-500/30 bg-brand-500/5' : 'hover:border-border'
+              )}
+            >
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-sm"
+                style={{ background: `${plan.color}15`, color: plan.color, border: `1px solid ${plan.color}25` }}
+              >
+                {plan.name[0]}
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-sm">{plan.name} — {plan.price}</p>
+                <p className="text-xs text-muted-foreground">{plan.limit}</p>
+              </div>
+              {isCurrentPlan ? (
+                <span className="badge-success text-[10px]">Atual</span>
+              ) : isUpgrade ? (
+                hasSubscription ? (
+                  <button
+                    onClick={handlePortal}
+                    disabled={loadingPortal}
+                    className="text-xs text-brand-400 font-semibold flex items-center gap-1 hover:underline disabled:opacity-50"
+                  >
+                    {loadingPortal ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                    Upgrade <ExternalLink className="w-3 h-3" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleUpgrade(plan.id as 'starter' | 'pro')}
+                    disabled={loadingCheckout !== null}
+                    className="text-xs text-brand-400 font-semibold flex items-center gap-1 hover:underline disabled:opacity-50"
+                  >
+                    {loadingCheckout === plan.id ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                    Upgrade <ExternalLink className="w-3 h-3" />
+                  </button>
+                )
+              ) : isDowngrade ? (
+                <button
+                  onClick={handlePortal}
+                  disabled={loadingPortal || !currentAcademy?.stripe_customer_id}
+                  className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors disabled:opacity-30"
+                >
+                  Downgrade
+                </button>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Invoice history */}
+      {(invoices.length > 0 || loadingInvoices) && (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Histórico de faturas</p>
+          {loadingInvoices ? (
+            <div className="space-y-2">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="glass rounded-xl p-3 animate-pulse h-12" />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {invoices.map((inv) => (
+                <div key={inv.id} className="glass rounded-xl p-3 flex items-center gap-3">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">
+                      {new Date(inv.date * 1000).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {(inv.amount / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </p>
+                  </div>
+                  <span className={cn(
+                    'text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full',
+                    inv.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400' :
+                    inv.status === 'open' ? 'bg-amber-500/10 text-amber-400' :
+                    'bg-muted text-muted-foreground'
+                  )}>
+                    {inv.status === 'paid' ? 'Pago' : inv.status === 'open' ? 'Aberto' : inv.status}
+                  </span>
+                  {inv.pdfUrl && (
+                    <a
+                      href={inv.pdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -480,6 +684,11 @@ function SegurancaTab() {
 // ── Page ──────────────────────────────────────────────────
 export default function ConfiguracoesPage() {
   const [activeTab, setActiveTab] = useState<Tab>('perfil')
+
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab') as Tab | null
+    if (tab && TABS.some((t) => t.id === tab)) setActiveTab(tab)
+  }, [])
 
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6">

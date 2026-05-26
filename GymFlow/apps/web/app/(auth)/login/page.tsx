@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -28,8 +29,10 @@ const fadeUp = {
   }),
 }
 
-export default function LoginPage() {
+function LoginInner() {
   const { signIn, signInWithGoogle } = useAuth()
+  const searchParams = useSearchParams()
+  const redirect = searchParams.get('redirect')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
@@ -45,7 +48,7 @@ export default function LoginPage() {
     setIsLoading(true)
     setServerError(null)
     try {
-      await signIn(data.email, data.password)
+      await signIn(data.email, data.password, redirect ?? undefined)
     } catch (err: unknown) {
       const msg = (err as Error).message
       if (msg.includes('Invalid login credentials')) {
@@ -211,5 +214,13 @@ export default function LoginPage() {
         </Link>
       </motion.p>
     </motion.div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginInner />
+    </Suspense>
   )
 }
