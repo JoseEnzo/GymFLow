@@ -75,11 +75,8 @@ export default function CadastroPage() {
     setIsLoading(true)
     setServerError(null)
     try {
-      await signUp(data.email, data.password, data.fullName, data.type)
-      if (inviteToken) {
-        router.push(`/convite/${inviteToken}`)
-        return
-      }
+      const redirectTo = inviteToken ? `/convite/${inviteToken}` : undefined
+      await signUp(data.email, data.password, data.fullName, data.type, redirectTo)
     } catch (err: unknown) {
       const msg = (err as Error).message
       if (msg.includes('already registered')) {

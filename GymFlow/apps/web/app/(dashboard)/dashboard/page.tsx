@@ -103,6 +103,24 @@ function EmptyState({
 interface OwnerStats { totalStudents: number; sheetsCreated: number; workoutsToday: number }
 interface StudentStats { totalWorkouts: number; weekWorkouts: number; streak: number; activeSheets: number }
 
+function dateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function computeStreak(timestamps: string[]): number {
+  if (timestamps.length === 0) return 0
+  const daySet = new Set(timestamps.map(t => dateKey(new Date(t))))
+  const cursor = new Date()
+  cursor.setHours(0, 0, 0, 0)
+  if (!daySet.has(dateKey(cursor))) cursor.setDate(cursor.getDate() - 1)
+  let streak = 0
+  while (daySet.has(dateKey(cursor))) {
+    streak++
+    cursor.setDate(cursor.getDate() - 1)
+  }
+  return streak
+}
+
 export default function DashboardPage() {
   const { currentRole, profile, currentAcademy } = useAuthStore()
   const supabase = createClient()
@@ -135,7 +153,7 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
-      const [{ count: total }, { count: week }, { count: sheets }] = await Promise.all([
+      const [{ count: total }, { count: week }, { count: sheets }, { data: logDates }] = await Promise.all([
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase as any).from('workout_logs').select('id', { count: 'exact', head: true })
           .eq('student_id', user.id).eq('academy_id', currentAcademy!.id),
@@ -145,8 +163,13 @@ export default function DashboardPage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase as any).from('workout_sheets').select('id', { count: 'exact', head: true })
           .eq('student_id', user.id).eq('academy_id', currentAcademy!.id).eq('is_active', true),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any).from('workout_logs').select('created_at')
+          .eq('student_id', user.id).eq('academy_id', currentAcademy!.id),
       ])
-      setStudentStats({ totalWorkouts: total ?? 0, weekWorkouts: week ?? 0, streak: 0, activeSheets: sheets ?? 0 })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const streak = computeStreak((logDates ?? []).map((r: any) => r.created_at as string))
+      setStudentStats({ totalWorkouts: total ?? 0, weekWorkouts: week ?? 0, streak, activeSheets: sheets ?? 0 })
     }
 
     if (isOwnerOrPersonal) loadOwnerStats()

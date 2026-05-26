@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
 
-const PUBLIC_ROUTES = ['/', '/login', '/cadastro', '/convite', '/onboarding']
+const PUBLIC_ROUTES = ['/', '/login', '/cadastro', '/convite', '/onboarding', '/recuperar-senha', '/redefinir-senha', '/codigo']
 const AUTH_ROUTES = ['/login', '/cadastro']
 
 export async function middleware(request: NextRequest) {

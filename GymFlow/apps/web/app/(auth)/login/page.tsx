@@ -203,6 +203,13 @@ export default function LoginPage() {
           Criar conta grátis
         </Link>
       </motion.p>
+
+      <motion.p variants={fadeUp} custom={7} className="text-center text-sm text-muted-foreground">
+        Recebeu um código de convite?{' '}
+        <Link href="/codigo" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
+          Entrar com código
+        </Link>
+      </motion.p>
     </motion.div>
   )
 }

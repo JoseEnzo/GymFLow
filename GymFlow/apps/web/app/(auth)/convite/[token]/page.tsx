@@ -15,6 +15,7 @@ interface InviteDetails {
   role: 'personal' | 'student'
   code: string
   expiresAt: string | null
+  usesCount: number
 }
 
 export default function ConvitePage() {
@@ -62,6 +63,7 @@ export default function ConvitePage() {
         role: data.role,
         code: data.code,
         expiresAt: data.expires_at,
+        usesCount: data.uses_count ?? 0,
       })
       setStatus('found')
     } catch (err: unknown) {
@@ -92,7 +94,7 @@ export default function ConvitePage() {
 
       if (!academyData) throw new Error('Academia não encontrada')
 
-      // Add member
+      // Add member (conflict on unique(academy_id, user_id) → update instead of error)
       const { error: memberError } = await supabase
         .from('academy_members')
         .upsert({
@@ -101,14 +103,14 @@ export default function ConvitePage() {
           role: invite.role,
           is_active: true,
           joined_at: new Date().toISOString(),
-        })
+        }, { onConflict: 'academy_id,user_id' })
 
       if (memberError) throw memberError
 
       // Increment uses_count
       await supabase
         .from('invites')
-        .update({ uses_count: (invite as unknown as { uses_count: number }).uses_count + 1 })
+        .update({ uses_count: invite.usesCount + 1 })
         .eq('token', token)
 
       setStatus('done')

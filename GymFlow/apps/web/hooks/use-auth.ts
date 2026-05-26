@@ -56,15 +56,15 @@ export function useAuth() {
     router.push('/dashboard')
   }
 
-  async function signUp(email: string, password: string, fullName: string, accountType: 'owner' | 'student' = 'owner') {
+  async function signUp(email: string, password: string, fullName: string, accountType: 'owner' | 'student' = 'owner', redirectTo?: string) {
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: fullName, account_type: accountType } },
     })
     if (error) throw error
-    toast.success('Conta criada! Complete seu perfil.')
-    router.push(`/onboarding?type=${accountType}`)
+    toast.success('Conta criada com sucesso!')
+    router.push(redirectTo ?? `/onboarding?type=${accountType}`)
   }
 
   async function signOut() {
@@ -85,7 +85,7 @@ export function useAuth() {
 
   async function resetPassword(email: string) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/redefinir-senha`,
+      redirectTo: `${window.location.origin}/auth/callback?next=/redefinir-senha`,
     })
     if (error) throw error
     toast.success('E-mail de redefinição enviado!')

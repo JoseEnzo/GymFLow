@@ -244,6 +244,7 @@ Esses três fluxos são o coração do produto. Qualquer mudança neles precisa 
 
 ---
 
+
 ## Migrations
 
 Toda mudança no banco vira um arquivo novo em `/supabase/migrations/`:
