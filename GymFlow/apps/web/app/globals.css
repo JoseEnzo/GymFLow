@@ -275,11 +275,20 @@
   /* Mesh background */
   .bg-mesh {
     background-image:
-      radial-gradient(at 40% 20%, rgba(99, 102, 241, 0.12) 0, transparent 50%),
-      radial-gradient(at 80% 0%, rgba(6, 182, 212, 0.10) 0, transparent 50%),
-      radial-gradient(at 0% 50%, rgba(249, 115, 22, 0.06) 0, transparent 50%),
-      radial-gradient(at 80% 50%, rgba(244, 63, 94, 0.05) 0, transparent 50%),
-      radial-gradient(at 0% 100%, rgba(251, 191, 36, 0.05) 0, transparent 50%);
+      /* tint diagonal base — une todo o gradiente */
+      linear-gradient(155deg, rgba(25, 15, 55, 0.22) 0%, transparent 42%, rgba(4, 26, 48, 0.18) 100%),
+      /* canto sup-esq — bloom índigo */
+      radial-gradient(ellipse 80% 60% at 15% 8%,   rgba(99, 102, 241, 0.22) 0%, transparent 70%),
+      /* canto sup-dir — bloom ciano */
+      radial-gradient(ellipse 60% 45% at 85% 8%,   rgba(6, 182, 212, 0.13) 0%, transparent 65%),
+      /* meio-esq — bloom violeta */
+      radial-gradient(ellipse 65% 55% at 8%  55%,  rgba(139, 92, 246, 0.11) 0%, transparent 65%),
+      /* meio-dir — bloom ciano suave */
+      radial-gradient(ellipse 60% 50% at 92% 52%,  rgba(6, 182, 212, 0.09) 0%, transparent 60%),
+      /* canto inf-esq — bloom índigo */
+      radial-gradient(ellipse 70% 50% at 20% 95%,  rgba(99, 102, 241, 0.12) 0%, transparent 65%),
+      /* canto inf-dir — bloom ciano escuro */
+      radial-gradient(ellipse 65% 50% at 80% 95%,  rgba(8, 145, 178, 0.10) 0%, transparent 60%);
   }
 
   /* Safe area for mobile */
@@ -317,4 +326,43 @@
 .page-exit-active {
   opacity: 0;
   transition: opacity 200ms ease-in;
+}
+
+/* ──────────────────────────────────────────────
+   Particle system (CSS-only, GPU-accelerated)
+   Uses only transform + opacity — no layout cost
+   ────────────────────────────────────────────── */
+/* outer wrapper: posição/translate */
+@keyframes particle-drift {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(10px, -24px); }
+  50%  { transform: translate(2px, -40px); }
+  75%  { transform: translate(-8px, -22px); }
+  100% { transform: translate(0, 0); }
+}
+
+/* inner dot: opacidade + escala — roda sem conflito */
+@keyframes particle-twinkle {
+  0%, 100% { opacity: 0.2;  transform: scale(1); }
+  50%       { opacity: 0.85; transform: scale(1.5); }
+}
+
+@keyframes section-line-draw {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+/* ──────────────────────────────────────────────
+   Respect user's reduced-motion preference
+   Battery saver on many phones triggers this
+   ────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

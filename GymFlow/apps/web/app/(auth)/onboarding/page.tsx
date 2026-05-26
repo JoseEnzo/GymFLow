@@ -1,204 +1,128 @@
 'use client'
 
-import { useState, Suspense, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Dumbbell, ArrowRight, Check, Loader2, Building2, Users, Search, AlertCircle, CheckCircle2, MapPin } from 'lucide-react'
+import {
+  Dumbbell, ArrowRight, ArrowLeft, Check, Loader2,
+  Building2, Users, Ticket, CreditCard, Zap, Lock,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
-import type { CNPJData } from '@/lib/cnpj'
-import { searchPlaces } from '@/lib/places'
-import type { PlaceDetails } from '@/lib/places'
 import { cn } from '@/lib/utils'
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] } },
-  exit: { opacity: 0, y: -12, transition: { duration: 0.25 } },
+const slide = {
+  hidden: { opacity: 0, x: 24 },
+  show: { opacity: 1, x: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } },
+  exit: { opacity: 0, x: -24, transition: { duration: 0.25 } },
 }
 
-function maskCNPJ(value: string): string {
-  const d = value.replace(/\D/g, '').slice(0, 14)
-  if (d.length <= 2) return d
-  if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`
-  if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`
-  if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`
-  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
+// ── Planos ────────────────────────────────────────────────────
+const PLANS = [
+  {
+    id: 'free',
+    name: 'Free',
+    price: 0,
+    label: 'para sempre',
+    color: '#6366F1',
+    features: ['Até 30 alunos', '1 personal', 'Fichas ilimitadas', 'PWA mobile'],
+  },
+  {
+    id: 'starter',
+    name: 'Starter',
+    price: 99,
+    label: '/mês',
+    color: '#06B6D4',
+    popular: true,
+    features: ['Até 100 alunos', '3 personais', 'Dashboard analítico', 'Suporte prioritário'],
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    price: 199,
+    label: '/mês',
+    color: '#10B981',
+    features: ['Alunos ilimitados', 'Personais ilimitados', 'Relatórios avançados', 'SLA garantido'],
+  },
+]
+
+// ── Plano individual para alunos sem convite ──────────────────
+const STUDENT_PLAN = {
+  price: 29,
+  features: [
+    'Acesso completo ao app',
+    'Crie suas próprias fichas',
+    'Histórico e gráficos de evolução',
+    'PWA instalável no celular',
+    'Cancele quando quiser',
+  ],
 }
 
-const GOALS = [
-  { id: 'Hipertrofia', label: 'Hipertrofia', desc: 'Ganhar massa muscular', emoji: '💪' },
-  { id: 'Perda de peso', label: 'Perda de peso', desc: 'Emagrecer com saúde', emoji: '🔥' },
-  { id: 'Força', label: 'Força', desc: 'Aumentar força máxima', emoji: '🏋️' },
-  { id: 'Saúde geral', label: 'Saúde geral', desc: 'Bem-estar e qualidade de vida', emoji: '❤️' },
-  { id: 'Condicionamento', label: 'Condicionamento', desc: 'Resistência e cardio', emoji: '🏃' },
-]
-
-const LEVELS = [
-  { id: 'Iniciante', label: 'Iniciante', desc: 'Menos de 1 ano treinando' },
-  { id: 'Intermediário', label: 'Intermediário', desc: '1 a 3 anos treinando' },
-  { id: 'Avançado', label: 'Avançado', desc: 'Mais de 3 anos treinando' },
-]
+// ─────────────────────────────────────────────────────────────
+type Role = 'owner' | 'student' | null
 
 function OnboardingContent() {
   const router = useRouter()
-  const params = useSearchParams()
-  const accountType = (params.get('type') ?? 'student') as 'owner' | 'student'
-  const { profile } = useAuthStore()
   const supabase = createClient()
+  const { profile, academies } = useAuthStore()
 
-  const [step, setStep] = useState(0)
-  const [saving, setSaving] = useState(false)
-
-  // Student state
-  const [goal, setGoal] = useState('')
-  const [level, setLevel] = useState('')
-  const [weightKg, setWeightKg] = useState('')
-  const [heightCm, setHeightCm] = useState('')
-
-  // Owner state
+  const [role, setRole] = useState<Role>(null)
+  const [plan, setPlan] = useState('free')
   const [academyName, setAcademyName] = useState('')
-  const [cnpj, setCnpj] = useState('')
-  const [cnpjData, setCnpjData] = useState<CNPJData | null>(null)
-  const [cnpjLoading, setCnpjLoading] = useState(false)
-  const [cnpjError, setCnpjError] = useState<string | null>(null)
-  const [placesResults, setPlacesResults] = useState<PlaceDetails[]>([])
-  const [placesLoading, setPlacesLoading] = useState(false)
-  const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null)
+  const [inviteCode, setInviteCode] = useState('')
+  const [hasInvite, setHasInvite] = useState<boolean | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [step, setStep] = useState<'role' | 'plan' | 'academy' | 'invite' | 'payment'>('role')
 
+  // Usuário já configurado → direto ao dashboard
   useEffect(() => {
-    const digits = cnpj.replace(/\D/g, '')
-    if (digits.length !== 14) {
-      setCnpjData(null)
-      setCnpjError(null)
-      return
-    }
-    let cancelled = false
-    setCnpjLoading(true)
-    setCnpjError(null)
-    fetch(`/api/cnpj?cnpj=${digits}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return
-        if (data.error) {
-          setCnpjError(data.error)
-          setCnpjData(null)
-        } else {
-          setCnpjData(data as CNPJData)
-          setAcademyName(data.nomeFantasia || data.razaoSocial)
-          setCnpjError(null)
-        }
-      })
-      .catch(() => { if (!cancelled) setCnpjError('Erro ao consultar CNPJ. Tente novamente.') })
-      .finally(() => { if (!cancelled) setCnpjLoading(false) })
-    return () => { cancelled = true }
-  }, [cnpj])
+    if (academies.length > 0) router.replace('/dashboard')
+  }, [academies, router])
 
-  useEffect(() => {
-    if (accountType !== 'owner') return
-    if (academyName.trim().length < 3) { setPlacesResults([]); return }
-    setPlacesLoading(true)
-    const query = cnpjData ? `${academyName} ${cnpjData.endereco.municipio}` : academyName
-    let cancelled = false
-    const timer = setTimeout(() => {
-      searchPlaces(query)
-        .then((r) => { if (!cancelled) setPlacesResults(r.slice(0, 4)) })
-        .catch(() => {})
-        .finally(() => { if (!cancelled) setPlacesLoading(false) })
-    }, 700)
-    return () => { cancelled = true; clearTimeout(timer) }
-  }, [academyName, cnpjData, accountType])
+  const firstName = profile?.full_name?.split(' ')[0] ?? 'você'
 
-  const totalSteps = accountType === 'student' ? 2 : 1
-
-  async function saveStudent() {
+  // ── Salvar academia (owner/personal) ─────────────────────
+  async function saveAcademy() {
+    if (!academyName.trim()) return
     setSaving(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Não autenticado')
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase.from('profiles') as any).upsert({
-        id: user.id,
-        goal,
-        bio: level,
-        weight_kg: weightKg ? parseFloat(weightKg) : null,
-        height_cm: heightCm ? parseFloat(heightCm) : null,
-        updated_at: new Date().toISOString(),
-      })
-
-      router.push('/dashboard')
-    } catch {
-      toast.error('Erro ao salvar. Tente novamente.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function saveOwner() {
-    setSaving(true)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Não autenticado')
-
-      const slug = academyName
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[̀-ͯ]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '')
+      const slug =
+        academyName
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[̀-ͯ]/g, '')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '') +
+        '-' +
+        Date.now().toString(36)
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: newAcademy, error } = await (supabase.from('academies') as any).insert({
+      const { data: newAcademy, error: academyError } = await (supabase.from('academies') as any).insert({
         owner_id: user.id,
         name: academyName,
-        slug: `${slug}-${Date.now().toString(36)}`,
-        plan: 'free',
-        ...(cnpjData ? {
-          cnpj: cnpjData.cnpj,
-          email: cnpjData.email,
-          phone: cnpjData.telefone,
-          address_city: cnpjData.endereco.municipio,
-          address_state: cnpjData.endereco.uf,
-        } : {}),
-        ...(selectedPlace ? {
-          place_id: selectedPlace.placeId,
-          latitude: selectedPlace.geometry?.lat ?? null,
-          longitude: selectedPlace.geometry?.lng ?? null,
-        } : {}),
-      }).select('id').single()
+        slug,
+        plan,
+      }).select().single()
+      if (academyError) throw academyError
 
-      if (error) throw error
-
-      // Insere o owner em academy_members (RLS permite auto-ingresso com auth.uid() = user_id)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: memberError } = await (supabase.from('academy_members') as any).insert({
         academy_id: newAcademy.id,
         user_id: user.id,
         role: 'owner',
-        joined_at: new Date().toISOString(),
+        is_active: true,
       })
-
       if (memberError) throw memberError
 
-      // Reload academies
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: members } = await (supabase as any)
-        .from('academy_members')
-        .select('*, academy:academies(*)')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
+      useAuthStore.getState().setCurrentAcademy(newAcademy, 'owner')
+      useAuthStore.getState().setAcademies([{ academy: newAcademy, role: 'owner' }])
 
-      if (members) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const academies = (members as any[])
-          .filter((m) => m.academy)
-          .map((m) => ({ academy: m.academy, role: m.role }))
-        useAuthStore.getState().setAcademies(academies)
-      }
-
+      toast.success('Academia criada com sucesso!')
       router.push('/dashboard')
     } catch {
       toast.error('Erro ao criar academia. Tente novamente.')
@@ -207,12 +131,25 @@ function OnboardingContent() {
     }
   }
 
-  function handleSkip() {
-    router.push('/dashboard')
+  // ── Validar código de convite ─────────────────────────────
+  async function redeemInvite() {
+    if (!inviteCode.trim()) return
+    setSaving(true)
+    try {
+      router.push(`/convite/${inviteCode.trim()}`)
+    } catch {
+      toast.error('Código inválido. Verifique e tente novamente.')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const firstName = profile?.full_name?.split(' ')[0] ?? 'você'
+  // ── Stripe checkout placeholder ───────────────────────────
+  function handleStudentPayment() {
+    toast('Em breve! Pagamento individual será habilitado.', { icon: '🚧' })
+  }
 
+  // ─────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       {/* Logo */}
@@ -229,335 +166,359 @@ function OnboardingContent() {
       </div>
 
       <div className="w-full max-w-lg">
-        {/* Progress */}
-        {totalSteps > 1 && (
-          <div className="flex gap-2 mb-8">
-            {Array.from({ length: totalSteps }).map((_, i) => (
-              <div
-                key={i}
-                className={cn(
-                  'h-1 flex-1 rounded-full transition-all duration-500',
-                  i <= step ? 'bg-brand-500' : 'bg-surface-300'
-                )}
-              />
-            ))}
-          </div>
-        )}
-
         <AnimatePresence mode="wait">
-          {/* ── STUDENT STEP 0: Goal ── */}
-          {accountType === 'student' && step === 0 && (
-            <motion.div key="s0" variants={fadeUp} initial="hidden" animate="show" exit="exit" className="space-y-6">
+
+          {/* ── STEP: role picker ── */}
+          {step === 'role' && (
+            <motion.div key="role" variants={slide} initial="hidden" animate="show" exit="exit" className="space-y-6">
               <div>
                 <h1 className="text-2xl font-display font-bold">
-                  Olá, {firstName}! 👋
+                  Bem-vindo, {firstName}! 👋
                 </h1>
                 <p className="text-muted-foreground mt-1.5 text-sm">
-                  Qual é o seu principal objetivo no treino?
+                  Como você vai usar o GymFlow?
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 gap-2.5">
-                {GOALS.map((g) => (
+              <div className="grid gap-3">
+                <button
+                  onClick={() => { setRole('owner'); setStep('plan') }}
+                  className="flex items-center gap-4 p-5 rounded-2xl border border-border/60 hover:border-brand-500/40 hover:bg-brand-500/5 text-left transition-all duration-200 group"
+                >
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-500/15 flex-shrink-0 group-hover:scale-105 transition-transform">
+                    <Building2 className="w-6 h-6 text-brand-400" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">Sou proprietário ou personal trainer</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Vou criar minha academia e gerenciar alunos
+                    </p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto group-hover:translate-x-1 transition-transform" />
+                </button>
+
+                <button
+                  onClick={() => { setRole('student'); setStep('invite') }}
+                  className="flex items-center gap-4 p-5 rounded-2xl border border-border/60 hover:border-cyan-500/40 hover:bg-cyan-500/5 text-left transition-all duration-200 group"
+                >
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-cyan-500/15 flex-shrink-0 group-hover:scale-105 transition-transform">
+                    <Users className="w-6 h-6 text-cyan-400" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">Sou aluno</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Quero acompanhar meus treinos e evolução
+                    </p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto group-hover:translate-x-1 transition-transform" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ── STEP: plan (owner) ── */}
+          {step === 'plan' && (
+            <motion.div key="plan" variants={slide} initial="hidden" animate="show" exit="exit" className="space-y-6">
+              <div>
+                <button onClick={() => setStep('role')} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors">
+                  <ArrowLeft className="w-3.5 h-3.5" /> Voltar
+                </button>
+                <h1 className="text-2xl font-display font-bold">Escolha seu plano</h1>
+                <p className="text-muted-foreground mt-1.5 text-sm">
+                  Você pode mudar de plano a qualquer momento.
+                </p>
+              </div>
+
+              <div className="grid gap-3">
+                {PLANS.map((p) => (
                   <button
-                    key={g.id}
-                    onClick={() => setGoal(g.id)}
+                    key={p.id}
+                    onClick={() => setPlan(p.id)}
                     className={cn(
-                      'flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-200',
-                      goal === g.id
+                      'relative flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-200',
+                      plan === p.id
                         ? 'border-brand-500/50 bg-brand-500/8 shadow-glow-sm'
                         : 'border-border/60 hover:border-border hover:bg-surface-100'
                     )}
                   >
-                    <span className="text-2xl">{g.emoji}</span>
-                    <div className="flex-1">
-                      <p className="font-semibold text-sm">{g.label}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{g.desc}</p>
-                    </div>
-                    {goal === g.id && (
-                      <div className="w-5 h-5 rounded-full bg-brand-500 flex items-center justify-center flex-shrink-0">
-                        <Check className="w-3 h-3 text-white" />
-                      </div>
+                    {p.popular && (
+                      <span className="absolute -top-2.5 right-4 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-brand-500 to-cyan-500 text-white">
+                        Mais popular
+                      </span>
                     )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-display font-bold" style={{ color: p.color }}>{p.name}</span>
+                        <span className="text-sm font-semibold">
+                          {p.price === 0 ? 'Grátis' : `R$ ${p.price}`}
+                          <span className="text-xs font-normal text-muted-foreground"> {p.label}</span>
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                        {p.features.map((f) => (
+                          <span key={f} className="text-xs text-muted-foreground">{f}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className={cn(
+                      'w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                      plan === p.id ? 'bg-brand-500 border-brand-500' : 'border-border/60'
+                    )}>
+                      {plan === p.id && <Check className="w-3 h-3 text-white" />}
+                    </div>
                   </button>
                 ))}
               </div>
 
               <button
-                onClick={() => setStep(1)}
-                disabled={!goal}
-                className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm disabled:opacity-40"
+                onClick={() => setStep('academy')}
+                className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
               >
-                Continuar <ArrowRight className="w-4 h-4 inline ml-1" />
+                Continuar <ArrowRight className="w-4 h-4" />
               </button>
             </motion.div>
           )}
 
-          {/* ── STUDENT STEP 1: Physical data ── */}
-          {accountType === 'student' && step === 1 && (
-            <motion.div key="s1" variants={fadeUp} initial="hidden" animate="show" exit="exit" className="space-y-6">
+          {/* ── STEP: academy name (owner) ── */}
+          {step === 'academy' && (
+            <motion.div key="academy" variants={slide} initial="hidden" animate="show" exit="exit" className="space-y-6">
               <div>
-                <h1 className="text-2xl font-display font-bold">Suas características</h1>
+                <button onClick={() => setStep('plan')} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors">
+                  <ArrowLeft className="w-3.5 h-3.5" /> Voltar
+                </button>
+                <h1 className="text-2xl font-display font-bold">Crie sua academia 🏢</h1>
                 <p className="text-muted-foreground mt-1.5 text-sm">
-                  Essas informações ajudam a personalizar seus treinos e acompanhar sua evolução.
+                  Você pode ajustar os detalhes depois nas configurações.
                 </p>
               </div>
 
-              {/* Physical */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Peso atual (kg)</label>
-                  <input
-                    type="number"
-                    value={weightKg}
-                    onChange={(e) => setWeightKg(e.target.value)}
-                    placeholder="Ex: 75"
-                    className="field"
-                    min="30"
-                    max="300"
-                  />
+              {/* Plan badge */}
+              {(() => {
+                const p = PLANS.find((x) => x.id === plan)!
+                return (
+                  <div className="glass rounded-xl px-4 py-3 flex items-center gap-3">
+                    <Zap className="w-4 h-4" style={{ color: p.color }} />
+                    <span className="text-sm">
+                      Plano selecionado:{' '}
+                      <span className="font-bold" style={{ color: p.color }}>{p.name}</span>
+                      {p.price > 0 && (
+                        <span className="text-muted-foreground text-xs"> — R$ {p.price}/mês</span>
+                      )}
+                    </span>
+                  </div>
+                )
+              })()}
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Nome da academia</label>
+                <input
+                  type="text"
+                  value={academyName}
+                  onChange={(e) => setAcademyName(e.target.value)}
+                  placeholder="Ex: Academia Força Total"
+                  className="field"
+                  onKeyDown={(e) => e.key === 'Enter' && academyName.trim() && saveAcademy()}
+                />
+              </div>
+
+              <div className="glass rounded-2xl p-4 flex gap-3">
+                <div className="w-9 h-9 rounded-xl bg-cyan-500/15 flex items-center justify-center flex-shrink-0">
+                  <Users className="w-4 h-4 text-cyan-400" />
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Altura (cm)</label>
-                  <input
-                    type="number"
-                    value={heightCm}
-                    onChange={(e) => setHeightCm(e.target.value)}
-                    placeholder="Ex: 175"
-                    className="field"
-                    min="100"
-                    max="250"
-                  />
+                <div>
+                  <p className="text-sm font-semibold">Convide seus alunos depois</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Após criar a academia você receberá um link e código de convite para compartilhar.
+                  </p>
                 </div>
               </div>
 
-              {/* Level */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Nível de experiência</label>
-                <div className="grid grid-cols-1 gap-2">
-                  {LEVELS.map((l) => (
-                    <button
-                      key={l.id}
-                      onClick={() => setLevel(l.id)}
-                      className={cn(
-                        'flex items-center justify-between p-3.5 rounded-xl border text-left transition-all',
-                        level === l.id
-                          ? 'border-brand-500/50 bg-brand-500/8'
-                          : 'border-border/60 hover:border-border hover:bg-surface-100'
-                      )}
-                    >
-                      <div>
-                        <p className="font-semibold text-sm">{l.label}</p>
-                        <p className="text-xs text-muted-foreground">{l.desc}</p>
-                      </div>
-                      {level === l.id && (
-                        <div className="w-5 h-5 rounded-full bg-brand-500 flex items-center justify-center">
-                          <Check className="w-3 h-3 text-white" />
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setStep(0)}
-                  className="flex-1 btn-secondary py-3.5 rounded-xl font-semibold text-sm"
-                >
-                  Voltar
-                </button>
-                <button
-                  onClick={saveStudent}
-                  disabled={saving}
-                  className="flex-2 flex-1 btn-primary py-3.5 rounded-xl font-semibold text-sm"
-                >
-                  {saving
-                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : 'Começar agora →'
-                  }
-                </button>
-              </div>
+              <button
+                onClick={saveAcademy}
+                disabled={saving || !academyName.trim()}
+                className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
+              >
+                {saving
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <><Check className="w-4 h-4" /> Criar academia e entrar</>
+                }
+              </button>
             </motion.div>
           )}
 
-          {/* ── OWNER STEP 0: Academy setup ── */}
-          {accountType === 'owner' && step === 0 && (
-            <motion.div key="o0" variants={fadeUp} initial="hidden" animate="show" exit="exit" className="space-y-6">
+          {/* ── STEP: invite choice (student) ── */}
+          {step === 'invite' && (
+            <motion.div key="invite" variants={slide} initial="hidden" animate="show" exit="exit" className="space-y-6">
               <div>
-                <h1 className="text-2xl font-display font-bold">
-                  Vamos configurar sua academia 🏢
-                </h1>
+                <button onClick={() => setStep('role')} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors">
+                  <ArrowLeft className="w-3.5 h-3.5" /> Voltar
+                </button>
+                <h1 className="text-2xl font-display font-bold">Você tem um convite? 🎯</h1>
                 <p className="text-muted-foreground mt-1.5 text-sm">
-                  Você pode alterar essas informações depois nas configurações.
+                  Se seu professor ou academia enviou um código, use-o para entrar gratuitamente.
                 </p>
               </div>
 
-              <div className="space-y-4">
-                {/* CNPJ */}
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">CNPJ</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={cnpj}
-                      onChange={(e) => setCnpj(maskCNPJ(e.target.value))}
-                      placeholder="00.000.000/0000-00"
-                      inputMode="numeric"
-                      className="field pr-10"
-                    />
-                    <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
-                      {cnpjLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
-                      {!cnpjLoading && cnpjData && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
-                      {!cnpjLoading && cnpjError && <AlertCircle className="w-4 h-4 text-red-400" />}
-                      {!cnpjLoading && !cnpjData && !cnpjError && cnpj.replace(/\D/g, '').length < 14 && (
-                        <Search className="w-4 h-4 text-muted-foreground/40" />
-                      )}
-                    </div>
-                  </div>
-                  {cnpjError && <p className="text-xs text-red-400">{cnpjError}</p>}
-                  {cnpjData && (
-                    <p className="text-xs text-emerald-400">
-                      {cnpjData.situacao === 'ATIVA' ? '✓ CNPJ ativo' : `Situação: ${cnpjData.situacao}`} — {cnpjData.razaoSocial}
-                    </p>
+              <div className="grid gap-3">
+                <button
+                  onClick={() => setHasInvite(true)}
+                  className={cn(
+                    'flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-200',
+                    hasInvite === true
+                      ? 'border-emerald-500/50 bg-emerald-500/8'
+                      : 'border-border/60 hover:border-border hover:bg-surface-100'
                   )}
-                </div>
-
-                {/* Academy name — preenchido automaticamente ou manual */}
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">
-                    Nome da academia
-                    {cnpjData && <span className="ml-2 text-[10px] text-brand-400 font-normal">preenchido automaticamente</span>}
-                  </label>
-                  <input
-                    type="text"
-                    value={academyName}
-                    onChange={(e) => setAcademyName(e.target.value)}
-                    placeholder="Ex: Academia Força Total"
-                    className="field"
-                  />
-                </div>
-
-                {/* Google Places results */}
-                {!selectedPlace && (placesLoading || placesResults.length > 0) && (
-                  <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground">
-                      {placesLoading ? 'Buscando no Google Maps...' : 'Selecione sua academia para vincular ao Google:'}
-                    </p>
-                    {placesLoading && (
-                      <div className="flex justify-center py-3">
-                        <Loader2 className="w-4 h-4 animate-spin text-brand-400" />
-                      </div>
-                    )}
-                    {!placesLoading && placesResults.map((place) => (
-                      <button
-                        key={place.placeId}
-                        onClick={() => {
-                          setSelectedPlace(place)
-                          setPlacesResults([])
-                          setAcademyName(place.name)
-                        }}
-                        className="w-full flex items-start gap-3 p-3 rounded-xl border border-border/60 hover:border-brand-500/40 hover:bg-brand-500/5 text-left transition-all"
-                      >
-                        <MapPin className="w-4 h-4 text-brand-400 flex-shrink-0 mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold truncate">{place.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{place.formattedAddress}</p>
-                          {place.rating && (
-                            <p className="text-[11px] text-amber-400 mt-0.5">★ {place.rating}</p>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Selected place confirmation */}
-                {selectedPlace && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="glass rounded-2xl p-4 space-y-1.5 border border-brand-500/20 bg-brand-500/5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-brand-400">Academia vinculada ao Google Maps</p>
-                      <button
-                        onClick={() => setSelectedPlace(null)}
-                        className="text-[11px] text-muted-foreground hover:text-foreground"
-                      >
-                        Remover
-                      </button>
-                    </div>
-                    <div className="flex items-start gap-2 text-xs text-muted-foreground">
-                      <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-brand-400" />
-                      <span>{selectedPlace.formattedAddress}</span>
-                    </div>
-                    {selectedPlace.rating && (
-                      <p className="text-[11px] text-amber-400">★ {selectedPlace.rating} no Google</p>
-                    )}
-                  </motion.div>
-                )}
-
-                {/* CNPJ enriched info card */}
-                {cnpjData && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="glass rounded-2xl p-4 space-y-2 border border-emerald-500/20 bg-emerald-500/5"
-                  >
-                    <p className="text-xs font-semibold text-emerald-400">Dados preenchidos via Receita Federal</p>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                      {cnpjData.email && <span>✉ {cnpjData.email}</span>}
-                      {cnpjData.telefone && <span>📞 {cnpjData.telefone}</span>}
-                      {cnpjData.endereco.municipio && (
-                        <span className="col-span-2">
-                          📍 {cnpjData.endereco.municipio}, {cnpjData.endereco.uf}
-                        </span>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-
-                <div className="glass rounded-2xl p-4 flex gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-brand-500/15 flex items-center justify-center flex-shrink-0">
-                    <Users className="w-4 h-4 text-brand-400" />
+                >
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-500/15 flex-shrink-0">
+                    <Ticket className="w-5 h-5 text-emerald-400" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold">Convide seus alunos depois</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Após criar sua academia você receberá um link e código de convite para compartilhar.
-                    </p>
+                    <p className="font-semibold text-sm">Sim, tenho um código de convite</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Entro gratuitamente via convite do professor</p>
                   </div>
-                </div>
+                  {hasInvite === true && (
+                    <div className="ml-auto w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                      <Check className="w-3 h-3 text-white" />
+                    </div>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => setHasInvite(false)}
+                  className={cn(
+                    'flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-200',
+                    hasInvite === false
+                      ? 'border-amber-500/50 bg-amber-500/8'
+                      : 'border-border/60 hover:border-border hover:bg-surface-100'
+                  )}
+                >
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-amber-500/15 flex-shrink-0">
+                    <CreditCard className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm">Não tenho convite</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Quero assinar um plano individual</p>
+                  </div>
+                  {hasInvite === false && (
+                    <div className="ml-auto w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
+                      <Check className="w-3 h-3 text-white" />
+                    </div>
+                  )}
+                </button>
               </div>
 
-              <div className="flex gap-3">
+              {/* Inline: enter code */}
+              <AnimatePresence>
+                {hasInvite === true && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-3 overflow-hidden"
+                  >
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium">Código de convite</label>
+                      <input
+                        type="text"
+                        value={inviteCode}
+                        onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                        placeholder="Ex: ACAD-1234"
+                        className="field tracking-widest font-mono"
+                        onKeyDown={(e) => e.key === 'Enter' && inviteCode.trim() && redeemInvite()}
+                      />
+                    </div>
+                    <button
+                      onClick={redeemInvite}
+                      disabled={saving || !inviteCode.trim()}
+                      className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
+                    >
+                      {saving
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <><Check className="w-4 h-4" /> Entrar com convite</>
+                      }
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {hasInvite === false && (
                 <button
-                  onClick={handleSkip}
-                  className="flex-1 btn-secondary py-3.5 rounded-xl font-semibold text-sm"
+                  onClick={() => setStep('payment')}
+                  className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
                 >
-                  Pular por enquanto
+                  Ver plano individual <ArrowRight className="w-4 h-4" />
                 </button>
+              )}
+            </motion.div>
+          )}
+
+          {/* ── STEP: payment (student without invite) ── */}
+          {step === 'payment' && (
+            <motion.div key="payment" variants={slide} initial="hidden" animate="show" exit="exit" className="space-y-6">
+              <div>
+                <button onClick={() => setStep('invite')} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors">
+                  <ArrowLeft className="w-3.5 h-3.5" /> Voltar
+                </button>
+                <h1 className="text-2xl font-display font-bold">Plano individual</h1>
+                <p className="text-muted-foreground mt-1.5 text-sm">
+                  Acesse o GymFlow sem precisar de uma academia.
+                </p>
+              </div>
+
+              <div
+                className="glass rounded-2xl p-6 space-y-5"
+                style={{ border: '1px solid rgba(99,102,241,0.3)' }}
+              >
+                <div className="flex items-end gap-1">
+                  <span className="text-4xl font-display font-extrabold gradient-text">
+                    R$ {STUDENT_PLAN.price}
+                  </span>
+                  <span className="text-muted-foreground text-sm mb-1">/mês</span>
+                </div>
+
+                <ul className="space-y-2.5">
+                  {STUDENT_PLAN.features.map((f) => (
+                    <li key={f} className="flex items-center gap-2.5 text-sm">
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center bg-brand-500/15 flex-shrink-0">
+                        <Check className="w-3 h-3 text-brand-400" />
+                      </div>
+                      <span className="text-muted-foreground">{f}</span>
+                    </li>
+                  ))}
+                </ul>
+
                 <button
-                  onClick={saveOwner}
-                  disabled={saving || !academyName.trim()}
-                  className="flex-1 btn-primary py-3.5 rounded-xl font-semibold text-sm disabled:opacity-40"
+                  onClick={handleStudentPayment}
+                  className="w-full py-3.5 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2"
+                  style={{ background: 'linear-gradient(135deg, #6366F1, #4F46E5)' }}
                 >
-                  {saving
-                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : 'Criar academia →'
-                  }
+                  <CreditCard className="w-4 h-4" />
+                  Assinar por R$ {STUDENT_PLAN.price}/mês
                 </button>
+
+                <p className="text-center text-xs text-muted-foreground flex items-center justify-center gap-1">
+                  <Lock className="w-3 h-3" />
+                  Pagamento seguro · Cancele quando quiser
+                </p>
+              </div>
+
+              <div className="glass rounded-xl p-4 flex gap-3">
+                <Ticket className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-muted-foreground">
+                  Se você ainda conseguir um convite da sua academia,{' '}
+                  <button
+                    onClick={() => { setHasInvite(true); setStep('invite') }}
+                    className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2 transition-colors"
+                  >
+                    clique aqui para inserir o código
+                  </button>{' '}
+                  e entre gratuitamente.
+                </p>
               </div>
             </motion.div>
           )}
-        </AnimatePresence>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          <button onClick={handleSkip} className="hover:text-foreground transition-colors underline underline-offset-2">
-            Pular e configurar depois
-          </button>
-        </p>
+        </AnimatePresence>
       </div>
     </div>
   )

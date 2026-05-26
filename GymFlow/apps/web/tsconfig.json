@@ -1,7 +1,6 @@
 {
   "extends": "@gymflow/typescript-config/nextjs.json",
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
       "@/*": [
         "./*"

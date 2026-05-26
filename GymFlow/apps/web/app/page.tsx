@@ -1,6 +1,6 @@
 'use client'
 
-import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import Link from 'next/link'
 import { useRef, useState, useEffect } from 'react'
 import {
@@ -93,6 +93,94 @@ function FloatingCard({
     >
       {children}
     </motion.div>
+  )
+}
+
+// ──────────────────────────────────────────────
+// Particle field — CSS-only, GPU-accelerated
+// Positions are static (SSR-safe, no randomness)
+// Hidden via CSS when prefers-reduced-motion: reduce
+// ──────────────────────────────────────────────
+const PARTICLES = [
+  { left: '6%',  top: '15%', w: 7,  color: '#6366F1', td: '14s', tt: '3.5s', d: '0s'   },
+  { left: '90%', top: '10%', w: 5,  color: '#06B6D4', td: '11s', tt: '4s',   d: '2.5s' },
+  { left: '20%', top: '76%', w: 9,  color: '#6366F1', td: '16s', tt: '5s',   d: '5s'   },
+  { left: '74%', top: '55%', w: 5,  color: '#10B981', td: '13s', tt: '3s',   d: '1s'   },
+  { left: '46%', top: '22%', w: 6,  color: '#06B6D4', td: '10s', tt: '4.5s', d: '7s'   },
+  { left: '88%', top: '80%', w: 5,  color: '#818CF8', td: '17s', tt: '2.5s', d: '3.5s' },
+  { left: '12%', top: '88%', w: 6,  color: '#F59E0B', td: '12s', tt: '6s',   d: '8s'   },
+  { left: '62%', top: '90%', w: 4,  color: '#22D3EE', td: '9s',  tt: '3s',   d: '4.5s' },
+  { left: '32%', top: '48%', w: 4,  color: '#8B5CF6', td: '15s', tt: '4s',   d: '6s'   },
+  { left: '70%', top: '28%', w: 6,  color: '#6366F1', td: '18s', tt: '5s',   d: '1.5s' },
+  { left: '26%', top: '33%', w: 4,  color: '#10B981', td: '11s', tt: '3.5s', d: '9s'   },
+  { left: '82%', top: '62%', w: 7,  color: '#06B6D4', td: '13s', tt: '4.5s', d: '2s'   },
+]
+
+function ParticleField({ count = 8, className = '' }: { count?: number; className?: string }) {
+  return (
+    <div
+      className={cn('absolute inset-0 overflow-hidden pointer-events-none', className)}
+      aria-hidden="true"
+    >
+      {PARTICLES.slice(0, count).map((p, i) => (
+        <div
+          key={i}
+          className="absolute"
+          style={{
+            left: p.left,
+            top: p.top,
+            animation: `particle-drift ${p.td} ease-in-out ${p.d} infinite`,
+          }}
+        >
+          <span
+            className="block rounded-full"
+            style={{
+              width: p.w,
+              height: p.w,
+              background: p.color,
+              boxShadow: `0 0 ${p.w * 2}px ${p.color}, 0 0 ${p.w * 5}px ${p.color}55`,
+              animation: `particle-twinkle ${p.tt} ease-in-out ${p.d} infinite`,
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────
+// Section transition divider
+// ──────────────────────────────────────────────
+function SectionTransition() {
+  return (
+    <div className="relative h-12 flex items-center justify-center" aria-hidden="true">
+      {/* Linha que se desenha */}
+      <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[2px] overflow-hidden">
+        <motion.div
+          className="h-full origin-left"
+          style={{
+            background: 'linear-gradient(to right, transparent 0%, rgba(99,102,241,0.9) 30%, rgba(6,182,212,0.8) 70%, transparent 100%)',
+            boxShadow: '0 0 12px rgba(99,102,241,0.6), 0 0 24px rgba(99,102,241,0.3)',
+          }}
+          initial={{ scaleX: 0 }}
+          whileInView={{ scaleX: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
+        />
+      </div>
+      {/* Ponto central com glow */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.5, delay: 0.9, ease: [0.16, 1, 0.3, 1] }}
+        className="relative z-10 w-4 h-4 rounded-full"
+        style={{
+          background: 'linear-gradient(135deg, #6366F1, #06B6D4)',
+          boxShadow: '0 0 16px rgba(99,102,241,0.9), 0 0 32px rgba(99,102,241,0.5), 0 0 48px rgba(6,182,212,0.3)',
+        }}
+      />
+    </div>
   )
 }
 
@@ -209,15 +297,10 @@ function Nav() {
 // Hero Section
 // ──────────────────────────────────────────────
 function Hero() {
-  const ref = useRef<HTMLElement>(null)
-  const { scrollYProgress } = useScroll({ target: ref })
-  const y = useTransform(scrollYProgress, [0, 1], [0, -100])
-  const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0])
+  const reduceMotion = useReducedMotion()
 
   return (
-    <section ref={ref} className="relative min-h-screen flex items-center overflow-hidden pt-16">
-      {/* Background mesh */}
-      <div className="absolute inset-0 bg-mesh" />
+    <section className="relative min-h-screen flex items-center overflow-hidden pt-16">
 
       {/* Grid pattern */}
       <div
@@ -229,21 +312,34 @@ function Hero() {
         }}
       />
 
-      {/* Glowing orbs */}
-      <motion.div
-        animate={{ scale: [1, 1.1, 1], opacity: [0.4, 0.6, 0.4] }}
-        transition={{ duration: 8, repeat: Infinity }}
-        className="absolute top-1/4 left-1/4 w-[600px] h-[600px] rounded-full"
-        style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%)' }}
-      />
-      <motion.div
-        animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.5, 0.3] }}
-        transition={{ duration: 10, repeat: Infinity, delay: 2 }}
-        className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] rounded-full"
-        style={{ background: 'radial-gradient(circle, rgba(6,182,212,0.08) 0%, transparent 70%)' }}
-      />
+      {/* Glowing orbs — skipped for reduced motion */}
+      {!reduceMotion && (
+        <>
+          <motion.div
+            animate={{ scale: [1, 1.18, 1], opacity: [0.35, 0.65, 0.35] }}
+            transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute top-1/4 left-1/4 w-[640px] h-[640px] rounded-full"
+            style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.10) 0%, transparent 70%)' }}
+          />
+          <motion.div
+            animate={{ scale: [1, 1.2, 1], opacity: [0.25, 0.50, 0.25] }}
+            transition={{ duration: 10, repeat: Infinity, delay: 2, ease: 'easeInOut' }}
+            className="absolute bottom-1/4 right-1/4 w-[520px] h-[520px] rounded-full"
+            style={{ background: 'radial-gradient(circle, rgba(6,182,212,0.09) 0%, transparent 70%)' }}
+          />
+          <motion.div
+            animate={{ scale: [1, 1.12, 1], opacity: [0.20, 0.40, 0.20] }}
+            transition={{ duration: 13, repeat: Infinity, delay: 5, ease: 'easeInOut' }}
+            className="absolute top-3/4 left-1/2 w-[380px] h-[380px] rounded-full"
+            style={{ background: 'radial-gradient(circle, rgba(245,158,11,0.07) 0%, transparent 70%)' }}
+          />
+        </>
+      )}
 
-      <motion.div style={{ y, opacity }} className="relative z-10 w-full">
+      {/* CSS particles */}
+      <ParticleField count={8} />
+
+      <div className="relative z-10 w-full">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 lg:py-32">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             {/* Left — Copy */}
@@ -283,12 +379,17 @@ function Hero() {
                     style={{ background: 'linear-gradient(135deg, #818CF8, #6366F1)' }} />
                 </Link>
 
-                <button className="inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-2xl font-semibold text-muted-foreground hover:text-foreground border border-border/60 hover:border-border hover:bg-surface-100 transition-all duration-200">
+                <a
+                  href="/demo"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-2xl font-semibold text-muted-foreground hover:text-foreground border border-border/60 hover:border-border hover:bg-surface-100 transition-all duration-200"
+                >
                   <div className="flex items-center justify-center w-7 h-7 rounded-full bg-brand-500/15">
                     <Play className="w-3 h-3 text-brand-400 ml-0.5" />
                   </div>
                   Ver demonstração
-                </button>
+                </a>
               </motion.div>
 
               {/* Social proof */}
@@ -410,7 +511,7 @@ function Hero() {
             </motion.div>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Scroll indicator */}
       <motion.div
@@ -428,42 +529,6 @@ function Hero() {
           <div className="w-1 h-2 rounded-full bg-brand-400" />
         </motion.div>
       </motion.div>
-    </section>
-  )
-}
-
-// ──────────────────────────────────────────────
-// Stats Ticker
-// ──────────────────────────────────────────────
-function StatsSection() {
-  const stats = [
-    { label: 'Academias ativas', end: 523, suffix: '+' },
-    { label: 'Alunos cadastrados', end: 18400, suffix: '+' },
-    { label: 'Treinos por dia', end: 2100, suffix: '+' },
-    { label: 'Taxa de satisfação', end: 98, suffix: '%' },
-  ]
-
-  return (
-    <section className="relative py-20 border-y border-border/40">
-      <div className="absolute inset-0 bg-gradient-to-r from-brand-500/5 via-transparent to-cyan-500/5" />
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: '-100px' }}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12"
-        >
-          {stats.map(({ label, end, suffix }) => (
-            <motion.div key={label} variants={fadeUp} className="text-center">
-              <p className="text-4xl lg:text-5xl font-display font-extrabold gradient-text">
-                <Counter end={end} suffix={suffix} />
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">{label}</p>
-            </motion.div>
-          ))}
-        </motion.div>
-      </div>
     </section>
   )
 }
@@ -540,7 +605,8 @@ const features = [
 
 function FeaturesSection() {
   return (
-    <section id="funcionalidades" className="py-24 lg:py-32">
+    <section id="funcionalidades" className="relative py-24 lg:py-32 overflow-hidden">
+      <ParticleField count={5} />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
           variants={stagger}
@@ -649,7 +715,9 @@ function PersonasSection() {
   const [activeRole, setActiveRole] = useState(0)
 
   return (
-    <section className="py-24 lg:py-32 bg-mesh">
+    <section className="relative py-24 lg:py-32 overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none" aria-hidden="true"
+        style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 50%, rgba(6,182,212,0.06) 0%, transparent 70%)' }} />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
           variants={stagger}
@@ -784,13 +852,20 @@ const steps = [
 
 function HowItWorksSection() {
   return (
-    <section className="py-24 lg:py-32">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <section className="relative py-24 lg:py-32 overflow-hidden">
+      {/* Gradiente de entrada — torna a transição visível */}
+      <div
+        className="absolute top-0 inset-x-0 h-48 pointer-events-none"
+        style={{ background: 'linear-gradient(to bottom, rgba(99,102,241,0.13) 0%, rgba(6,182,212,0.04) 60%, transparent 100%)' }}
+      />
+      <ParticleField count={6} />
+
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
           variants={stagger}
           initial="hidden"
           whileInView="show"
-          viewport={{ once: true }}
+          viewport={{ once: true, margin: '-80px' }}
           className="text-center mb-16 space-y-4"
         >
           <motion.div variants={fadeUp}>
@@ -802,8 +877,16 @@ function HowItWorksSection() {
         </motion.div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 relative">
-          {/* Connecting line on desktop */}
-          <div className="hidden lg:block absolute top-10 left-[12.5%] right-[12.5%] h-0.5 bg-gradient-to-r from-brand-500/50 via-cyan-500/50 to-amber-500/50" />
+          {/* Connecting line — animada ao entrar na viewport */}
+          <div className="hidden lg:block absolute top-10 left-[12.5%] right-[12.5%] h-0.5 rounded-full overflow-hidden bg-surface-100/40">
+            <motion.div
+              className="h-full origin-left bg-gradient-to-r from-brand-500/60 via-cyan-500/60 to-amber-500/60"
+              initial={{ scaleX: 0 }}
+              whileInView={{ scaleX: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 1.4, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            />
+          </div>
 
           {steps.map((step, i) => (
             <motion.div
@@ -811,26 +894,38 @@ function HowItWorksSection() {
               variants={fadeUp}
               initial="hidden"
               whileInView="show"
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.15 }}
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ delay: i * 0.18 }}
               className="relative"
             >
-              <div className="glass rounded-2xl p-6 text-center group hover:border-brand-500/20 transition-all duration-300 hover:-translate-y-1">
+              <motion.div
+                className="glass rounded-2xl p-6 text-center group cursor-default border border-transparent"
+                whileHover={{
+                  y: -8,
+                  borderColor: `${step.color}25`,
+                  boxShadow: `0 20px 40px rgba(0,0,0,0.35), 0 0 24px ${step.color}20`,
+                  transition: { duration: 0.25, ease: 'easeOut' },
+                }}
+              >
                 {/* Step number badge */}
                 <div
-                  className="relative inline-flex items-center justify-center w-12 h-12 rounded-2xl font-display font-black text-sm mb-5 z-10"
+                  className="relative inline-flex items-center justify-center w-12 h-12 rounded-2xl font-display font-black text-sm mb-5 z-10 transition-transform duration-300 group-hover:scale-110"
                   style={{ background: `${step.color}18`, border: `1px solid ${step.color}30`, color: step.color }}
                 >
                   {step.number}
                   <div
-                    className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{ boxShadow: `0 0 20px ${step.color}40` }}
+                    className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                    style={{ boxShadow: `0 0 24px ${step.color}50` }}
                   />
                 </div>
-                <step.icon className="w-6 h-6 mx-auto mb-4" style={{ color: step.color }} />
+
+                <motion.div whileHover={{ rotate: [0, -8, 8, 0], transition: { duration: 0.45 } }}>
+                  <step.icon className="w-6 h-6 mx-auto mb-4" style={{ color: step.color }} />
+                </motion.div>
+
                 <h3 className="font-display font-bold mb-2 leading-snug">{step.title}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{step.description}</p>
-              </div>
+              </motion.div>
             </motion.div>
           ))}
         </div>
@@ -904,7 +999,9 @@ const plans = [
 
 function PricingSection() {
   return (
-    <section id="preços" className="py-24 lg:py-32 bg-mesh">
+    <section id="preços" className="relative py-24 lg:py-32 overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none" aria-hidden="true"
+        style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 50%, rgba(99,102,241,0.07) 0%, transparent 70%)' }} />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
           variants={stagger}
@@ -989,6 +1086,127 @@ function PricingSection() {
               </Link>
             </motion.div>
           ))}
+        </motion.div>
+      </div>
+    </section>
+  )
+}
+
+// ──────────────────────────────────────────────
+// Sobre Section
+// ──────────────────────────────────────────────
+function SobreSection() {
+  const values = [
+    {
+      icon: Target,
+      title: 'Missão',
+      description: 'Tornar a gestão de academias acessível e eficiente, do menor estúdio ao complexo fitness.',
+      color: '#6366F1',
+    },
+    {
+      icon: TrendingUp,
+      title: 'Visão',
+      description: 'Ser a plataforma de referência para academias independentes no Brasil e América Latina.',
+      color: '#06B6D4',
+    },
+    {
+      icon: Shield,
+      title: 'Valores',
+      description: 'Simplicidade, privacidade e foco no usuário final — o aluno que treina com as mãos suadas.',
+      color: '#10B981',
+    },
+  ]
+
+  return (
+    <section id="sobre" className="py-24 lg:py-32">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: '-100px' }}
+          className="text-center mb-16 space-y-4"
+        >
+          <motion.div variants={fadeUp}>
+            <span className="badge-primary text-xs uppercase tracking-widest">Sobre nós</span>
+          </motion.div>
+          <motion.h2 variants={fadeUp} className="text-4xl lg:text-5xl font-display font-extrabold">
+            Feito por quem entende
+            <span className="block gradient-text">o chão da academia</span>
+          </motion.h2>
+          <motion.p variants={fadeUp} className="text-muted-foreground text-lg max-w-2xl mx-auto leading-relaxed">
+            O GymFlow nasceu da frustração com ferramentas genéricas que não entendiam o dia a dia de academias
+            independentes. Criamos uma plataforma focada em simplicidade, velocidade e experiência mobile — porque
+            o aluno está na academia, não na frente do computador.
+          </motion.p>
+        </motion.div>
+
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: '-50px' }}
+          className="grid md:grid-cols-3 gap-6 mb-16"
+        >
+          {values.map((v) => (
+            <motion.div
+              key={v.title}
+              variants={scaleIn}
+              className="glass rounded-2xl p-7 group hover:border-brand-500/20 transition-all duration-300 hover:-translate-y-1"
+            >
+              <div
+                className="w-11 h-11 rounded-xl flex items-center justify-center mb-5"
+                style={{ background: `${v.color}18`, border: `1px solid ${v.color}30` }}
+              >
+                <v.icon className="w-5 h-5" style={{ color: v.color }} />
+              </div>
+              <h3 className="font-display font-bold text-lg mb-2">{v.title}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{v.description}</p>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="glass rounded-3xl p-8 lg:p-12 max-w-4xl mx-auto"
+          style={{ borderColor: 'rgba(99,102,241,0.2)' }}
+        >
+          <div className="grid lg:grid-cols-2 gap-8 items-center">
+            <div className="space-y-4">
+              <span className="badge-primary text-xs">Nossa história</span>
+              <h3 className="text-2xl font-display font-bold leading-snug">
+                Uma startup brasileira,<br />com o coração na academia
+              </h3>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                Desenvolvido no Brasil, o GymFlow é construído com as melhores tecnologias modernas — Next.js,
+                Supabase e Stripe — para entregar uma experiência de nível enterprise acessível para qualquer academia.
+              </p>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                Nossa prioridade é o aluno que usa o app durante o treino: interface limpa, rápida e que funciona
+                mesmo com sinal fraco.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { label: 'Fundado em', value: '2024', color: '#6366F1' },
+                { label: 'País', value: '🇧🇷 Brasil', color: '#10B981' },
+                { label: 'Stack', value: 'Next.js + Supabase', color: '#06B6D4' },
+                { label: 'Foco', value: 'Mobile-first', color: '#F59E0B' },
+              ].map(({ label, value, color }) => (
+                <div
+                  key={label}
+                  className="rounded-xl p-4"
+                  style={{ background: `${color}10`, border: `1px solid ${color}20` }}
+                >
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">{label}</p>
+                  <p className="font-display font-bold text-sm">{value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </motion.div>
       </div>
     </section>
@@ -1115,15 +1333,25 @@ function Footer() {
 // ──────────────────────────────────────────────
 export default function LandingPage() {
   return (
-    <div className="relative min-h-screen bg-background">
+    <div className="relative min-h-screen bg-background bg-mesh">
+      {/* Vignette — fixed viewport overlay, below nav (z-50) */}
+      <div
+        className="fixed inset-0 pointer-events-none z-[45]"
+        aria-hidden="true"
+        style={{
+          background:
+            'radial-gradient(ellipse 80% 75% at 50% 50%, transparent 45%, rgba(0,0,0,0.55) 100%)',
+        }}
+      />
       <Nav />
       <main>
         <Hero />
-        <StatsSection />
         <FeaturesSection />
         <PersonasSection />
+        <SectionTransition />
         <HowItWorksSection />
         <PricingSection />
+        <SobreSection />
         <CTASection />
       </main>
       <Footer />

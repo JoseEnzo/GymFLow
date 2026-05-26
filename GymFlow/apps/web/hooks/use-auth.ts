@@ -53,7 +53,8 @@ export function useAuth() {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
     await loadUserData()
-    router.push(redirectTo ?? '/dashboard')
+    const { academies } = useAuthStore.getState()
+    router.push(redirectTo ?? (academies.length > 0 ? '/dashboard' : '/onboarding'))
   }
 
   async function signUp(email: string, password: string, fullName: string, accountType: 'owner' | 'student' = 'owner', redirectTo?: string) {
@@ -64,7 +65,7 @@ export function useAuth() {
     })
     if (error) throw error
     toast.success('Conta criada com sucesso!')
-    router.push(redirectTo ?? `/onboarding?type=${accountType}`)
+    router.push(redirectTo ?? '/onboarding')
   }
 
   async function signOut() {
