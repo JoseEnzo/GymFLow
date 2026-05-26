@@ -1,0 +1,50 @@
+===============================================
+  COMANDOS GIT - GYMFLOW
+===============================================
+
+-----------------------------------------------
+1. PC NOVO (primeira vez) - CLONAR O PROJETO
+-----------------------------------------------
+git clone https://github.com/JoseEnzo/GymFLow.git
+cd GymFLow
+git config user.name "JoseEnzo"
+git config user.email "jose.correia9393@gmail.com"
+
+
+-----------------------------------------------
+2. CHEGOU NO PC (projeto já clonado) - ATUALIZAR
+-----------------------------------------------
+git pull
+
+
+-----------------------------------------------
+3. ANTES DE SAIR - SALVAR NO GITHUB
+-----------------------------------------------
+
+cd /home/aluno/Downloads/GymFLow-main
+git add GymFlow.txt COMANDOS_GIT.txt
+git commit -m "descrição do que você fez"
+git push -u origin main
+
+===============================================
+  RESUMO DO DIA A DIA
+===============================================
+
+Chegou no PC  →  git pull
+Trabalhou     →  git add . && git commit -m "sua mensagem" && git push
+Saiu          →  seguro no GitHub
+
+===============================================
+  ATENÇÃO
+===============================================
+Na primeira vez que der "git push" num PC novo,
+o GitHub vai pedir usuario e senha.
+
+- Usuario: JoseEnzo
+- Senha: use um Personal Access Token (nao a senha da conta)
+
+Para gerar o token:
+  github.com → Settings → Developer settings
+  → Personal access tokens → Tokens (classic) → Generate new token
+  Marque a opcao: repo
+  Copie o token e use como senha no git push
