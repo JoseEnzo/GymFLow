@@ -80,7 +80,7 @@ Acesse em: http://localhost:3000
 
 ---
 
-## Comandos úteis
+## Comandos úteis do projeto
 
 ```bash
 pnpm install      # instalar dependências
@@ -88,3 +88,33 @@ pnpm dev          # rodar em desenvolvimento
 pnpm build        # gerar build de produção
 pnpm lint         # checar erros de lint
 ```
+
+---
+
+## Subir alterações para o GitHub
+
+```bash
+# 1. Ver o que mudou
+git status
+
+# 2. Adicionar os arquivos alterados
+git add .                     # todos os arquivos
+# ou
+git add nome-do-arquivo.tsx   # arquivo específico
+
+# 3. Criar o commit com mensagem
+git commit -m "descrição do que você fez"
+
+# 4. Enviar pro GitHub
+git push origin main
+```
+
+**Fluxo completo de exemplo:**
+```bash
+git status
+git add .
+git commit -m "feat: adicionar tela de treinos"
+git push origin main
+```
+
+> Sempre faça `git pull origin main` antes de começar a trabalhar, para evitar conflitos.
