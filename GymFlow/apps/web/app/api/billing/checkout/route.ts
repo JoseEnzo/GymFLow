@@ -2,18 +2,15 @@ import { NextResponse } from 'next/server'
 
 import { createClient } from '@/lib/supabase/server'
 import { createCheckoutSession } from '@/lib/stripe'
+import { guardRoute } from '@/lib/api-guard'
+import { checkoutSchema } from '@/lib/validations'
 
 export async function POST(request: Request) {
+  const result = await guardRoute(request, checkoutSchema)
+  if (result instanceof NextResponse) return result
+  const { user, body: { academyId, planId } } = result
+
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
-
-  const body = await request.json()
-  const { academyId, planId } = body as { academyId?: string; planId?: 'starter' | 'pro' }
-
-  if (!academyId || !planId || !['starter', 'pro'].includes(planId)) {
-    return NextResponse.json({ error: 'Parâmetros inválidos' }, { status: 400 })
-  }
 
   const { data: member } = await supabase
     .from('academy_members')

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, Suspense, useRef } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 
 import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
+import { Turnstile, type TurnstileRef } from '@/components/ui/turnstile'
 
 const schema = z.object({
   email: z.string().email('E-mail inválido'),
@@ -37,6 +38,7 @@ function LoginInner() {
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
+  const turnstileRef = useRef<TurnstileRef>(null)
 
   const {
     register,
@@ -48,6 +50,23 @@ function LoginInner() {
     setIsLoading(true)
     setServerError(null)
     try {
+      // Verificar Turnstile antes de chamar Supabase
+      const token = await turnstileRef.current?.getToken()
+      if (token !== '') {
+        // token vazio = dev sem SITE_KEY configurado (bypass)
+        const res = await fetch('/api/turnstile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        })
+        if (!res.ok) {
+          const err = await res.json() as { error?: string }
+          setServerError(err.error ?? 'Verificação de segurança falhou.')
+          turnstileRef.current?.reset()
+          return
+        }
+      }
+
       await signIn(data.email, data.password, redirect ?? undefined)
     } catch (err: unknown) {
       const msg = (err as Error).message
@@ -56,6 +75,7 @@ function LoginInner() {
       } else {
         setServerError(msg)
       }
+      turnstileRef.current?.reset()
     } finally {
       setIsLoading(false)
     }
@@ -140,6 +160,9 @@ function LoginInner() {
             <p className="text-xs text-red-400">{errors.password.message}</p>
           )}
         </motion.div>
+
+        {/* Turnstile widget (invisível por padrão no modo "managed") */}
+        <Turnstile ref={turnstileRef} appearance="managed" />
 
         {/* Submit */}
         <motion.div variants={fadeUp} custom={3}>

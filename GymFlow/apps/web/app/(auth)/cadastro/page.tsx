@@ -7,9 +7,10 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Eye, EyeOff, Loader2, AlertCircle, Check, Building2, Dumbbell, ArrowLeft } from 'lucide-react'
+import { Eye, EyeOff, Loader2, AlertCircle, Check, Building2, Dumbbell, ArrowLeft, ShieldCheck } from 'lucide-react'
 
 import { useAuth } from '@/hooks/use-auth'
+import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 
 const schema = z.object({
@@ -80,12 +81,27 @@ function CadastroInner() {
   const searchParams = useSearchParams()
   const inviteToken = searchParams.get('token')
 
-  // If arriving via invite, skip type selection — they're always a student
+  // If arriving via invite, skip type selection
   const [step, setStep] = useState<0 | 1>(inviteToken ? 1 : 0)
   const [accountType, setAccountType] = useState<'owner' | 'student'>(inviteToken ? 'student' : 'owner')
+  const [inviteRole, setInviteRole] = useState<'personal' | 'student' | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!inviteToken) return
+    const supabase = createClient()
+    supabase
+      .from('invites')
+      .select('role')
+      .eq('token', inviteToken)
+      .eq('is_active', true)
+      .single()
+      .then(({ data }) => {
+        if (data?.role) setInviteRole(data.role as 'personal' | 'student')
+      })
+  }, [inviteToken])
 
   const {
     register,
@@ -223,10 +239,20 @@ function CadastroInner() {
 
             {/* Invite banner */}
             {inviteToken && (
-              <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 text-sm">
-                <Check className="w-4 h-4 flex-shrink-0" />
-                Convite válido — após criar a conta você entrará automaticamente para a academia.
-              </div>
+              inviteRole === 'personal' ? (
+                <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-sm">
+                  <ShieldCheck className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold">Você foi convidado como Personal Trainer</p>
+                    <p className="text-indigo-400/70 text-xs mt-0.5">Após criar a conta, você terá acesso ao painel de treinos da academia.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 text-sm">
+                  <Check className="w-4 h-4 flex-shrink-0" />
+                  Convite válido — após criar a conta você entrará automaticamente para a academia.
+                </div>
+              )
             )}
 
             {/* Error */}

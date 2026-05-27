@@ -2,18 +2,15 @@ import { NextResponse } from 'next/server'
 
 import { createClient } from '@/lib/supabase/server'
 import { createCustomerPortalSession } from '@/lib/stripe'
+import { guardRoute } from '@/lib/api-guard'
+import { portalSchema } from '@/lib/validations'
 
 export async function POST(request: Request) {
+  const result = await guardRoute(request, portalSchema)
+  if (result instanceof NextResponse) return result
+  const { user, body: { academyId } } = result
+
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
-
-  const body = await request.json()
-  const { academyId } = body as { academyId?: string }
-
-  if (!academyId) {
-    return NextResponse.json({ error: 'academyId obrigatório' }, { status: 400 })
-  }
 
   const { data: member } = await supabase
     .from('academy_members')

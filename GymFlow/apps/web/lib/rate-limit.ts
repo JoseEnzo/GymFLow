@@ -1,7 +1,40 @@
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 
-function createLimiters() {
+// ── In-memory fallback (sem Upstash) ─────────────────────────────────────────
+// Garante proteção mesmo em dev ou quando variáveis não estão configuradas.
+// Atenção: não escala horizontalmente — use Upstash em produção com múltiplos pods.
+class InMemoryLimiter {
+  private hits = new Map<string, number[]>()
+
+  constructor(
+    private readonly max: number,
+    private readonly windowMs: number,
+  ) {}
+
+  async limit(key: string): Promise<{ success: boolean }> {
+    const now = Date.now()
+    const prev = this.hits.get(key) ?? []
+    const recent = prev.filter((t) => t > now - this.windowMs)
+
+    if (recent.length >= this.max) return { success: false }
+
+    recent.push(now)
+    this.hits.set(key, recent)
+
+    // Limpeza preventiva para não vazar memória
+    if (this.hits.size > 5000) {
+      for (const [k, v] of this.hits) {
+        if (v.every((t) => t <= now - this.windowMs)) this.hits.delete(k)
+      }
+    }
+
+    return { success: true }
+  }
+}
+
+// ── Upstash (produção) ────────────────────────────────────────────────────────
+function createUpstashLimiters() {
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
     return null
   }
@@ -33,4 +66,14 @@ function createLimiters() {
   }
 }
 
-export const limiters = createLimiters()
+// ── Exportação unificada ──────────────────────────────────────────────────────
+// Sempre retorna um limiter válido — Upstash se configurado, in-memory se não.
+const upstash = createUpstashLimiters()
+
+export const limiters = upstash ?? {
+  auth:   new InMemoryLimiter(5,  15 * 60 * 1000),  // 5/15min
+  invite: new InMemoryLimiter(10,  5 * 60 * 1000),  // 10/5min
+  api:    new InMemoryLimiter(30,       60 * 1000),  // 30/min
+}
+
+export const isUsingUpstash = upstash !== null

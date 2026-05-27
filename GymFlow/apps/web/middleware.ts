@@ -18,38 +18,37 @@ function getIp(request: NextRequest): string {
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
 
-  if (limiters) {
-    const ip = getIp(request)
+  // Rate limiting: sempre ativo (Upstash em prod, in-memory em dev)
+  const ip = getIp(request)
 
-    if (RATE_LIMITED_AUTH.some((r) => path === r)) {
-      const { success } = await limiters.auth.limit(ip)
-      if (!success) {
-        return NextResponse.json(
-          { error: 'Muitas tentativas. Tente novamente em 15 minutos.' },
-          { status: 429 }
-        )
-      }
+  if (RATE_LIMITED_AUTH.some((r) => path === r)) {
+    const { success } = await limiters.auth.limit(ip)
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Muitas tentativas. Tente novamente em 15 minutos.' },
+        { status: 429 }
+      )
     }
+  }
 
-    if (path.startsWith('/convite/') && path.length > '/convite/'.length) {
-      const { success } = await limiters.invite.limit(ip)
-      if (!success) {
-        return NextResponse.json(
-          { error: 'Muitas tentativas. Tente novamente em alguns minutos.' },
-          { status: 429 }
-        )
-      }
+  if (path.startsWith('/convite/') && path.length > '/convite/'.length) {
+    const { success } = await limiters.invite.limit(ip)
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Muitas tentativas. Tente novamente em alguns minutos.' },
+        { status: 429 }
+      )
     }
+  }
 
-    if (path.startsWith('/api/') && !path.startsWith('/api/webhooks/')) {
-      const userId = request.cookies.get('sb-access-token')?.value ?? ip
-      const { success } = await limiters.api.limit(userId)
-      if (!success) {
-        return NextResponse.json(
-          { error: 'Limite de requisições atingido.' },
-          { status: 429 }
-        )
-      }
+  if (path.startsWith('/api/') && !path.startsWith('/api/webhooks/')) {
+    const userId = request.cookies.get('sb-access-token')?.value ?? ip
+    const { success } = await limiters.api.limit(userId)
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Limite de requisições atingido.' },
+        { status: 429 }
+      )
     }
   }
 

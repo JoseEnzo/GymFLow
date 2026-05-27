@@ -13,6 +13,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
+import { BioimpedanceSection } from '@/components/bioimpedance/bioimpedance-section'
+import { MeasurementsSection } from '@/components/bioimpedance/measurements-section'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 12 },
@@ -230,8 +232,29 @@ export default function StudentDetailPage() {
         </motion.div>
       )}
 
+      {/* Bioimpedância */}
+      {currentAcademy && (
+        <motion.div custom={3} variants={fadeUp} initial="hidden" animate="show">
+          <BioimpedanceSection
+            studentId={id}
+            academyId={currentAcademy.id}
+            studentHeight={student.height_cm ?? undefined}
+          />
+        </motion.div>
+      )}
+
+      {/* Medidas Corporais */}
+      {currentAcademy && (
+        <motion.div custom={4} variants={fadeUp} initial="hidden" animate="show">
+          <MeasurementsSection
+            studentId={id}
+            academyId={currentAcademy.id}
+          />
+        </motion.div>
+      )}
+
       {/* Workout sheets */}
-      <motion.div custom={3} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5">
+      <motion.div custom={5} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-display font-bold text-sm">Fichas de treino ({sheets.length})</h3>
           <Link

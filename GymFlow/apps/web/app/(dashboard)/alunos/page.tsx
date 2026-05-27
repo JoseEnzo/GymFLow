@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   Search, UserPlus, Filter, Dumbbell, Flame,
-  Clock, ChevronRight, Copy, Send, Loader2, Users,
+  Clock, ChevronRight, Copy, Loader2, Users,
+  Link2, CheckCircle2,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -101,98 +102,188 @@ function StudentCard({ student }: { student: Student }) {
 }
 
 function InvitePanel({ onClose, academyId, role }: { onClose: () => void; academyId: string; role: 'student' | 'personal' }) {
-  const [inviteCode, setInviteCode] = useState<string | null>(null)
-  const [inviteLink, setInviteLink] = useState<string | null>(null)
-  const [generating, setGenerating] = useState(false)
   const supabase = createClient()
+  const [status, setStatus] = useState<'idle' | 'generating' | 'done'>('idle')
+  const [invite, setInvite] = useState<{ code: string; token: string; expiresAt: string | null; usesLimit: number | null } | null>(null)
+  const [expiry, setExpiry] = useState<'7d' | '30d' | 'never'>('7d')
+  const [multiUse, setMultiUse] = useState(false)
 
-  async function generateInvite() {
-    setGenerating(true)
+  const label = role === 'personal' ? 'personal' : 'aluno'
+  const link = invite ? `${window.location.origin}/convite/${invite.token}` : ''
+
+  async function generate() {
+    setStatus('generating')
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Não autenticado')
 
       const code = Math.random().toString(36).substring(2, 8).toUpperCase()
       const token = crypto.randomUUID()
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+
+      let expiresAt: string | null = null
+      if (expiry === '7d') expiresAt = new Date(Date.now() + 7 * 86_400_000).toISOString()
+      if (expiry === '30d') expiresAt = new Date(Date.now() + 30 * 86_400_000).toISOString()
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from('invites').insert({
+      const { error } = await (supabase as any).from('invites').insert({
         academy_id: academyId,
         created_by: user.id,
         code,
         token,
         role,
         expires_at: expiresAt,
-        uses_limit: 1,
+        uses_limit: multiUse ? null : 1,
       })
 
-      setInviteCode(code)
-      setInviteLink(`${window.location.origin}/convite/${token}`)
-    } catch {
-      toast.error('Erro ao gerar convite.')
-    } finally {
-      setGenerating(false)
+      if (error) throw error
+      setInvite({ code, token, expiresAt, usesLimit: multiUse ? null : 1 })
+      setStatus('done')
+      toast.success('Convite gerado!')
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? 'Erro ao gerar convite.')
+      setStatus('idle')
     }
   }
 
-  useEffect(() => { generateInvite() }, [])
+  if (status === 'done' && invite) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 8 }}
+        className="glass rounded-2xl p-5 border border-brand-500/20 shadow-glow-sm space-y-4"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-emerald-400">
+            <CheckCircle2 className="w-4 h-4" />
+            <p className="text-sm font-semibold">Convite de {label} gerado!</p>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xs">Fechar</button>
+        </div>
 
-  const label = role === 'personal' ? 'personal' : 'aluno'
+        <div>
+          <p className="text-xs text-muted-foreground mb-1.5">Código de acesso</p>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 font-mono font-black text-2xl text-center tracking-[0.3em] py-3 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-300">
+              {invite.code}
+            </div>
+            <button
+              onClick={() => { navigator.clipboard.writeText(invite.code); toast.success('Código copiado!') }}
+              className="p-3 rounded-xl border border-border/60 hover:bg-surface-200 transition-all text-muted-foreground hover:text-foreground"
+            >
+              <Copy className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="divider" />
+
+        <div>
+          <p className="text-xs text-muted-foreground mb-1.5">Link de convite</p>
+          <div className="flex items-center gap-2">
+            <input readOnly value={link} className="field text-xs flex-1" />
+            <button
+              onClick={() => { navigator.clipboard.writeText(link); toast.success('Link copiado!') }}
+              className="p-3 rounded-xl border border-border/60 hover:bg-surface-200 transition-all text-muted-foreground hover:text-foreground flex-shrink-0"
+            >
+              <Copy className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Clock className="w-3 h-3" />
+          {invite.expiresAt
+            ? `Expira em ${new Date(invite.expiresAt).toLocaleDateString('pt-BR')}`
+            : 'Sem validade definida'}
+          {invite.usesLimit === 1 && ' · Uso único'}
+          {!invite.usesLimit && ' · Usos ilimitados'}
+        </div>
+
+        <button onClick={() => { setStatus('idle'); setInvite(null) }} className="text-xs text-brand-400 hover:underline">
+          Gerar outro convite
+        </button>
+      </motion.div>
+    )
+  }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 8 }}
-      className="glass rounded-2xl p-5 border border-brand-500/20 shadow-glow-sm"
+      className="glass rounded-2xl p-5 border border-brand-500/20 shadow-glow-sm space-y-5"
     >
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-display font-bold">Convidar {label}</h3>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xs">
-          Fechar
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-brand-500/15 flex items-center justify-center">
+            <Link2 className="w-4 h-4 text-brand-400" />
+          </div>
+          <div>
+            <p className="font-display font-bold text-sm">Convidar {label}</p>
+            <p className="text-xs text-muted-foreground">Compartilhe o link ou código</p>
+          </div>
+        </div>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xs">Fechar</button>
+      </div>
+
+      {/* Validade */}
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-muted-foreground">Validade do convite</p>
+        <div className="flex gap-2">
+          {([
+            { value: '7d', label: '7 dias' },
+            { value: '30d', label: '30 dias' },
+            { value: 'never', label: 'Sem validade' },
+          ] as const).map(({ value, label: l }) => (
+            <button
+              key={value}
+              onClick={() => setExpiry(value)}
+              className={cn(
+                'flex-1 py-2 rounded-xl text-xs font-medium border transition-all',
+                expiry === value
+                  ? 'bg-brand-500/15 text-brand-300 border-brand-500/30'
+                  : 'border-border/60 text-muted-foreground hover:bg-surface-200'
+              )}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tipo de uso */}
+      <div className="flex items-center justify-between glass rounded-xl p-3">
+        <div>
+          <p className="text-sm font-medium">Usos ilimitados</p>
+          <p className="text-xs text-muted-foreground">Padrão: uso único por {label}</p>
+        </div>
+        <button
+          onClick={() => setMultiUse(!multiUse)}
+          className={cn('relative rounded-full transition-all duration-300 flex-shrink-0', multiUse ? 'bg-brand-500' : 'bg-surface-300')}
+          style={{ width: '2.5rem', height: '1.375rem' }}
+        >
+          <span
+            className={cn('absolute top-0.5 rounded-full bg-white shadow transition-all duration-300', multiUse ? 'left-5' : 'left-0.5')}
+            style={{ width: '1.125rem', height: '1.125rem' }}
+          />
         </button>
       </div>
 
-      {generating || !inviteCode ? (
-        <div className="flex justify-center py-8">
-          <Loader2 className="w-5 h-5 animate-spin text-brand-400" />
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">Código de convite de {label} (válido por 7 dias)</p>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 font-mono font-black text-2xl text-center tracking-[0.3em] py-3 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-300">
-                {inviteCode}
-              </div>
-              <button
-                onClick={() => { navigator.clipboard.writeText(inviteCode); toast.success('Código copiado!') }}
-                className="p-3 rounded-xl border border-border/60 hover:bg-surface-200 transition-all text-muted-foreground hover:text-foreground"
-              >
-                <Copy className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="divider" />
-
-          {inviteLink && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-2">Link de convite</p>
-              <div className="flex items-center gap-2">
-                <input readOnly value={inviteLink} className="field text-xs flex-1" />
-                <button
-                  onClick={() => { navigator.clipboard.writeText(inviteLink); toast.success('Link copiado!') }}
-                  className="p-3 rounded-xl border border-border/60 hover:bg-surface-200 transition-all text-muted-foreground hover:text-foreground flex-shrink-0"
-                >
-                  <Copy className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      <button
+        onClick={generate}
+        disabled={status === 'generating'}
+        className="btn-primary w-full py-3 rounded-xl text-sm font-semibold"
+      >
+        {status === 'generating' ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <>
+            <Link2 className="w-4 h-4" />
+            Gerar convite de {label}
+          </>
+        )}
+      </button>
     </motion.div>
   )
 }

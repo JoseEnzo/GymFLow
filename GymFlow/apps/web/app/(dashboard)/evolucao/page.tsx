@@ -7,7 +7,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
 } from 'recharts'
-import { TrendingUp, Dumbbell, ChevronDown, Loader2, BarChart3 } from 'lucide-react'
+import { TrendingUp, Dumbbell, ChevronDown, Loader2, BarChart3, Ruler, Activity } from 'lucide-react'
+import { BodyEvolutionSection } from '@/components/evolution/body-evolution-section'
 import { toast } from 'sonner'
 
 import { createClient } from '@/lib/supabase/client'
@@ -78,6 +79,7 @@ export default function EvolucaoPage() {
   const { currentAcademy, profile } = useAuthStore()
   const supabase = createClient()
 
+  const [activeTab, setActiveTab] = useState<'treinos' | 'corpo'>('treinos')
   const [weeklyData, setWeeklyData] = useState<WeekPoint[]>([])
   const [exercises, setExercises] = useState<ExerciseOption[]>([])
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null)
@@ -218,20 +220,46 @@ export default function EvolucaoPage() {
       {/* Header */}
       <motion.div custom={0} variants={fadeUp} initial="hidden" animate="show">
         <h2 className="section-title">Evolução</h2>
-        <p className="section-subtitle mt-1">
-          {loadingWeekly ? 'Carregando...' : 'Últimas 8 semanas de treino'}
-        </p>
+        <p className="section-subtitle mt-1">Acompanhe seu progresso ao longo do tempo</p>
       </motion.div>
 
+      {/* Tabs */}
+      <motion.div custom={1} variants={fadeUp} initial="hidden" animate="show"
+        className="flex gap-1 p-1 glass rounded-xl w-fit border border-border/40"
+      >
+        {([
+          { key: 'treinos', label: 'Treinos',  icon: Dumbbell  },
+          { key: 'corpo',   label: 'Medidas',  icon: Ruler     },
+        ] as const).map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            className={cn(
+              'flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+              activeTab === key
+                ? 'bg-brand-500/15 text-brand-300 border border-brand-500/20'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+          </button>
+        ))}
+      </motion.div>
+
+      {/* ── Tab: Corpo ── */}
+      {activeTab === 'corpo' && <BodyEvolutionSection />}
+
+      {/* ── Tab: Treinos ── */}
       {/* Loading */}
-      {loadingWeekly && (
+      {activeTab === 'treinos' && loadingWeekly && (
         <div className="flex justify-center py-20">
           <Loader2 className="w-6 h-6 animate-spin text-brand-400" />
         </div>
       )}
 
       {/* Empty */}
-      {!loadingWeekly && weeklyData.length === 0 && (
+      {activeTab === 'treinos' && !loadingWeekly && weeklyData.length === 0 && (
         <motion.div custom={1} variants={fadeUp} initial="hidden" animate="show"
           className="text-center py-20"
         >
@@ -245,7 +273,7 @@ export default function EvolucaoPage() {
         </motion.div>
       )}
 
-      {!loadingWeekly && weeklyData.length > 0 && (
+      {activeTab === 'treinos' && !loadingWeekly && weeklyData.length > 0 && (
         <>
           {/* Summary */}
           <motion.div custom={1} variants={fadeUp} initial="hidden" animate="show"
