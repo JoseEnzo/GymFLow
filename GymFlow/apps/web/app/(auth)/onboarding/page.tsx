@@ -61,7 +61,7 @@ const STUDENT_PLAN = {
 }
 
 // ─────────────────────────────────────────────────────────────
-type Role = 'owner' | 'student' | null
+type Role = 'owner' | 'personal' | 'student' | null
 
 function OnboardingContent() {
   const router = useRouter()
@@ -84,15 +84,16 @@ function OnboardingContent() {
   const firstName = profile?.full_name?.split(' ')[0] ?? 'você'
 
   // ── Salvar academia (owner/personal) ─────────────────────
-  async function saveAcademy() {
-    if (!academyName.trim()) return
+  async function saveAcademy(autoName?: string) {
+    const name = autoName ?? academyName
+    if (!name.trim()) return
     setSaving(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Não autenticado')
 
       const slug =
-        academyName
+        name
           .toLowerCase()
           .normalize('NFD')
           .replace(/[̀-ͯ]/g, '')
@@ -104,7 +105,7 @@ function OnboardingContent() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: newAcademy, error: academyError } = await (supabase.from('academies') as any).insert({
         owner_id: user.id,
-        name: academyName,
+        name,
         slug,
         plan,
       }).select().single()
@@ -189,9 +190,25 @@ function OnboardingContent() {
                     <Building2 className="w-6 h-6 text-brand-400" />
                   </div>
                   <div>
-                    <p className="font-semibold">Sou proprietário ou personal trainer</p>
+                    <p className="font-semibold">Sou proprietário de academia</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       Vou criar minha academia e gerenciar alunos
+                    </p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto group-hover:translate-x-1 transition-transform" />
+                </button>
+
+                <button
+                  onClick={() => { setRole('personal'); setStep('plan') }}
+                  className="flex items-center gap-4 p-5 rounded-2xl border border-border/60 hover:border-brand-500/40 hover:bg-brand-500/5 text-left transition-all duration-200 group"
+                >
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-500/15 flex-shrink-0 group-hover:scale-105 transition-transform">
+                    <Users className="w-6 h-6 text-brand-400" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">Sou personal trainer</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Trabalho de forma independente com meus alunos
                     </p>
                   </div>
                   <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto group-hover:translate-x-1 transition-transform" />
@@ -271,10 +288,17 @@ function OnboardingContent() {
               </div>
 
               <button
-                onClick={() => setStep('academy')}
-                className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
+                onClick={() => role === 'personal'
+                  ? saveAcademy(`${firstName} Personal`)
+                  : setStep('academy')
+                }
+                disabled={saving}
+                className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
               >
-                Continuar <ArrowRight className="w-4 h-4" />
+                {saving
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <>Continuar <ArrowRight className="w-4 h-4" /></>
+                }
               </button>
             </motion.div>
           )}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, AlertCircle, CheckCircle2, Dumbbell } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -147,132 +147,157 @@ export default function ConvitePage() {
           </div>
         </div>
 
-        {/* Loading state */}
-        {status === 'loading' && (
-          <div className="flex flex-col items-center gap-4 py-8">
-            <div className="relative">
-              <div className="w-12 h-12 rounded-full border-2 border-brand-500/30 animate-spin border-t-brand-500" />
-            </div>
-            <p className="text-sm text-muted-foreground">Validando convite...</p>
-          </div>
-        )}
+        <AnimatePresence mode="wait">
 
-        {/* Error state */}
-        {status === 'error' && (
-          <div className="text-center space-y-4 py-8">
-            <div className="w-14 h-14 rounded-full bg-destructive/15 flex items-center justify-center mx-auto">
-              <AlertCircle className="w-7 h-7 text-red-400" />
-            </div>
-            <div>
-              <h2 className="font-display font-bold text-lg">Convite inválido</h2>
-              <p className="text-sm text-muted-foreground mt-1">{error}</p>
-            </div>
-            <button
-              onClick={() => router.push('/')}
-              className="btn-secondary w-full py-3 rounded-xl text-sm"
+          {/* Loading state */}
+          {status === 'loading' && (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="flex flex-col items-center gap-4 py-8"
             >
-              Voltar ao início
-            </button>
-          </div>
-        )}
+              <div className="w-12 h-12 rounded-full border-2 border-brand-500/30 animate-spin border-t-brand-500" />
+              <p className="text-sm text-muted-foreground">Validando convite...</p>
+            </motion.div>
+          )}
 
-        {/* Found state */}
-        {(status === 'found' || status === 'accepting') && invite && (
-          <div className="space-y-6">
-            <div className="text-center space-y-3">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500/20 to-cyan-500/20 flex items-center justify-center mx-auto border border-brand-500/20">
-                <Dumbbell className="w-8 h-8 text-brand-400" />
-              </div>
+          {/* Error state */}
+          {status === 'error' && (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="text-center space-y-4 py-8"
+            >
+              <motion.div
+                initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.1, type: 'spring', stiffness: 200, damping: 15 }}
+                className="w-14 h-14 rounded-full bg-destructive/15 flex items-center justify-center mx-auto"
+              >
+                <AlertCircle className="w-7 h-7 text-red-400" />
+              </motion.div>
               <div>
-                <p className="text-sm text-muted-foreground">Você foi convidado para</p>
-                <h2 className="text-xl font-display font-bold mt-0.5">{invite.academyName}</h2>
+                <h2 className="font-display font-bold text-lg">Convite inválido</h2>
+                <p className="text-sm text-muted-foreground mt-1">{error}</p>
               </div>
-            </div>
+              <button
+                onClick={() => router.push('/')}
+                className="btn-secondary w-full py-3 rounded-xl text-sm"
+              >
+                Voltar ao início
+              </button>
+            </motion.div>
+          )}
 
-            {/* Details */}
-            <div className="glass rounded-2xl p-4 space-y-3 border border-border/40">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Função</span>
-                <span className="badge-primary">{roleLabel}</span>
+          {/* Found state */}
+          {(status === 'found' || status === 'accepting') && invite && (
+            <motion.div
+              key="found"
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="space-y-6"
+            >
+              <div className="text-center space-y-3">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500/20 to-cyan-500/20 flex items-center justify-center mx-auto border border-brand-500/20">
+                  <Dumbbell className="w-8 h-8 text-brand-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Você foi convidado para</p>
+                  <h2 className="text-xl font-display font-bold mt-0.5">{invite.academyName}</h2>
+                </div>
               </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Código</span>
-                <span className="font-mono font-bold text-brand-400 text-base tracking-widest">
-                  {invite.code}
-                </span>
-              </div>
-              {invite.expiresAt && (
+
+              <div className="glass rounded-2xl p-4 space-y-3 border border-border/40">
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground">Expira em</span>
-                  <span className="text-foreground">
-                    {new Date(invite.expiresAt).toLocaleDateString('pt-BR')}
+                  <span className="text-muted-foreground">Função</span>
+                  <span className="badge-primary">{roleLabel}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Código</span>
+                  <span className="font-mono font-bold text-brand-400 text-base tracking-widest">
+                    {invite.code}
                   </span>
                 </div>
-              )}
-            </div>
-
-            {profile ? (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground text-center">
-                  Entrando como <span className="text-foreground font-medium">{profile.full_name}</span>
-                </p>
-                <button
-                  onClick={acceptInvite}
-                  disabled={status === 'accepting'}
-                  className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm"
-                >
-                  {status === 'accepting' ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    `Aceitar e entrar para ${invite.academyName}`
-                  )}
-                </button>
+                {invite.expiresAt && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Expira em</span>
+                    <span className="text-foreground">
+                      {new Date(invite.expiresAt).toLocaleDateString('pt-BR')}
+                    </span>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="space-y-2">
-                <button
-                  onClick={acceptInvite}
-                  className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm"
-                >
-                  Criar conta e aceitar convite
-                </button>
-                <p className="text-center text-xs text-muted-foreground">
-                  Já tem conta?{' '}
+
+              {profile ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground text-center">
+                    Entrando como <span className="text-foreground font-medium">{profile.full_name}</span>
+                  </p>
                   <button
-                    onClick={() => router.push(`/login?redirect=/convite/${token}`)}
-                    className="text-brand-400 hover:underline"
+                    onClick={acceptInvite}
+                    disabled={status === 'accepting'}
+                    className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm"
                   >
-                    Fazer login
+                    {status === 'accepting' ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      `Aceitar e entrar para ${invite.academyName}`
+                    )}
                   </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <button
+                    onClick={acceptInvite}
+                    className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm"
+                  >
+                    Criar conta e aceitar convite
+                  </button>
+                  <p className="text-center text-xs text-muted-foreground">
+                    Já tem conta?{' '}
+                    <button
+                      onClick={() => router.push(`/login?redirect=/convite/${token}`)}
+                      className="text-brand-400 hover:underline"
+                    >
+                      Fazer login
+                    </button>
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* Done state */}
+          {status === 'done' && (
+            <motion.div
+              key="done"
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="text-center space-y-5 py-6"
+            >
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                className="w-16 h-16 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto border border-emerald-500/20"
+              >
+                <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+              </motion.div>
+              <div>
+                <h2 className="font-display font-bold text-xl">Bem-vindo!</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Você entrou para <span className="text-foreground font-medium">{invite?.academyName}</span>
                 </p>
               </div>
-            )}
-          </div>
-        )}
-
-        {/* Done state */}
-        {status === 'done' && (
-          <div className="text-center space-y-5 py-6">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-              className="w-16 h-16 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto border border-emerald-500/20"
-            >
-              <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+              <div className="flex items-center gap-2 justify-center text-xs text-muted-foreground">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Redirecionando para o dashboard...
+              </div>
             </motion.div>
-            <div>
-              <h2 className="font-display font-bold text-xl">Bem-vindo!</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Você entrou para <span className="text-foreground font-medium">{invite?.academyName}</span>
-              </p>
-            </div>
-            <div className="flex items-center gap-2 justify-center text-xs text-muted-foreground">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              Redirecionando para o dashboard...
-            </div>
-          </div>
-        )}
+          )}
+
+        </AnimatePresence>
       </motion.div>
     </div>
   )
