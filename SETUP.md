@@ -101,11 +101,9 @@ git status
 
 # 3. Adicionar os arquivos alterados
 git add .                     # todos os arquivos
-# ou
-git add nome-do-arquivo.tsx   # arquivo específico
 
 # 4. Criar o commit com mensagem
-git commit -m "descrição do que você fez"
+git commit -m "Doppler adicionado"
 
 # 5. Enviar pro GitHub
 git push origin main
