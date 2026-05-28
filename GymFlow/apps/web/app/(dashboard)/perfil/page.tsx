@@ -12,7 +12,7 @@ import { toast } from 'sonner'
 
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
-// Avatar upload é feito via /api/upload/avatar (validação server-side)
+import { StudentBioView } from '@/components/bioimpedance/student-bio-view'
 import { cn } from '@/lib/utils'
 import type { Profile } from '@/types'
 
@@ -568,6 +568,13 @@ export default function PerfilPage() {
           </motion.div>
         )}
       </motion.div>
+
+      {/* ── Bioimpedância & Medidas ── */}
+      {profile && (
+        <motion.div variants={fadeUp}>
+          <StudentBioView studentId={profile.id} />
+        </motion.div>
+      )}
 
       {/* ── Save confirmation visual ── */}
       <AnimatePresence>

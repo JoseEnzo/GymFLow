@@ -22,13 +22,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Token obrigatório' }, { status: 422 })
   }
 
-  const secretKey = process.env.TURNSTILE_SECRET_KEY
+  const secretKey = process.env['TURNSTILE_SECRET_KEY']
   if (!secretKey) {
     // Se não configurado, deixa passar (para dev sem Turnstile)
     return NextResponse.json({ success: true })
   }
 
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? undefined
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined
 
   const form = new URLSearchParams()
   form.set('secret', secretKey)

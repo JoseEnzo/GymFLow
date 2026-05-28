@@ -1,6 +1,8 @@
 import type { NextConfig } from 'next'
 import { withSentryConfig } from '@sentry/nextjs'
 
+const isDev = process.env.NODE_ENV === 'development'
+
 const SECURITY_HEADERS = [
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -19,7 +21,7 @@ const SECURITY_HEADERS = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' https: data: blob:",
       "font-src 'self'",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://maps.googleapis.com",
+      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://maps.googleapis.com${isDev ? ' http://localhost:54321 ws://localhost:54321' : ''}`,
       "frame-src https://js.stripe.com https://hooks.stripe.com",
       "object-src 'none'",
       "base-uri 'self'",
@@ -51,9 +53,9 @@ const nextConfig: NextConfig = {
 }
 
 export default withSentryConfig(nextConfig, {
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  silent: !process.env.CI,
+  org: process.env['SENTRY_ORG'],
+  project: process.env['SENTRY_PROJECT'],
+  silent: !process.env['CI'],
   widenClientFileUpload: true,
   hideSourceMaps: true,
   disableLogger: true,

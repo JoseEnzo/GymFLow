@@ -4,13 +4,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   History, Dumbbell, Clock, ChevronDown, ChevronUp,
-  Calendar, Loader2, Trophy, TrendingUp, Zap,
+  Calendar, Trophy, TrendingUp, Zap,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
 import { cn, formatDuration } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 12 },
@@ -69,9 +70,10 @@ function SessionCard({ session, index }: { session: WorkoutSession; index: numbe
     if (!acc[s.exercise_name]) {
       acc[s.exercise_name] = { name: s.exercise_name, bestWeight: s.weight_kg, totalSets: 0 }
     }
-    acc[s.exercise_name].totalSets++
-    if (s.weight_kg && (!acc[s.exercise_name].bestWeight || s.weight_kg > acc[s.exercise_name].bestWeight!)) {
-      acc[s.exercise_name].bestWeight = s.weight_kg
+    const entry = acc[s.exercise_name]!
+    entry.totalSets++
+    if (s.weight_kg && (!entry.bestWeight || s.weight_kg > entry.bestWeight)) {
+      entry.bestWeight = s.weight_kg
     }
     return acc
   }, {})
@@ -269,8 +271,27 @@ export default function HistoricoPage() {
 
       {/* Loading */}
       {loading && (
-        <div className="flex justify-center py-20">
-          <Loader2 className="w-6 h-6 animate-spin text-brand-400" />
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="glass rounded-2xl overflow-hidden">
+              <Skeleton className="h-1 rounded-none" />
+              <div className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1.5 flex-1">
+                    <Skeleton className="h-3.5 w-16" />
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                  <Skeleton className="h-8 w-8 rounded-xl flex-shrink-0" />
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <Skeleton className="h-12 rounded-xl" />
+                  <Skeleton className="h-12 rounded-xl" />
+                  <Skeleton className="h-12 rounded-xl" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import {
   Users, Activity, TrendingUp, Calendar, ArrowUpRight,
   Dumbbell, ChevronRight, Plus, UserPlus, Building2,
-  ClipboardList, ArrowRight, Flame, AlertTriangle, Clock,
+  ClipboardList, ArrowRight, Flame, AlertTriangle, Clock, Play, CheckCircle2,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -13,6 +13,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
 import { FrequencyHeatmap } from '@/components/charts/frequency-heatmap'
 import { createClient } from '@/lib/supabase/client'
+import { StudentBioView } from '@/components/bioimpedance/student-bio-view'
 
 const stagger = {
   hidden: {},
@@ -129,7 +130,27 @@ interface RecentWorkout {
   durationSeconds: number | null
 }
 
+interface InactiveStudent { userId: string; fullName: string; lastWorkoutAt: string | null }
+
 interface StudentStats { totalWorkouts: number; weekWorkouts: number; streak: number; activeSheets: number }
+
+interface TodayWorkout {
+  id: string
+  name: string
+  goal: string | null
+  exerciseCount: number
+  alreadyDone: boolean
+}
+
+const BADGES: Array<{ id: string; icon: string; label: string; desc: string; condition: (w: number, s: number) => boolean }> = [
+  { id: 'first',   icon: '🥉', label: 'Primeira pedrada', desc: '1 treino',        condition: (w) => w >= 1  },
+  { id: 'five',    icon: '🥈', label: 'Constante',         desc: '5 treinos',       condition: (w) => w >= 5  },
+  { id: 'ten',     icon: '🥇', label: 'Dedicado',           desc: '10 treinos',      condition: (w) => w >= 10 },
+  { id: 'thirty',  icon: '💎', label: 'Veterano',           desc: '30 treinos',      condition: (w) => w >= 30 },
+  { id: 'streak3', icon: '🔥', label: 'Em chamas',          desc: '3 dias seguidos', condition: (_w, s) => s >= 3  },
+  { id: 'streak7', icon: '⚡', label: 'Inabalável',         desc: '7 dias seguidos', condition: (_w, s) => s >= 7  },
+  { id: 'streak14',icon: '🏆', label: 'Imparável',          desc: '14 dias seguidos',condition: (_w, s) => s >= 14 },
+]
 
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -181,6 +202,8 @@ export default function DashboardPage() {
   const [recentMembers, setRecentMembers] = useState<RecentMember[]>([])
   const [recentWorkouts, setRecentWorkouts] = useState<RecentWorkout[]>([])
   const [studentStats, setStudentStats] = useState<StudentStats>({ totalWorkouts: 0, weekWorkouts: 0, streak: 0, activeSheets: 0 })
+  const [inactiveStudents, setInactiveStudents] = useState<InactiveStudent[]>([])
+  const [todayWorkout, setTodayWorkout] = useState<TodayWorkout | null>(null)
 
   useEffect(() => {
     if (!currentAcademy) return
@@ -202,6 +225,7 @@ export default function DashboardPage() {
         { count: newThisMonth },
         { data: recentMembersRaw },
         { data: recentWorkoutsRaw },
+        { data: allStudentsRaw },
       ] = await Promise.all([
         sb.from('academy_members')
           .select('id', { count: 'exact', head: true })
@@ -234,6 +258,13 @@ export default function DashboardPage() {
           .eq('academy_id', academyId)
           .order('created_at', { ascending: false })
           .limit(5),
+
+        sb.from('academy_members')
+          .select('user_id')
+          .eq('academy_id', academyId)
+          .eq('role', 'student')
+          .eq('is_active', true)
+          .limit(60),
       ])
 
       const activeStudentIds = new Set((weeklyLogs ?? []).map((l: { student_id: string }) => l.student_id))
@@ -249,11 +280,16 @@ export default function DashboardPage() {
         newThisMonth: newThisMonth ?? 0,
       })
 
-      // Fetch profiles e fichas em paralelo
+      // Calcula IDs dos alunos inativos (todos - ativos esta semana)
+      const allStudentIds: string[] = (allStudentsRaw ?? []).map((m: { user_id: string }) => m.user_id)
+      const inactiveIds = allStudentIds.filter(id => !activeStudentIds.has(id))
+
+      // Fetch profiles e fichas em paralelo (inclui inativos para mostrar nomes)
       const memberUserIds: string[] = (recentMembersRaw ?? []).map((m: { user_id: string }) => m.user_id)
-      const workoutStudentIds: string[] = [...new Set((recentWorkoutsRaw ?? []).map((w: { student_id: string }) => w.student_id))]
-      const sheetIds: string[] = (recentWorkoutsRaw ?? []).map((w: { sheet_id: string }) => w.sheet_id).filter(Boolean)
-      const allUserIds = [...new Set([...memberUserIds, ...workoutStudentIds])]
+      const workoutsRaw = (recentWorkoutsRaw ?? []) as Array<{ student_id: string; sheet_id: string }>
+      const workoutStudentIds: string[] = [...new Set(workoutsRaw.map((w) => w.student_id))]
+      const sheetIds: string[] = workoutsRaw.map((w) => w.sheet_id).filter(Boolean)
+      const allUserIds = [...new Set([...memberUserIds, ...workoutStudentIds, ...inactiveIds])]
 
       const [{ data: profiles }, { data: sheets }] = await Promise.all([
         allUserIds.length > 0
@@ -281,6 +317,29 @@ export default function DashboardPage() {
         sheetName: (sheetMap.get(w.sheet_id) as { name: string } | undefined)?.name ?? 'Treino',
         durationSeconds: w.duration_seconds,
       })))
+
+      // Busca último treino dos inativos e monta lista
+      if (inactiveIds.length > 0) {
+        const { data: lastWorkouts } = await sb
+          .from('workout_logs')
+          .select('student_id, created_at')
+          .eq('academy_id', academyId)
+          .in('student_id', inactiveIds)
+          .order('created_at', { ascending: false })
+
+        const lastWorkoutMap = new Map<string, string>()
+        for (const log of (lastWorkouts ?? [])) {
+          if (!lastWorkoutMap.has(log.student_id)) lastWorkoutMap.set(log.student_id, log.created_at)
+        }
+
+        setInactiveStudents(inactiveIds.slice(0, 8).map(id => ({
+          userId: id,
+          fullName: (profileMap.get(id) as { full_name: string } | undefined)?.full_name ?? 'Aluno',
+          lastWorkoutAt: lastWorkoutMap.get(id) ?? null,
+        })))
+      } else {
+        setInactiveStudents([])
+      }
     }
 
     async function loadStudentStats() {
@@ -301,6 +360,37 @@ export default function DashboardPage() {
       ])
       const streak = computeStreak((logDates ?? []).map((r: { created_at: string }) => r.created_at))
       setStudentStats({ totalWorkouts: total ?? 0, weekWorkouts: week ?? 0, streak, activeSheets: sheets ?? 0 })
+
+      // Treino de hoje — busca ficha com o dia atual em scheduled_days
+      const todayIndex = new Date().getDay()
+      const todayStr = dateKey(new Date())
+      const { data: scheduledSheets } = await sb
+        .from('workout_sheets')
+        .select('id, name, goal, scheduled_days, sheet_exercises(id)')
+        .eq('student_id', user.id)
+        .eq('academy_id', currentAcademy!.id)
+        .eq('is_active', true)
+        .contains('scheduled_days', [todayIndex])
+        .limit(1)
+        .maybeSingle()
+
+      if (scheduledSheets) {
+        const { data: completion } = await sb
+          .from('agenda_completions')
+          .select('id')
+          .eq('sheet_id', scheduledSheets.id)
+          .eq('student_id', user.id)
+          .eq('completed_on', todayStr)
+          .maybeSingle()
+
+        setTodayWorkout({
+          id: scheduledSheets.id,
+          name: scheduledSheets.name,
+          goal: scheduledSheets.goal ?? null,
+          exerciseCount: scheduledSheets.sheet_exercises?.length ?? 0,
+          alreadyDone: !!completion,
+        })
+      }
     }
 
     if (isOwnerOrPersonal) loadOwnerMetrics()
@@ -410,6 +500,49 @@ export default function DashboardPage() {
         </motion.div>
       )}
 
+      {/* Student — treino de hoje */}
+      {isStudent && todayWorkout && (
+        <motion.div variants={fadeUp} className={cn(
+          'glass rounded-2xl p-5 border',
+          todayWorkout.alreadyDone
+            ? 'border-emerald-500/20 bg-emerald-500/5'
+            : 'border-brand-500/20 bg-brand-500/5',
+        )}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={cn(
+                'w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0',
+                todayWorkout.alreadyDone ? 'bg-emerald-500/15' : 'bg-brand-500/15',
+              )}>
+                {todayWorkout.alreadyDone
+                  ? <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  : <Dumbbell className="w-5 h-5 text-brand-400" />
+                }
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] text-muted-foreground font-medium mb-0.5">
+                  {todayWorkout.alreadyDone ? 'Treino de hoje — concluído 💪' : 'Treino de hoje'}
+                </p>
+                <p className="font-display font-bold text-sm leading-snug truncate">{todayWorkout.name}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {todayWorkout.exerciseCount} exercícios{todayWorkout.goal ? ` · ${todayWorkout.goal}` : ''}
+                </p>
+              </div>
+            </div>
+
+            {!todayWorkout.alreadyDone && (
+              <Link
+                href={`/treinos/executar/${todayWorkout.id}`}
+                className="flex-shrink-0 flex items-center gap-1.5 btn-primary text-xs py-2.5 px-4 rounded-xl"
+              >
+                <Play className="w-3.5 h-3.5" />
+                Iniciar
+              </Link>
+            )}
+          </div>
+        </motion.div>
+      )}
+
       {/* Student — perfil incompleto */}
       {isStudent && !goalLabel && (
         <motion.div variants={fadeUp} className="glass rounded-2xl p-5 border border-amber-500/20 bg-amber-500/5">
@@ -450,6 +583,43 @@ export default function DashboardPage() {
           <Link href="/configuracoes" className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1 mt-3">
             Editar perfil <ChevronRight className="w-3 h-3" />
           </Link>
+        </motion.div>
+      )}
+
+      {/* Student — conquistas */}
+      {isStudent && studentStats.totalWorkouts > 0 && (
+        <motion.div variants={fadeUp} className="glass rounded-2xl p-5">
+          <h3 className="font-display font-bold text-sm mb-4">Conquistas</h3>
+          <div className="flex flex-wrap gap-2">
+            {BADGES.map((badge) => {
+              const earned = badge.condition(studentStats.totalWorkouts, studentStats.streak)
+              return (
+                <div
+                  key={badge.id}
+                  title={earned ? badge.desc : `${badge.desc} para desbloquear`}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-2 rounded-xl border transition-all',
+                    earned
+                      ? 'bg-brand-500/10 border-brand-500/20'
+                      : 'bg-surface-100 border-surface-200 opacity-40 grayscale'
+                  )}
+                >
+                  <span className="text-base leading-none">{badge.icon}</span>
+                  <div>
+                    <p className="text-xs font-semibold leading-tight">{badge.label}</p>
+                    <p className="text-[10px] text-muted-foreground">{badge.desc}</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Student — bioimpedância & medidas */}
+      {!isOwnerOrPersonal && profile && (
+        <motion.div variants={fadeUp}>
+          <StudentBioView studentId={profile.id} />
         </motion.div>
       )}
 
@@ -670,14 +840,37 @@ export default function DashboardPage() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/8 border border-amber-500/15">
-                  <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                  <p className="text-xs text-amber-300">
-                    <span className="font-bold">{ownerMetrics.inactiveCount}</span> de{' '}
-                    <span className="font-bold">{ownerMetrics.totalStudents}</span> alunos não treinaram nos últimos 7 dias.
-                  </p>
-                </div>
+              <div className="space-y-2">
+                {inactiveStudents.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {inactiveStudents.slice(0, 5).map((s) => (
+                      <div key={s.userId} className="flex items-center gap-3 p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                        <div className="w-7 h-7 rounded-full bg-amber-500/15 flex items-center justify-center flex-shrink-0">
+                          <span className="text-[11px] font-bold text-amber-400">{s.fullName.charAt(0).toUpperCase()}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{s.fullName}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {s.lastWorkoutAt ? `Último: ${formatTimeAgo(s.lastWorkoutAt)}` : 'Nunca treinou'}
+                          </p>
+                        </div>
+                        <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                      </div>
+                    ))}
+                    {inactiveStudents.length > 5 && (
+                      <p className="text-[10px] text-muted-foreground text-center pt-1">
+                        e mais {inactiveStudents.length - 5} alunos
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/8 border border-amber-500/15">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    <p className="text-xs text-amber-300">
+                      <span className="font-bold">{ownerMetrics.inactiveCount}</span> alunos não treinaram nos últimos 7 dias.
+                    </p>
+                  </div>
+                )}
                 <div className="p-3 rounded-xl bg-surface-100 text-center">
                   <p className="text-2xl font-display font-extrabold">{engagementPct}%</p>
                   <p className="text-xs text-muted-foreground mt-0.5">taxa de engajamento</p>
@@ -689,7 +882,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <Link href="/alunos" className="flex items-center justify-center gap-1.5 text-xs text-brand-400 hover:text-brand-300 font-medium py-1">
-                  Enviar lembrete aos inativos <ArrowRight className="w-3 h-3" />
+                  Ver detalhes <ArrowRight className="w-3 h-3" />
                 </Link>
               </div>
             )}

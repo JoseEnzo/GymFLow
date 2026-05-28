@@ -189,7 +189,7 @@ export function Sidebar() {
                 <item.icon className={cn(
                   'relative z-10 w-4.5 h-4.5 flex-shrink-0',
                   active ? 'text-brand-400' : 'text-muted-foreground'
-                )} style={{ width: '1.125rem', height: '1.125rem' }} />
+                )} />
                 {!sidebarCollapsed && (
                   <span className="relative z-10">{item.label}</span>
                 )}

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Search, ClipboardList, Dumbbell, Clock, Target,
-  ChevronRight, Edit2, Trash2, Play, Users, Eye, Loader2,
+  ChevronRight, Edit2, Trash2, Play, Users, Eye,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } }
 const fadeUp = {
@@ -256,9 +257,27 @@ export default function TreinosPage() {
 
       {/* Loading */}
       {loading && (
-        <div className="flex justify-center py-20">
-          <Loader2 className="w-6 h-6 animate-spin text-brand-400" />
-        </div>
+        <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="glass rounded-2xl overflow-hidden">
+              <Skeleton className="h-1 rounded-none" />
+              <div className="p-5 space-y-4">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-5 w-3/4" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Skeleton className="h-12 rounded-lg" />
+                  <Skeleton className="h-12 rounded-lg" />
+                </div>
+                <div className="flex gap-2">
+                  <Skeleton className="h-10 flex-1 rounded-xl" />
+                  <Skeleton className="h-10 flex-1 rounded-xl" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </motion.div>
       )}
 
       {/* Grid */}

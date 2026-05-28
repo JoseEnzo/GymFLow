@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Query obrigatória (máx. 100 chars)' }, { status: 400 })
   }
 
-  const apiKey = process.env.GOOGLE_PLACES_API_KEY
+  const apiKey = process.env['GOOGLE_PLACES_API_KEY']
   if (!apiKey) {
     return NextResponse.json({ error: 'API key não configurada' }, { status: 500 })
   }
@@ -35,14 +35,14 @@ export async function GET(request: Request) {
   const json = await res.json()
 
   const results = (json.results ?? []).slice(0, 5).map((place: Record<string, unknown>) => ({
-    placeId: place.place_id,
-    name: place.name,
-    formattedAddress: place.formatted_address,
-    rating: place.rating ?? null,
-    geometry: place.geometry
+    placeId: place['place_id'],
+    name: place['name'],
+    formattedAddress: place['formatted_address'],
+    rating: place['rating'] ?? null,
+    geometry: place['geometry']
       ? {
-          lat: (place.geometry as { location: { lat: number; lng: number } }).location.lat,
-          lng: (place.geometry as { location: { lat: number; lng: number } }).location.lng,
+          lat: (place['geometry'] as { location: { lat: number; lng: number } }).location.lat,
+          lng: (place['geometry'] as { location: { lat: number; lng: number } }).location.lng,
         }
       : null,
   }))

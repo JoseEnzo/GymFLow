@@ -7,11 +7,13 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Eye, EyeOff, Loader2, AlertCircle, Check, Building2, Dumbbell, ArrowLeft, ShieldCheck } from 'lucide-react'
+import { Eye, EyeOff, Loader2, AlertCircle, Check, Building2, Dumbbell, ArrowLeft, ShieldCheck, UserCheck } from 'lucide-react'
+import { toast } from 'sonner'
 
 import { useAuth } from '@/hooks/use-auth'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { validateCPF, validateCNPJ, maskCPF, maskCNPJ } from '@/lib/cnpj'
 
 const schema = z.object({
   fullName: z.string().min(3, 'Nome muito curto'),
@@ -44,11 +46,12 @@ const strengthColors = ['bg-red-500', 'bg-red-400', 'bg-amber-400', 'bg-amber-30
 
 const fadeUp = {
   hidden: { opacity: 0, y: 14 },
-  show: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.06, duration: 0.45, ease: [0.16, 1, 0.3, 1] },
-  }),
+  show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] } },
+}
+
+const staggerForm = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.06 } },
 }
 
 const TYPES = [
@@ -64,6 +67,17 @@ const TYPES = [
     iconColor: 'text-brand-400',
   },
   {
+    value: 'personal' as const,
+    icon: UserCheck,
+    title: 'Sou personal trainer',
+    description: 'Monte fichas, acompanhe alunos e registre resultados',
+    color: '#8B5CF6',
+    bg: 'bg-violet-500/8',
+    border: 'border-violet-500/40',
+    iconBg: 'bg-violet-500/15',
+    iconColor: 'text-violet-400',
+  },
+  {
     value: 'student' as const,
     icon: Dumbbell,
     title: 'Sou aluno',
@@ -77,17 +91,20 @@ const TYPES = [
 ]
 
 function CadastroInner() {
-  const { signUp } = useAuth()
+  const { signUp, signInWithGoogle } = useAuth()
   const searchParams = useSearchParams()
   const inviteToken = searchParams.get('token')
 
   // If arriving via invite, skip type selection
   const [step, setStep] = useState<0 | 1>(inviteToken ? 1 : 0)
-  const [accountType, setAccountType] = useState<'owner' | 'student'>(inviteToken ? 'student' : 'owner')
+  const [accountType, setAccountType] = useState<'owner' | 'personal' | 'student'>(inviteToken ? 'student' : 'owner')
   const [inviteRole, setInviteRole] = useState<'personal' | 'student' | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
+  const [document, setDocument] = useState('')
+  const [documentError, setDocumentError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!inviteToken) return
@@ -99,7 +116,8 @@ function CadastroInner() {
       .eq('is_active', true)
       .single()
       .then(({ data }) => {
-        if (data?.role) setInviteRole(data.role as 'personal' | 'student')
+        const d = data as { role?: string } | null
+        if (d?.role) setInviteRole(d.role as 'personal' | 'student')
       })
   }, [inviteToken])
 
@@ -114,11 +132,18 @@ function CadastroInner() {
   const strength = passwordStrength(password)
 
   async function onSubmit(data: FormData) {
+    setDocumentError(null)
+    if (accountType === 'owner') {
+      if (!validateCNPJ(document)) { setDocumentError('CNPJ inválido'); return }
+    } else if (accountType === 'personal') {
+      if (!validateCPF(document)) { setDocumentError('CPF inválido'); return }
+    }
+
     setIsLoading(true)
     setServerError(null)
     try {
       const redirectTo = inviteToken ? `/convite/${inviteToken}` : undefined
-      await signUp(data.email, data.password, data.fullName, accountType, redirectTo)
+      await signUp(data.email, data.password, data.fullName, accountType, redirectTo, document)
     } catch (err: unknown) {
       const msg = (err as Error).message
       if (msg.includes('already registered')) {
@@ -188,6 +213,46 @@ function CadastroInner() {
                 )
               })}
             </div>
+
+            {/* Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border/60" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-background px-3 text-muted-foreground">ou continue com</span>
+              </div>
+            </div>
+
+            {/* Google OAuth */}
+            <button
+              type="button"
+              onClick={async () => {
+                setIsGoogleLoading(true)
+                try {
+                  await signInWithGoogle()
+                } catch {
+                  toast.error('Erro ao continuar com Google')
+                  setIsGoogleLoading(false)
+                }
+              }}
+              disabled={isGoogleLoading}
+              className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl border border-border/60 hover:bg-surface-100 transition-all text-sm font-medium disabled:opacity-60"
+            >
+              {isGoogleLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                  Continuar com Google
+                </>
+              )}
+            </button>
 
             <p className="text-center text-sm text-muted-foreground">
               Já tem uma conta?{' '}
@@ -270,9 +335,9 @@ function CadastroInner() {
               )}
             </AnimatePresence>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <motion.form onSubmit={handleSubmit(onSubmit)} className="space-y-4" initial="hidden" animate="show" variants={staggerForm}>
               {/* Name */}
-              <motion.div variants={fadeUp} custom={0} className="space-y-1.5">
+              <motion.div variants={fadeUp} className="space-y-1.5">
                 <label className="text-sm font-medium">Nome completo</label>
                 <input
                   {...register('fullName')}
@@ -284,8 +349,31 @@ function CadastroInner() {
                 {errors.fullName && <p className="text-xs text-red-400">{errors.fullName.message}</p>}
               </motion.div>
 
+              {/* CPF / CNPJ */}
+              <motion.div variants={fadeUp} className="space-y-1.5">
+                <label className="text-sm font-medium flex items-center gap-1.5">
+                  {accountType === 'owner' ? 'CNPJ da academia' : 'CPF'}
+                  {accountType === 'student' && (
+                    <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={document}
+                  placeholder={accountType === 'owner' ? '00.000.000/0000-00' : '000.000.000-00'}
+                  autoComplete="off"
+                  onChange={(e) => {
+                    setDocumentError(null)
+                    setDocument(accountType === 'owner' ? maskCNPJ(e.target.value) : maskCPF(e.target.value))
+                  }}
+                  className={cn('field', documentError && 'border-destructive/60 focus:ring-destructive/40')}
+                />
+                {documentError && <p className="text-xs text-red-400">{documentError}</p>}
+              </motion.div>
+
               {/* Email */}
-              <motion.div variants={fadeUp} custom={1} className="space-y-1.5">
+              <motion.div variants={fadeUp}className="space-y-1.5">
                 <label className="text-sm font-medium">E-mail</label>
                 <input
                   {...register('email')}
@@ -298,7 +386,7 @@ function CadastroInner() {
               </motion.div>
 
               {/* Password */}
-              <motion.div variants={fadeUp} custom={2} className="space-y-1.5">
+              <motion.div variants={fadeUp}className="space-y-1.5">
                 <label className="text-sm font-medium">Senha</label>
                 <div className="relative">
                   <input
@@ -338,7 +426,7 @@ function CadastroInner() {
               </motion.div>
 
               {/* Confirm Password */}
-              <motion.div variants={fadeUp} custom={3} className="space-y-1.5">
+              <motion.div variants={fadeUp}className="space-y-1.5">
                 <label className="text-sm font-medium">Confirmar senha</label>
                 <div className="relative">
                   <input
@@ -358,7 +446,7 @@ function CadastroInner() {
               </motion.div>
 
               {/* Terms */}
-              <motion.div variants={fadeUp} custom={4}>
+              <motion.div variants={fadeUp}>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   Ao criar a conta você aceita nossos{' '}
                   <a href="#" className="text-brand-400 hover:underline">Termos de Uso</a>
@@ -368,7 +456,7 @@ function CadastroInner() {
               </motion.div>
 
               {/* Submit */}
-              <motion.div variants={fadeUp} custom={5}>
+              <motion.div variants={fadeUp}>
                 <button
                   type="submit"
                   disabled={isLoading}
@@ -377,7 +465,7 @@ function CadastroInner() {
                   {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Criar conta gratuita'}
                 </button>
               </motion.div>
-            </form>
+            </motion.form>
 
             <p className="text-center text-sm text-muted-foreground">
               Já tem uma conta?{' '}

@@ -42,7 +42,8 @@ interface ExerciseForm {
 
 function NewExerciseModal({ onClose, onCreated }: { onClose: () => void; onCreated: (ex: Exercise) => void }) {
   const { currentAcademy } = useAuthStore()
-  const supabase = createClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = createClient() as any
   const [form, setForm] = useState<ExerciseForm>({ name_pt: '', difficulty: 'beginner', muscle_groups: [], equipment: '' })
   const [saving, setSaving] = useState(false)
 
@@ -172,7 +173,8 @@ function ExerciciosContent() {
   const searchParams = useSearchParams()
   const addTo = searchParams.get('addTo')
   const { currentAcademy, currentRole } = useAuthStore()
-  const supabase = createClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = createClient() as any
   const isPersonal = currentRole === 'owner' || currentRole === 'personal'
 
   const [exercises, setExercises] = useState<Exercise[]>([])
@@ -208,7 +210,7 @@ function ExerciciosContent() {
 
     if (addTo) {
       supabase.from('workout_sheets').select('name').eq('id', addTo).single()
-        .then(({ data }) => { if (data) setSheetName(data.name) })
+        .then(({ data }: { data: { name: string } | null }) => { if (data) setSheetName(data.name) })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentAcademy, addTo])

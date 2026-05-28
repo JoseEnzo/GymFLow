@@ -4,8 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { stripe } from '@/lib/stripe'
 
 export async function GET(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const supabaseRaw = await createClient()
+  const { data: { user } } = await supabaseRaw.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const { searchParams } = new URL(request.url)
@@ -15,6 +15,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'academyId obrigatório' }, { status: 400 })
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = supabaseRaw as any
+
   const { data: member } = await supabase
     .from('academy_members')
     .select('role')
@@ -22,7 +25,7 @@ export async function GET(request: Request) {
     .eq('user_id', user.id)
     .single()
 
-  if (!member || member.role !== 'owner') {
+  if (!member || (member as { role: string }).role !== 'owner') {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
   }
 
@@ -32,15 +35,17 @@ export async function GET(request: Request) {
     .eq('id', academyId)
     .single()
 
-  if (!academy?.stripe_customer_id) {
+  const ac = academy as { stripe_customer_id: string | null; stripe_subscription_id: string | null } | null
+
+  if (!ac?.stripe_customer_id) {
     return NextResponse.json({ invoices: [], periodEnd: null, trialEnd: null })
   }
 
   try {
     const [invoiceList, subscription] = await Promise.all([
-      stripe.invoices.list({ customer: academy.stripe_customer_id, limit: 5 }),
-      academy.stripe_subscription_id
-        ? stripe.subscriptions.retrieve(academy.stripe_subscription_id)
+      stripe.invoices.list({ customer: ac.stripe_customer_id, limit: 5 }),
+      ac.stripe_subscription_id
+        ? stripe.subscriptions.retrieve(ac.stripe_subscription_id)
         : null,
     ])
 

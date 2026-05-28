@@ -82,14 +82,14 @@ function fmtDate(d: string) {
   return `${day}/${m}/${y?.slice(2)}`
 }
 
-function filterByPeriod<T extends { [k: string]: unknown }>(
+function filterByPeriod<T>(
   rows: T[],
   dateKey: keyof T,
   period: Period,
 ): T[] {
   if (period === 'all') return rows
   const cutoff = new Date(Date.now() - PERIODS.find((p) => p.key === period)!.days * 86400000)
-  return rows.filter((r) => new Date(r[dateKey] as string) >= cutoff)
+  return rows.filter((r) => new Date(r[dateKey] as unknown as string) >= cutoff)
 }
 
 function diffLabel(first: number, last: number, unit: string, lowerIsBetter = false) {

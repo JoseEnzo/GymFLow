@@ -6,8 +6,8 @@ import { stripe } from '@/lib/stripe'
 import { createAdminClient } from '@/lib/supabase/server'
 
 const PLAN_MAP: Record<string, 'starter' | 'pro'> = {
-  [process.env.STRIPE_PRICE_STARTER_MONTHLY!]: 'starter',
-  [process.env.STRIPE_PRICE_PRO_MONTHLY!]: 'pro',
+  [process.env['STRIPE_PRICE_STARTER_MONTHLY']!]: 'starter',
+  [process.env['STRIPE_PRICE_PRO_MONTHLY']!]: 'pro',
 }
 
 export async function POST(request: Request) {
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     event = stripe.webhooks.constructEvent(
       body,
       sig!,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      process.env['STRIPE_WEBHOOK_SECRET']!
     )
   } catch (err: unknown) {
     return NextResponse.json(
@@ -30,7 +30,8 @@ export async function POST(request: Request) {
     )
   }
 
-  const supabase = await createAdminClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = await createAdminClient() as any
 
   // Idempotência: ignorar eventos já processados
   const { data: existing } = await supabase
@@ -46,8 +47,8 @@ export async function POST(request: Request) {
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object as Stripe.Checkout.Session
-      const academyId = session.metadata?.academyId
-      const planId = session.metadata?.planId as 'starter' | 'pro' | undefined
+      const academyId = session.metadata?.['academyId']
+      const planId = session.metadata?.['planId'] as 'starter' | 'pro' | undefined
 
       if (academyId && planId) {
         await supabase.from('academies').update({
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
 
     case 'customer.subscription.updated': {
       const sub = event.data.object as Stripe.Subscription
-      const academyId = sub.metadata?.academyId
+      const academyId = sub.metadata?.['academyId']
       const priceId = sub.items.data[0]?.price.id
       const plan = priceId ? PLAN_MAP[priceId] : undefined
 

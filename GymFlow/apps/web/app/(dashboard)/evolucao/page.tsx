@@ -7,13 +7,14 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
 } from 'recharts'
-import { TrendingUp, Dumbbell, ChevronDown, Loader2, BarChart3, Ruler, Activity } from 'lucide-react'
+import { TrendingUp, Dumbbell, ChevronDown, BarChart3, Ruler, Activity } from 'lucide-react'
 import { BodyEvolutionSection } from '@/components/evolution/body-evolution-section'
 import { toast } from 'sonner'
 
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 12 },
@@ -160,7 +161,7 @@ export default function EvolucaoPage() {
     }
     setExercises(exOptions)
     if (exOptions.length > 0 && !selectedExercise) {
-      setSelectedExercise(exOptions[0].id)
+      setSelectedExercise(exOptions[0]!.id)
     }
 
     setLoadingWeekly(false)
@@ -253,8 +254,14 @@ export default function EvolucaoPage() {
       {/* ── Tab: Treinos ── */}
       {/* Loading */}
       {activeTab === 'treinos' && loadingWeekly && (
-        <div className="flex justify-center py-20">
-          <Loader2 className="w-6 h-6 animate-spin text-brand-400" />
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-20 rounded-2xl" />
+            ))}
+          </div>
+          <Skeleton className="h-[228px] rounded-2xl" />
+          <Skeleton className="h-[228px] rounded-2xl" />
         </div>
       )}
 
@@ -398,9 +405,7 @@ export default function EvolucaoPage() {
               </div>
 
               {loadingExercise ? (
-                <div className="flex justify-center py-12">
-                  <Loader2 className="w-5 h-5 animate-spin text-brand-400" />
-                </div>
+                <Skeleton className="h-[200px] rounded-xl" />
               ) : exerciseData.length < 2 ? (
                 <div className="flex flex-col items-center py-10 text-center">
                   <p className="text-sm text-muted-foreground">

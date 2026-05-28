@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, useRouter } from 'next/navigation'
 import {
@@ -50,6 +50,10 @@ export default function ExecutarTreinoPage() {
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [isCompleted, setIsCompleted] = useState(false)
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false)
+  const [showExitDialog, setShowExitDialog] = useState(false)
+  const [prMaxWeights, setPrMaxWeights] = useState<Record<string, number>>({})
+  const [lastPrKey, setLastPrKey] = useState<string | null>(null)
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -99,11 +103,31 @@ export default function ExecutarTreinoPage() {
 
       setExercises(slots)
 
-      const defaultSetData = Object.fromEntries(
+      // Carrega recordes históricos (máximo por exercício) para detectar PRs
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: prData } = await (supabase as any)
+          .from('set_logs')
+          .select('exercise_id, weight_kg, workout_logs!inner(student_id, academy_id)')
+          .eq('workout_logs.student_id', user.id)
+          .eq('workout_logs.academy_id', currentAcademy.id)
+          .in('exercise_id', slots.map((s) => s.exerciseId))
+          .not('weight_kg', 'is', null)
+        const maxes: Record<string, number> = {}
+        for (const row of (prData ?? [])) {
+          if (maxes[row.exercise_id] === undefined || row.weight_kg > maxes[row.exercise_id]!) {
+            maxes[row.exercise_id] = row.weight_kg
+          }
+        }
+        setPrMaxWeights(maxes)
+      }
+
+      const defaultSetData: Record<string, SetData[]> = Object.fromEntries(
         slots.map((ex) => [
           ex.sheetExerciseId,
           Array.from({ length: ex.sets }, () => ({
-            weight: ex.weightSuggestion ?? '',
+            weight: ex.weightSuggestion ?? ('' as number | ''),
             reps: '' as number | '',
             done: false,
           })),
@@ -140,7 +164,21 @@ export default function ExecutarTreinoPage() {
 
   useInterval(
     () => setRestTimer((t) => {
-      if (t === null || t <= 1) return null
+      if (t === null) return null
+      if (t <= 1) {
+        if (soundEnabled) {
+          try {
+            const ctx = new AudioContext()
+            const osc = ctx.createOscillator()
+            osc.connect(ctx.destination)
+            osc.frequency.value = 440
+            osc.start()
+            osc.stop(ctx.currentTime + 0.4)
+          } catch { /* audio not available */ }
+        }
+        navigator.vibrate?.([150, 80, 150])
+        return null
+      }
       if (t === 4 && soundEnabled) {
         try {
           const ctx = new AudioContext()
@@ -157,6 +195,30 @@ export default function ExecutarTreinoPage() {
   )
 
   const draftKey = profile?.id ? `gymflow_draft_${profile.id}_${id}` : null
+
+  // WakeLock — mantém tela ligada durante o treino
+  useEffect(() => {
+    if (loading || isCompleted) return
+
+    async function acquireWakeLock() {
+      try {
+        wakeLockRef.current = await navigator.wakeLock?.request('screen') ?? null
+      } catch { /* dispositivo não suporta ou permissão negada — ignorar silenciosamente */ }
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') acquireWakeLock()
+    }
+
+    acquireWakeLock()
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      wakeLockRef.current?.release().catch(() => {})
+      wakeLockRef.current = null
+    }
+  }, [loading, isCompleted])
 
   // Persist draft on set data / navigation changes
   useEffect(() => {
@@ -195,9 +257,28 @@ export default function ExecutarTreinoPage() {
   function completeSet(setIdx: number) {
     const set = exerciseSets[setIdx]
     if (!set || set.done || !exercise) return
+
+    const weight = typeof set.weight === 'number' ? set.weight : 0
+    const historicalMax = prMaxWeights[exercise.exerciseId] ?? 0
+    const isPR = weight > 0 && weight > historicalMax
+
     updateSet(setIdx, 'done', true)
     setRestTimer(exercise.restSeconds)
-    toast.success(`Série ${setIdx + 1} concluída! 💪`)
+
+    if (isPR) {
+      const prKey = `${exercise.sheetExerciseId}-${setIdx}`
+      setLastPrKey(prKey)
+      setPrMaxWeights((prev) => ({ ...prev, [exercise.exerciseId]: weight }))
+      toast(`🏆 Novo recorde! ${weight} kg no ${exercise.name}`, {
+        style: {
+          background: 'rgba(120,53,15,0.9)',
+          border: '1px solid #EF9F27',
+          color: '#FDE68A',
+        },
+      })
+    } else {
+      toast.success(`Série ${setIdx + 1} concluída! 💪`)
+    }
   }
 
   const allExercisesDone = exercises.length > 0 && exercises.every((ex) =>
@@ -284,7 +365,7 @@ export default function ExecutarTreinoPage() {
       {/* Header bar */}
       <div className="flex items-center justify-between">
         <button
-          onClick={() => router.back()}
+          onClick={() => setShowExitDialog(true)}
           className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all"
         >
           <X className="w-5 h-5" />
@@ -411,7 +492,10 @@ export default function ExecutarTreinoPage() {
               <span>Série</span><span>Peso (kg)</span><span>Reps</span><span></span>
             </div>
 
-            {exerciseSets.map((set, i) => (
+            {exerciseSets.map((set, i) => {
+              const prKey = `${exercise.sheetExerciseId}-${i}`
+              const isPrRow = lastPrKey === prKey
+              return (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, x: 8 }}
@@ -419,14 +503,22 @@ export default function ExecutarTreinoPage() {
                 transition={{ delay: i * 0.05 }}
                 className={cn(
                   'grid grid-cols-[2rem_1fr_1fr_2.5rem] gap-2 items-center p-2 rounded-xl transition-all',
-                  set.done ? 'bg-emerald-500/8 border border-emerald-500/15' : 'bg-surface-100'
+                  isPrRow
+                    ? 'bg-amber-500/10 border border-amber-500/30'
+                    : set.done
+                    ? 'bg-emerald-500/8 border border-emerald-500/15'
+                    : 'bg-surface-100'
                 )}
               >
                 <span className={cn(
                   'w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold',
-                  set.done ? 'bg-emerald-500/20 text-emerald-400' : 'bg-surface-200 text-muted-foreground'
+                  isPrRow
+                    ? 'bg-amber-500/20 text-amber-400'
+                    : set.done
+                    ? 'bg-emerald-500/20 text-emerald-400'
+                    : 'bg-surface-200 text-muted-foreground'
                 )}>
-                  {set.done ? <Check className="w-3.5 h-3.5" /> : i + 1}
+                  {isPrRow ? <Trophy className="w-3.5 h-3.5" /> : set.done ? <Check className="w-3.5 h-3.5" /> : i + 1}
                 </span>
 
                 <input
@@ -460,9 +552,55 @@ export default function ExecutarTreinoPage() {
                   <Check className="w-4 h-4" />
                 </button>
               </motion.div>
-            ))}
+            )})}
           </div>
         </motion.div>
+      </AnimatePresence>
+
+      {/* Exit confirmation dialog */}
+      <AnimatePresence>
+        {showExitDialog && (
+          <>
+            <motion.div
+              key="exit-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+              onClick={() => setShowExitDialog(false)}
+            />
+            <motion.div
+              key="exit-dialog"
+              initial={{ opacity: 0, scale: 0.92, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 12 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              className="fixed inset-x-4 bottom-8 sm:inset-auto sm:left-1/2 sm:-translate-x-1/2 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 sm:w-[360px] z-50 glass rounded-2xl p-6 border border-border/60 shadow-2xl"
+            >
+              <div className="w-11 h-11 rounded-2xl bg-amber-500/15 flex items-center justify-center mb-4">
+                <X className="w-5 h-5 text-amber-400" />
+              </div>
+              <h3 className="font-display font-bold text-base">Sair do treino?</h3>
+              <p className="text-sm text-muted-foreground mt-1.5">
+                Seu progresso está salvo como rascunho e será restaurado na próxima vez.
+              </p>
+              <div className="flex gap-2 mt-5">
+                <button
+                  onClick={() => setShowExitDialog(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-border/60 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-200 transition-all"
+                >
+                  Continuar treino
+                </button>
+                <button
+                  onClick={() => router.back()}
+                  className="flex-1 py-2.5 rounded-xl bg-red-500/15 text-red-400 border border-red-500/20 text-sm font-bold hover:bg-red-500/25 transition-all"
+                >
+                  Sair
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
       </AnimatePresence>
 
       {/* Navigation */}

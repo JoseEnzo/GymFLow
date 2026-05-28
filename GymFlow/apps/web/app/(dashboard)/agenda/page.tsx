@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronLeft, ChevronRight, CheckCircle2, Circle,
-  Dumbbell, Play, CalendarDays, Loader2, Target,
+  Dumbbell, Play, CalendarDays, Target, Loader2,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 12 },
@@ -62,7 +63,7 @@ function addDays(date: Date, n: number): Date {
 }
 
 function toDateStr(date: Date): string {
-  return date.toISOString().split('T')[0]
+  return date.toISOString().split('T')[0] ?? ''
 }
 
 function formatWeekRange(start: Date): string {
@@ -393,8 +394,22 @@ export default function AgendaPage() {
 
       {/* Loading */}
       {loading && (
-        <div className="flex justify-center py-20">
-          <Loader2 className="w-6 h-6 animate-spin text-brand-400" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="glass rounded-2xl overflow-hidden">
+              <Skeleton className="h-1 rounded-none" />
+              <div className="p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
+                  <Skeleton className="h-3 w-8" />
+                </div>
+                <Skeleton className="h-3.5 w-16" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-9 rounded-xl" />
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

@@ -94,31 +94,197 @@ pnpm lint         # checar erros de lint
 ## Subir alterações para o GitHub
 
 ```bash
-# 1. Ver o que mudou
+# 1. Logar ao seu repositorio git
+git remote add origin https://github.com/JoseEnzo/GymFLow.git
+# 2. Ver o que mudou
 git status
 
-# 2. Adicionar os arquivos alterados
+# 3. Adicionar os arquivos alterados
 git add .                     # todos os arquivos
-# ou
-git add nome-do-arquivo.tsx   # arquivo específico
 
-# 3. Criar o commit com mensagem
-git commit -m "descrição do que você fez"
+# 4. Criar o commit com mensagem
+git commit -m "Doppler adicionado"
 
-# 4. Enviar pro GitHub
+# 5. Enviar pro GitHub
 git push origin main
 ```
-
-**Fluxo completo de exemplo:**
-```bash
-git status
-git add .
-git commit -m "feat: adicionar tela de treinos"
-git push origin main
 ```
 
 > Sempre faça `git pull origin main` antes de começar a trabalhar, para evitar conflitos.
 
+---
+
+# 🪟 Setup Windows — Sem Permissão de Administrador
+
+> Guia para configurar o ambiente em computadores Windows **sem permissão de administrador** (laboratórios, escolas, etc).
+
+---
+
+## ⚠️ Restrições conhecidas
+
+| Restrição | Impacto |
+|-----------|---------|
+| Sem permissão de admin | Não pode usar instaladores `.exe` |
+| `bash` não disponível | Não pode usar scripts `.sh` |
+| Execução de scripts bloqueada por GPO | Perfil do PowerShell não carrega automaticamente |
+| `nvm-windows` requer admin | Usar `fnm` no lugar |
+
+---
+
+## 1. Instalar o fnm (gerenciador de versões do Node)
+
+Abra o **PowerShell** e rode os comandos abaixo:
+
+```powershell
+# Criar pasta do fnm no perfil do usuário
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.fnm" | Out-Null
+
+# Baixar o fnm (sem admin, sem instalador)
+Invoke-WebRequest -Uri "https://github.com/Schniz/fnm/releases/latest/download/fnm-windows.zip" -OutFile "$env:TEMP\fnm.zip" -UseBasicParsing
+
+# Extrair na pasta do usuário
+Expand-Archive "$env:TEMP\fnm.zip" -DestinationPath "$env:USERPROFILE\.fnm" -Force
+
+# Adicionar ao PATH do usuário (sem admin)
+$userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+if ($userPath -notlike "*\.fnm*") {
+    [Environment]::SetEnvironmentVariable("PATH", "$userPath;$env:USERPROFILE\.fnm", "User")
+}
+
+Write-Host "fnm instalado em: $env:USERPROFILE\.fnm"
+```
+
+---
+
+## 2. Liberar execução de scripts (sem admin)
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+```
+
+> ℹ️ Se aparecer aviso de "substituído por política de escopo mais específico", pode ignorar — a política efetiva ainda permite rodar scripts.
+
+---
+
+## 3. Instalar o Node.js
+
+```powershell
+# Ativar o fnm na sessão atual
+$env:PATH += ";$env:USERPROFILE\.fnm"
+fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression
+
+# Instalar Node LTS
+fnm install --lts
+
+# Ativar a versão instalada (usar número, não alias "lts")
+fnm use 24
+```
+
+Verificar instalação:
+
+```powershell
+node --version   # deve mostrar v24.x.x
+npm --version    # deve mostrar 10.x.x ou superior
+```
+
+---
+
+## 4. Instalar o pnpm
+
+```powershell
+npm install -g pnpm
+```
+
+Verificar:
+
+```powershell
+pnpm --version   # deve mostrar 9.x.x ou superior
+```
+
+---
+
+## 5. Clonar e configurar o projeto
+
+```powershell
+# Navegar até onde quer salvar o projeto
+cd "$env:USERPROFILE\Documents\GitHub"
+
+# Clonar o repositório
+git clone https://github.com/JoseEnzo/GymFLow.git
+
+# Entrar na pasta do projeto
+cd GymFLow
+
+# Instalar dependências
+pnpm install
+```
+
+---
+
+## 6. Rodar o projeto
+
+```powershell
+pnpm dev
+```
+
+---
+
+## 🔁 Toda vez que abrir um novo terminal
+
+> Como o perfil automático do PowerShell pode estar bloqueado por política da máquina, rode estes 3 comandos **no início de cada sessão** antes de usar Node/pnpm:
+
+```powershell
+$env:PATH += ";$env:USERPROFILE\.fnm"
+fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression
+fnm use 24
+```
+
+Depois navegue até o projeto e rode normalmente:
+
+```powershell
+cd "$env:USERPROFILE\Documents\GitHub\GymFlow"
+pnpm dev
+```
+
+---
+
+## 💡 Dica: criar um atalho rápido
+
+Para não precisar digitar os 3 comandos toda vez, salve um arquivo `iniciar.ps1` na raiz do projeto com este conteúdo:
+
+```powershell
+$env:PATH += ";$env:USERPROFILE\.fnm"
+fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression
+fnm use 24
+pnpm dev
+```
+
+E rode assim:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\iniciar.ps1
+```
+
+---
+
+## ❓ Problemas comuns
+
+### `bash não é reconhecido`
+O computador não tem WSL nem Git Bash. Use apenas comandos PowerShell.
+
+### `pnpm não é reconhecido`
+O fnm não foi ativado na sessão. Rode os 3 comandos da seção **"Toda vez que abrir um novo terminal"**.
+
+### `ERR_PNPM_NO_PKG_MANIFEST`
+Você está na pasta errada. Navegue até a pasta do projeto antes de rodar `pnpm install`.
+
+### `fnm use lts` não funciona
+Use o número da versão: `fnm use 24`.
+
+### Perfil `.ps1` bloqueado ao abrir o terminal
+Política de segurança da máquina bloqueia o perfil automático. Use o `iniciar.ps1` com `-ExecutionPolicy Bypass` conforme a dica acima.
+
+---
 
 Fazer na aula de LIP
 
@@ -175,3 +341,51 @@ Rota	O que verificar
 
 git add .
 git commit -m "feat: security hardening, perfil page, bioimpedance, measurements, evolution dashboard"
+
+# Setup do Ambiente de Desenvolvimento
+
+## Pré-requisitos
+
+- Node.js 18+
+- pnpm
+- Doppler CLI
+
+## 1. Instalar dependências
+
+```bash
+pnpm install
+```
+
+## 2. Configurar variáveis de ambiente com Doppler
+
+### Instalar o Doppler CLI (Linux)
+
+```bash
+(curl -Ls --tlsv1.2 --proto "=https" --retry 3 https://cli.doppler.com/install.sh || wget -t 3 -qO- https://cli.doppler.com/install.sh) | sudo sh
+```
+
+### Fazer login
+
+```bash
+doppler login
+```
+
+### Conectar o projeto
+
+```bash
+cd apps/web
+doppler setup
+# Projeto: gymflow-s-org
+# Ambiente: dev
+```
+
+## 3. Rodar o projeto
+
+```bash
+doppler run -- pnpm dev
+```
+
+---
+
+> As variáveis de ambiente ficam armazenadas no Doppler (projeto `gymflow-s-org`, ambiente `dev`).
+> Nunca commite arquivos `.env.local` com valores reais.

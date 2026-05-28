@@ -51,14 +51,28 @@ function WeekGrid({ weekDays }: { weekDays: boolean[] }) {
   )
 }
 
-interface FreqStats { thisWeek: number; thisMonth: number; total: number; weekDays: boolean[] }
+interface FreqStats { thisWeek: number; thisMonth: number; total: number; bestStreak: number; weekDays: boolean[] }
+
+function computeBestStreak(timestamps: string[]): number {
+  if (timestamps.length === 0) return 0
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const days = [...new Set(timestamps.map(t => fmt(new Date(t))))].sort()
+  let best = 1, cur = 1
+  for (let i = 1; i < days.length; i++) {
+    const diff = Math.round((new Date(days[i]!).getTime() - new Date(days[i - 1]!).getTime()) / 86400000)
+    if (diff === 1) { cur++; if (cur > best) best = cur }
+    else cur = 1
+  }
+  return days.length > 0 ? best : 0
+}
 
 export default function FrequenciaPage() {
   const { currentRole, currentAcademy } = useAuthStore()
   const supabase = createClient()
   const isOwnerOrPersonal = currentRole === 'owner' || currentRole === 'personal'
 
-  const [stats, setStats] = useState<FreqStats>({ thisWeek: 0, thisMonth: 0, total: 0, weekDays: Array(7).fill(false) })
+  const [stats, setStats] = useState<FreqStats>({ thisWeek: 0, thisMonth: 0, total: 0, bestStreak: 0, weekDays: Array(7).fill(false) })
 
   useEffect(() => {
     if (!currentAcademy) return
@@ -71,29 +85,26 @@ export default function FrequenciaPage() {
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const baseQuery = isOwnerOrPersonal
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ? (supabase as any).from('workout_logs').select('created_at').eq('academy_id', currentAcademy!.id)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        : (supabase as any).from('workout_logs').select('created_at').eq('student_id', user.id).eq('academy_id', currentAcademy!.id)
+      const sb = supabase as any
+      const base = isOwnerOrPersonal
+        ? sb.from('workout_logs').select('created_at').eq('academy_id', currentAcademy!.id)
+        : sb.from('workout_logs').select('created_at').eq('student_id', user.id).eq('academy_id', currentAcademy!.id)
 
-      const [{ count: total }, { count: thisMonth }, { data: weekLogs }] = await Promise.all([
-        baseQuery,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // allLogs → total + best streak | monthLogs → este mês | weekLogs → semana atual
+      const [{ data: allLogs }, { data: monthLogs }, { data: weekLogs }] = await Promise.all([
+        base,
         (isOwnerOrPersonal
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ? (supabase as any).from('workout_logs').select('id', { count: 'exact', head: true }).eq('academy_id', currentAcademy!.id)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          : (supabase as any).from('workout_logs').select('id', { count: 'exact', head: true }).eq('student_id', user.id).eq('academy_id', currentAcademy!.id)
+          ? sb.from('workout_logs').select('created_at').eq('academy_id', currentAcademy!.id)
+          : sb.from('workout_logs').select('created_at').eq('student_id', user.id).eq('academy_id', currentAcademy!.id)
         ).gte('created_at', monthStart.toISOString()),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (isOwnerOrPersonal
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ? (supabase as any).from('workout_logs').select('created_at').eq('academy_id', currentAcademy!.id)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          : (supabase as any).from('workout_logs').select('created_at').eq('student_id', user.id).eq('academy_id', currentAcademy!.id)
+          ? sb.from('workout_logs').select('created_at').eq('academy_id', currentAcademy!.id)
+          : sb.from('workout_logs').select('created_at').eq('student_id', user.id).eq('academy_id', currentAcademy!.id)
         ).gte('created_at', weekStart.toISOString()),
       ])
+
+      const allTimestamps = (allLogs ?? []).map((l: { created_at: string }) => l.created_at)
+      const bestStreak = computeBestStreak(allTimestamps)
 
       const weekDays = Array(7).fill(false)
       ;(weekLogs ?? []).forEach((log: { created_at: string }) => {
@@ -101,7 +112,13 @@ export default function FrequenciaPage() {
         weekDays[day] = true
       })
 
-      setStats({ thisWeek: weekLogs?.length ?? 0, thisMonth: thisMonth ?? 0, total: total ?? 0, weekDays })
+      setStats({
+        thisWeek: weekLogs?.length ?? 0,
+        thisMonth: monthLogs?.length ?? 0,
+        total: allLogs?.length ?? 0,
+        bestStreak,
+        weekDays,
+      })
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,7 +145,7 @@ export default function FrequenciaPage() {
         {[
           { label: 'Esta semana', value: String(stats.thisWeek), icon: Calendar, color: '#6366F1' },
           { label: 'Este mês', value: String(stats.thisMonth), icon: Activity, color: '#10B981' },
-          { label: 'Melhor sequência', value: '—', icon: TrendingUp, color: '#F97316' },
+          { label: 'Melhor sequência', value: stats.bestStreak > 0 ? `${stats.bestStreak}d` : '—', icon: TrendingUp, color: '#F97316' },
           { label: 'Total de treinos', value: String(stats.total), icon: Dumbbell, color: '#06B6D4' },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="stat-card">

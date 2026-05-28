@@ -134,12 +134,23 @@ function OnboardingContent() {
 
   // ── Validar código de convite ─────────────────────────────
   async function redeemInvite() {
-    if (!inviteCode.trim()) return
+    const trimmed = inviteCode.trim().toUpperCase()
+    if (!trimmed) return
     setSaving(true)
     try {
-      router.push(`/convite/${inviteCode.trim()}`)
+      const { data, error } = await supabase
+        .from('invites')
+        .select('token')
+        .eq('code', trimmed)
+        .eq('is_active', true)
+        .single()
+      if (error || !data) {
+        toast.error('Código inválido ou expirado. Verifique e tente novamente.')
+        return
+      }
+      router.push(`/convite/${(data as { token: string }).token}`)
     } catch {
-      toast.error('Código inválido. Verifique e tente novamente.')
+      toast.error('Erro ao verificar código. Tente novamente.')
     } finally {
       setSaving(false)
     }
@@ -233,7 +244,7 @@ function OnboardingContent() {
             </motion.div>
           )}
 
-          {/* ── STEP: plan (owner) ── */}
+          {/* ── STEP: plan (owner / personal independente) ── */}
           {step === 'plan' && (
             <motion.div key="plan" variants={slide} initial="hidden" animate="show" exit="exit" className="space-y-6">
               <div>
@@ -358,7 +369,7 @@ function OnboardingContent() {
               </div>
 
               <button
-                onClick={saveAcademy}
+                onClick={() => saveAcademy()}
                 disabled={saving || !academyName.trim()}
                 className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
               >
@@ -445,15 +456,17 @@ function OnboardingContent() {
                       <input
                         type="text"
                         value={inviteCode}
-                        onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                        placeholder="Ex: ACAD-1234"
+                        onChange={(e) => setInviteCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+                        placeholder="ABC123"
+                        maxLength={6}
+                        autoComplete="off"
                         className="field tracking-widest font-mono"
-                        onKeyDown={(e) => e.key === 'Enter' && inviteCode.trim() && redeemInvite()}
+                        onKeyDown={(e) => e.key === 'Enter' && inviteCode.length === 6 && redeemInvite()}
                       />
                     </div>
                     <button
                       onClick={redeemInvite}
-                      disabled={saving || !inviteCode.trim()}
+                      disabled={saving || inviteCode.length !== 6}
                       className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
                     >
                       {saving
@@ -466,11 +479,28 @@ function OnboardingContent() {
               </AnimatePresence>
 
               {hasInvite === false && (
+                <div className="space-y-2">
+                  <button
+                    onClick={() => setStep('payment')}
+                    className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
+                  >
+                    Ver plano individual <ArrowRight className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => router.replace('/dashboard')}
+                    className="w-full py-3 rounded-xl text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Pular por agora
+                  </button>
+                </div>
+              )}
+
+              {hasInvite === null && (
                 <button
-                  onClick={() => setStep('payment')}
-                  className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
+                  onClick={() => router.replace('/dashboard')}
+                  className="w-full py-3 rounded-xl text-sm text-muted-foreground hover:text-foreground transition-colors text-center"
                 >
-                  Ver plano individual <ArrowRight className="w-4 h-4" />
+                  Pular por agora
                 </button>
               )}
             </motion.div>

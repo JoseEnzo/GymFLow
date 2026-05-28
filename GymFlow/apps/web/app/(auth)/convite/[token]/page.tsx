@@ -21,9 +21,10 @@ interface InviteDetails {
 export default function ConvitePage() {
   const params = useParams()
   const router = useRouter()
-  const token = params.token as string
+  const token = params['token'] as string
   const { profile } = useAuth()
-  const supabase = createClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = createClient() as any
 
   const [invite, setInvite] = useState<InviteDetails | null>(null)
   const [status, setStatus] = useState<'loading' | 'found' | 'accepting' | 'done' | 'error'>('loading')

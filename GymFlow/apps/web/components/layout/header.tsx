@@ -1,8 +1,10 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
-import { motion } from 'framer-motion'
-import { Menu, Bell, Search, Plus } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useState, useRef, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Menu, Bell, Search, Plus, ArrowLeft, User, LogOut } from 'lucide-react'
+import Link from 'next/link'
 
 import { useUIStore } from '@/stores/ui-store'
 import { useAuthStore } from '@/stores/auth-store'
@@ -10,32 +12,56 @@ import { useAuth } from '@/hooks/use-auth'
 import { getInitials } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
-const BREADCRUMBS: Record<string, { label: string; parent?: string }> = {
-  '/dashboard': { label: 'Dashboard' },
-  '/alunos': { label: 'Alunos' },
-  '/treinos': { label: 'Treinos' },
-  '/exercicios': { label: 'Exercícios' },
-  '/frequencia': { label: 'Frequência' },
-  '/configuracoes': { label: 'Configurações' },
+const ROOT_ROUTES = new Set(['/dashboard'])
+
+const PAGE_TITLES: Record<string, string> = {
+  '/dashboard': 'Dashboard',
+  '/alunos': 'Alunos',
+  '/treinos': 'Treinos',
+  '/treinos/novo': 'Nova ficha',
+  '/exercicios': 'Exercícios',
+  '/frequencia': 'Frequência',
+  '/configuracoes': 'Configurações',
+  '/historico': 'Histórico',
+  '/evolucao': 'Evolução',
+  '/perfil': 'Perfil',
+  '/agenda': 'Agenda',
+  '/personais': 'Personais',
 }
 
-function getPageTitle(pathname: string) {
-  const exact = BREADCRUMBS[pathname]
-  if (exact) return exact.label
+function getPageInfo(pathname: string): { title: string; isSubPage: boolean } {
+  const isSubPage = !ROOT_ROUTES.has(pathname)
 
-  for (const [key, val] of Object.entries(BREADCRUMBS)) {
-    if (pathname.startsWith(key + '/')) return val.label
-  }
+  const exact = PAGE_TITLES[pathname]
+  if (exact) return { title: exact, isSubPage }
 
-  return 'GymFlow'
+  if (pathname.startsWith('/treinos/executar/')) return { title: 'Executar treino', isSubPage: true }
+  if (pathname.startsWith('/treinos/')) return { title: 'Ficha de treino', isSubPage: true }
+  if (pathname.startsWith('/alunos/')) return { title: 'Aluno', isSubPage: true }
+  if (pathname.startsWith('/exercicios/')) return { title: 'Exercício', isSubPage: true }
+
+  return { title: 'GymFlow', isSubPage }
 }
 
 export function Header() {
   const pathname = usePathname()
+  const router = useRouter()
   const { setSidebarOpen } = useUIStore()
-  const { profile } = useAuth()
+  const { profile, signOut } = useAuth()
   const { currentAcademy } = useAuthStore()
-  const title = getPageTitle(pathname)
+  const { title, isSubPage } = getPageInfo(pathname)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   return (
     <motion.header
@@ -46,13 +72,21 @@ export function Header() {
     >
       {/* Left */}
       <div className="flex items-center gap-3">
-        {/* Mobile menu toggle */}
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="lg:hidden p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
+        {isSubPage ? (
+          <button
+            onClick={() => router.back()}
+            className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+        ) : (
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="lg:hidden p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
 
         {/* Page title */}
         <div>
@@ -84,26 +118,68 @@ export function Header() {
           Novo
         </button>
 
-        {/* User avatar */}
-        <div className="relative cursor-pointer group">
-          {profile?.avatar_url ? (
-            <img
-              src={profile.avatar_url}
-              alt={profile.full_name ?? ''}
-              className="w-8 h-8 rounded-full object-cover ring-2 ring-border/60 group-hover:ring-brand-500/40 transition-all"
-            />
-          ) : (
-            <div className={cn(
-              'w-8 h-8 rounded-full flex items-center justify-center',
-              'bg-gradient-to-br from-brand-500/30 to-cyan-500/30',
-              'border border-brand-500/20 group-hover:border-brand-500/40',
-              'transition-all'
-            )}>
-              <span className="text-xs font-bold text-brand-300">
-                {getInitials(profile?.full_name ?? 'U')}
-              </span>
-            </div>
-          )}
+        {/* User avatar + dropdown */}
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            className="relative cursor-pointer group focus:outline-none"
+          >
+            {profile?.avatar_url ? (
+              <img
+                src={profile.avatar_url}
+                alt={profile.full_name ?? ''}
+                className="w-8 h-8 rounded-full object-cover ring-2 ring-border/60 group-hover:ring-brand-500/40 transition-all"
+              />
+            ) : (
+              <div className={cn(
+                'w-8 h-8 rounded-full flex items-center justify-center',
+                'bg-gradient-to-br from-brand-500/30 to-cyan-500/30',
+                'border border-brand-500/20 group-hover:border-brand-500/40',
+                'transition-all'
+              )}>
+                <span className="text-xs font-bold text-brand-300">
+                  {getInitials(profile?.full_name ?? 'U')}
+                </span>
+              </div>
+            )}
+          </button>
+
+          <AnimatePresence>
+            {menuOpen && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                className="absolute right-0 top-11 w-52 rounded-2xl border border-border/60 bg-card shadow-xl overflow-hidden z-50"
+              >
+                {/* User info */}
+                <div className="px-4 py-3 border-b border-border/40">
+                  <p className="text-sm font-semibold truncate">{profile?.full_name ?? 'Usuário'}</p>
+                </div>
+
+                {/* Actions */}
+                <div className="p-1.5 space-y-0.5">
+                  <Link
+                    href="/perfil"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all"
+                  >
+                    <User className="w-4 h-4" />
+                    Meu perfil
+                  </Link>
+
+                  <button
+                    onClick={() => { setMenuOpen(false); signOut() }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sair
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </motion.header>

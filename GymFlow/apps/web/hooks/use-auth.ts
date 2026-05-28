@@ -10,7 +10,8 @@ import { useAuthStore } from '@/stores/auth-store'
 export function useAuth() {
   const router = useRouter()
   const { profile, currentAcademy, currentRole, setProfile, setAcademies, reset } = useAuthStore()
-  const supabase = createClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = createClient() as any
 
   const loadUserData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -28,9 +29,9 @@ export function useAuth() {
     if (profileResult.data) setProfile(profileResult.data)
 
     if (membersResult.data) {
-      const academies = membersResult.data
+      const academies = (membersResult.data as Array<{ academy: unknown; role: string }>)
         .filter((m) => m.academy)
-        .map((m) => ({ academy: m.academy as any, role: m.role }))
+        .map((m) => ({ academy: m.academy as any, role: m.role as 'owner' | 'personal' | 'student' }))
       useAuthStore.getState().setAcademies(academies)
     }
   }, [supabase, setProfile, setAcademies])
@@ -38,7 +39,7 @@ export function useAuth() {
   useEffect(() => {
     loadUserData()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string) => {
       if (event === 'SIGNED_IN') loadUserData()
       if (event === 'SIGNED_OUT') {
         reset()
@@ -57,11 +58,11 @@ export function useAuth() {
     router.push(redirectTo ?? (academies.length > 0 ? '/dashboard' : '/onboarding'))
   }
 
-  async function signUp(email: string, password: string, fullName: string, accountType: 'owner' | 'student' = 'owner', redirectTo?: string) {
+  async function signUp(email: string, password: string, fullName: string, accountType: 'owner' | 'personal' | 'student' = 'owner', redirectTo?: string, document?: string) {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName, account_type: accountType } },
+      options: { data: { full_name: fullName, account_type: accountType, document: document ?? null } },
     })
     if (error) throw error
     toast.success('Conta criada com sucesso!')

@@ -168,7 +168,7 @@ function AcademiaTab() {
   }
 
   async function onSubmit(data: { name: string; email: string; phone: string; address_city: string; address_state: string }) {
-    if (!isOwner) return
+    if (!isOwner || !currentAcademy) return
     setSaving(true)
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -315,7 +315,7 @@ function NotificacoesTab() {
         { key: 'pushWorkoutReminder' as SettingKey, label: 'Lembrete de treino', sub: 'Notificação diária para os alunos', channel: 'Push' },
         { key: 'emailWorkoutCompleted' as SettingKey, label: 'Treino concluído', sub: 'Quando um aluno finaliza o treino', channel: 'E-mail' },
       ]).map(({ key, label, sub, channel }) => (
-        <div key={key} className="glass rounded-xl p-4 flex items-center gap-4">
+        <div key={key as string} className="glass rounded-xl p-4 flex items-center gap-4">
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <p className="text-sm font-medium">{label}</p>

@@ -54,8 +54,8 @@ enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
 enable_signup = true
 enable_anonymous_sign_ins = false
-minimum_password_length = 8
-password_requirements = ""
+# minimum_password_length = 8
+# password_requirements = ""
 
 [auth.email]
 enable_signup = true
@@ -70,9 +70,9 @@ enable_confirmations = false
 max_frequency = "5s"
 
 [auth.external.google]
-enabled = true
-client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
-secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
+enabled = false
+client_id = ""
+secret = ""
 redirect_uri = ""
 url = ""
 skip_nonce_check = false

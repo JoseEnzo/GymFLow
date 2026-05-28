@@ -10,7 +10,8 @@ export async function POST(request: Request) {
   if (result instanceof NextResponse) return result
   const { user, body: { academyId, planId } } = result
 
-  const supabase = await createClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = await createClient() as any
 
   const { data: member } = await supabase
     .from('academy_members')
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
     .eq('user_id', user.id)
     .single()
 
-  if (!member || member.role !== 'owner') {
+  if (!member || (member as { role: string }).role !== 'owner') {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
   }
 
@@ -29,13 +30,13 @@ export async function POST(request: Request) {
     .eq('id', academyId)
     .single()
 
-  const origin = request.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_URL ?? ''
+  const origin = request.headers.get('origin') ?? process.env['NEXT_PUBLIC_APP_URL'] ?? ''
 
   try {
     const session = await createCheckoutSession({
       academyId,
       planId,
-      customerId: academy?.stripe_customer_id ?? undefined,
+      customerId: (academy as { stripe_customer_id: string | null } | null)?.stripe_customer_id ?? undefined,
       successUrl: `${origin}/configuracoes?tab=plano&success=1`,
       cancelUrl: `${origin}/configuracoes?tab=plano`,
     })

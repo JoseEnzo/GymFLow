@@ -42,7 +42,8 @@ function EditModal({ exercise, onClose, onSaved }: {
   onClose: () => void
   onSaved: (ex: Exercise) => void
 }) {
-  const supabase = createClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = createClient() as any
   const [form, setForm] = useState<EditForm>({
     name_pt: exercise.name_pt,
     difficulty: exercise.difficulty,
