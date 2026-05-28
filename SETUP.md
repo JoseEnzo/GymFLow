@@ -94,20 +94,20 @@ pnpm lint         # checar erros de lint
 ## Subir alterações para o GitHub
 
 ```bash
-# 0. Logar ao seu repositorio git
+# 1. Logar ao seu repositorio git
 git remote add origin https://github.com/JoseEnzo/GymFLow.git
-# 1. Ver o que mudou
+# 2. Ver o que mudou
 git status
 
-# 2. Adicionar os arquivos alterados
+# 3. Adicionar os arquivos alterados
 git add .                     # todos os arquivos
 # ou
 git add nome-do-arquivo.tsx   # arquivo específico
 
-# 3. Criar o commit com mensagem
+# 4. Criar o commit com mensagem
 git commit -m "descrição do que você fez"
 
-# 4. Enviar pro GitHub
+# 5. Enviar pro GitHub
 git push origin main
 ```
 ```
