@@ -1,0 +1,53 @@
+{
+  "name": "@gymflow/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf .next"
+  },
+  "dependencies": {
+    "@gymflow/database": "workspace:*",
+    "@gymflow/ui": "workspace:*",
+    "@hookform/resolvers": "^3.9.1",
+    "@sentry/nextjs": "^8.48.0",
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.47.2",
+    "@tanstack/react-query": "^5.62.16",
+    "@tanstack/react-query-devtools": "^5.62.16",
+    "@upstash/ratelimit": "^2.0.5",
+    "@upstash/redis": "^1.34.3",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.15.0",
+    "import-in-the-middle": "^3.0.1",
+    "lucide-react": "^0.468.0",
+    "next": "15.1.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.54.2",
+    "recharts": "^2.14.1",
+    "require-in-the-middle": "^8.0.1",
+    "sonner": "^1.7.1",
+    "stripe": "^17.5.0",
+    "tailwind-merge": "^2.5.5",
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^3.24.1",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@gymflow/eslint-config": "workspace:*",
+    "@gymflow/typescript-config": "workspace:*",
+    "@types/node": "^22.10.6",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.17.0",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2"
+  }
+}
