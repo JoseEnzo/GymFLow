@@ -210,7 +210,7 @@ function LoginInner() {
         email = json.email
       }
 
-      await signIn(email, data.password, redirect ?? undefined)
+      await signIn(email, data.password, redirect ?? undefined, role ?? undefined)
     } catch (err: unknown) {
       const msg = (err as Error).message
       setServerError(msg.includes('Invalid login credentials') ? 'Credenciais inválidas' : msg)

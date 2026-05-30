@@ -72,10 +72,16 @@ export function useAuth() {
     return () => subscription.unsubscribe()
   }, [loadUserData, reset, router, supabase.auth])
 
-  async function signIn(email: string, password: string, redirectTo?: string) {
+  async function signIn(email: string, password: string, redirectTo?: string, intendedRole?: 'owner' | 'personal' | 'student') {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
+    reset()
     await loadUserData()
+    if (intendedRole) {
+      const { academies: loaded } = useAuthStore.getState()
+      const match = loaded.find(a => a.role === intendedRole)
+      if (match) useAuthStore.getState().setCurrentAcademy(match.academy, match.role)
+    }
     const { academies } = useAuthStore.getState()
     router.push(redirectTo ?? (academies.length > 0 ? '/dashboard' : '/onboarding'))
   }

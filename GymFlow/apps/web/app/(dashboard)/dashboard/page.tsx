@@ -85,6 +85,22 @@ const BADGES = [
   { id: 'streak30', icon: '💫', label: 'Fenômeno',             desc: '30 dias seguidos',  condition: (_w: number, s: number) => s >= 30  },
 ]
 
+const FREE_CATEGORIES = [
+  { id: 'musculacao', label: 'Musculação', emoji: '💪' },
+  { id: 'cardio',     label: 'Cardio',     emoji: '🏃' },
+  { id: 'funcional',  label: 'Funcional',  emoji: '⚡' },
+  { id: 'yoga',       label: 'Yoga',       emoji: '🧘' },
+  { id: 'esportes',   label: 'Esportes',   emoji: '⚽' },
+  { id: 'outro',      label: 'Outro',      emoji: '🎯' },
+]
+
+const FREE_DURATIONS = [
+  { label: '30min', value: 30 },
+  { label: '45min', value: 45 },
+  { label: '1h',    value: 60 },
+  { label: '1h30',  value: 90 },
+]
+
 // ─────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────
@@ -260,6 +276,34 @@ export default function DashboardPage() {
     }
   }
 
+  async function logFreeWorkout() {
+    if (!freeCategory || !currentAcademy) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    setFreeLogging(true)
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from('workout_logs').insert({
+        student_id: user.id,
+        academy_id: currentAcademy.id,
+        workout_type: freeCategory,
+        duration_seconds: freeDuration ? freeDuration * 60 : null,
+        completed_at: new Date().toISOString(),
+      })
+      if (error) throw error
+      toast.success('Treino registrado! 💪')
+      setFreeLoggedToday(true)
+      setFreeCategory(null)
+      setFreeDuration(null)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      loadStudentData(supabase as any, currentAcademy.id)
+    } catch {
+      toast.error('Erro ao registrar treino.')
+    } finally {
+      setFreeLogging(false)
+    }
+  }
+
   // Student
   const [studentStats, setStudentStats] = useState<StudentStats>({ totalWorkouts: 0, weekWorkouts: 0, streak: 0, activeSheets: 0, weekGoal: 3 })
   const [todayWorkout, setTodayWorkout] = useState<TodayWorkout | null>(null)
@@ -268,6 +312,11 @@ export default function DashboardPage() {
   const [subscriptionPlan, setSubscriptionPlan] = useState<string | null>(null)
   const [showSuccessBanner, setShowSuccessBanner] = useState(false)
   const [monthlyWorkouts, setMonthlyWorkouts] = useState<MonthlyWorkout[]>([])
+  const [freeCategory,    setFreeCategory]    = useState<string | null>(null)
+  const [freeDuration,    setFreeDuration]    = useState<number | null>(null)
+  const [freeLogging,     setFreeLogging]     = useState(false)
+  const [freeLoggedToday, setFreeLoggedToday] = useState(false)
+  const [weekActivity,    setWeekActivity]    = useState<boolean[]>(Array(7).fill(false))
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -463,17 +512,26 @@ export default function DashboardPage() {
     const weekAgo    = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
     const todayIndex = new Date().getDay()
     const todayStr   = dateKey(new Date())
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
 
-    const [{ count: total }, { count: week }, { count: sheets }, { data: logDates }, { data: lastLogRaw }] = await Promise.all([
+    const [{ count: total }, { count: week }, { count: sheets }, { data: logDates }, { data: lastLogRaw }, { count: freeTodayCount }] = await Promise.all([
       sb.from('workout_logs').select('id', { count: 'exact', head: true }).eq('student_id', user.id).eq('academy_id', aid),
       sb.from('workout_logs').select('id', { count: 'exact', head: true }).eq('student_id', user.id).eq('academy_id', aid).gte('created_at', weekAgo.toISOString()),
       sb.from('workout_sheets').select('id', { count: 'exact', head: true }).eq('student_id', user.id).eq('academy_id', aid).eq('is_active', true),
       sb.from('workout_logs').select('created_at').eq('student_id', user.id).eq('academy_id', aid),
       sb.from('workout_logs').select('id, created_at, duration_seconds, sheet_id').eq('student_id', user.id).eq('academy_id', aid).order('created_at', { ascending: false }).limit(1),
+      sb.from('workout_logs').select('id', { count: 'exact', head: true }).eq('student_id', user.id).eq('academy_id', aid).is('sheet_id', null).gte('created_at', todayStart.toISOString()),
     ])
 
     const streak = computeStreak((logDates ?? []).map((r: { created_at: string }) => r.created_at))
     setStudentStats({ totalWorkouts: total ?? 0, weekWorkouts: week ?? 0, streak, activeSheets: sheets ?? 0, weekGoal: 3 })
+    setFreeLoggedToday((freeTodayCount ?? 0) > 0)
+
+    const daySet = new Set((logDates ?? []).map((r: { created_at: string }) => dateKey(new Date(r.created_at))))
+    setWeekActivity(Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(); d.setDate(d.getDate() - (6 - i))
+      return daySet.has(dateKey(d))
+    }))
 
     const months: MonthlyWorkout[] = []
     for (let i = 5; i >= 0; i--) {
@@ -537,9 +595,8 @@ export default function DashboardPage() {
 
   const hasAcademy      = !!currentAcademy
   const engagementPct   = ownerMetrics.totalStudents > 0 ? Math.round((ownerMetrics.activeThisWeek / ownerMetrics.totalStudents) * 100) : 0
-  const weekDelta       = ownerMetrics.workoutsLastWeek > 0
-    ? `${ownerMetrics.workoutsThisWeek >= ownerMetrics.workoutsLastWeek ? '+' : ''}${ownerMetrics.workoutsThisWeek - ownerMetrics.workoutsLastWeek}`
-    : undefined
+  const trainedToday    = weekActivity[6] === true || freeLoggedToday || (todayWorkout?.alreadyDone ?? false)
+  const streakAtRisk    = studentStats.streak > 0 && !trainedToday
 
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6">
@@ -590,173 +647,82 @@ export default function DashboardPage() {
 
       {isOwner && hasAcademy && (
         <>
-          {/* KPIs — 6 cards */}
-          <motion.div variants={stagger} className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
-            <StatCard label="Alunos ativos"    value={ownerMetrics.totalStudents}       delta={ownerMetrics.newThisMonth > 0 ? `+${ownerMetrics.newThisMonth}` : undefined} icon={Users}         color="#6366F1" empty={ownerMetrics.totalStudents === 0} />
-            <StatCard label="Personais"         value={ownerMetrics.activePersonals}                                                                                         icon={ShieldCheck}    color="#8B5CF6" empty={ownerMetrics.activePersonals === 0} />
-            <StatCard label="Treinos/semana"    value={ownerMetrics.workoutsThisWeek}   delta={weekDelta}                                                                    icon={Dumbbell}       color="#10B981" empty={ownerMetrics.workoutsThisWeek === 0} />
-            <StatCard label="Engajamento"       value={engagementPct}    suffix="%"                                                                                          icon={Activity}       color="#06B6D4" empty={ownerMetrics.totalStudents === 0} />
-            <StatCard label="Inativos"          value={ownerMetrics.inactiveCount}                                                                                           icon={AlertTriangle}  color={ownerMetrics.inactiveCount > 0 ? '#F59E0B' : '#10B981'}     warning={ownerMetrics.inactiveCount > 0}      empty={ownerMetrics.totalStudents === 0} />
-            <StatCard label="Sem ficha"         value={ownerMetrics.studentsWithoutSheets}                                                                                   icon={ClipboardList}  color={ownerMetrics.studentsWithoutSheets > 0 ? '#EF4444' : '#10B981'} warning={ownerMetrics.studentsWithoutSheets > 0} empty={ownerMetrics.totalStudents === 0} />
+          {/* KPIs — 4 cards */}
+          <motion.div variants={stagger} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatCard label="Total de alunos"  value={ownerMetrics.totalStudents}   delta={ownerMetrics.newThisMonth > 0 ? `+${ownerMetrics.newThisMonth}` : undefined} icon={Users}       color="#6366F1" empty={ownerMetrics.totalStudents === 0} />
+            <StatCard label="Novos este mês"   value={ownerMetrics.newThisMonth}                                                                                          icon={UserPlus}    color="#10B981" empty={ownerMetrics.newThisMonth === 0} />
+            <StatCard label="Personais ativos" value={ownerMetrics.activePersonals}                                                                                       icon={ShieldCheck} color="#8B5CF6" empty={ownerMetrics.activePersonals === 0} />
+            <StatCard label="Engajamento"      value={engagementPct} suffix="%"                                                                                           icon={Activity}    color="#06B6D4" empty={ownerMetrics.totalStudents === 0} />
           </motion.div>
-
-          {/* Alerts */}
-          {(ownerMetrics.inactiveCount > 0 || ownerMetrics.studentsWithoutSheets > 0) && (
-            <motion.div variants={fadeUp} className="space-y-2">
-              {ownerMetrics.inactiveCount > 0 && (
-                <AlertBanner icon={AlertTriangle} color="#F59E0B">
-                  <span className="font-bold text-amber-300">{ownerMetrics.inactiveCount} aluno{ownerMetrics.inactiveCount > 1 ? 's' : ''}</span> sem treino nos últimos 7 dias.{' '}
-                  <Link href="/alunos" className="underline text-amber-400">Ver alunos →</Link>
-                </AlertBanner>
-              )}
-              {ownerMetrics.studentsWithoutSheets > 0 && (
-                <AlertBanner icon={ClipboardList} color="#EF4444">
-                  <span className="font-bold text-red-300">{ownerMetrics.studentsWithoutSheets} aluno{ownerMetrics.studentsWithoutSheets > 1 ? 's' : ''}</span> sem ficha de treino.{' '}
-                  <Link href="/treinos/novo" className="underline text-red-400">Criar ficha →</Link>
-                </AlertBanner>
-              )}
-            </motion.div>
-          )}
-
-          {/* Engagement bar */}
-          {ownerMetrics.totalStudents > 0 && (
-            <motion.div variants={fadeUp} className="glass rounded-2xl p-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-semibold">Taxa de engajamento semanal</p>
-                <span className={cn('text-lg font-display font-extrabold', engagementPct >= 70 ? 'text-emerald-400' : engagementPct >= 40 ? 'text-amber-400' : 'text-red-400')}>
-                  {engagementPct}%
-                </span>
-              </div>
-              <div className="h-2.5 rounded-full bg-surface-200 overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${engagementPct}%` }}
-                  transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-                  className={cn('h-full rounded-full', engagementPct >= 70 ? 'bg-emerald-500' : engagementPct >= 40 ? 'bg-amber-500' : 'bg-red-500')}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1.5">
-                {ownerMetrics.activeThisWeek} de {ownerMetrics.totalStudents} alunos treinaram esta semana
-              </p>
-            </motion.div>
-          )}
 
           {/* Main 2/3 + 1/3 */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Treinos recentes */}
-            <motion.div variants={fadeUp} className="xl:col-span-2 glass rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="font-display font-bold">Treinos recentes</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">Últimas sessões da academia</p>
-                </div>
-                <Link href="/frequencia" className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">Ver todos <ChevronRight className="w-3 h-3" /></Link>
-              </div>
-              {recentWorkouts.length === 0 ? (
-                <EmptyState icon={Users} title="Nenhum treino registrado" description="Quando seus alunos completarem treinos, eles aparecerão aqui." cta="Convidar aluno" ctaHref="/alunos" />
-              ) : (
-                <div className="space-y-2">
-                  {recentWorkouts.map(w => (
-                    <div key={w.id} className="flex items-center gap-3 p-3 rounded-xl bg-surface-100 hover:bg-surface-200 transition-colors">
-                      <div className="w-9 h-9 rounded-lg bg-brand-500/15 flex items-center justify-center flex-shrink-0">
-                        <Dumbbell className="w-4 h-4 text-brand-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate">{w.studentName}</p>
-                        <p className="text-xs text-muted-foreground truncate">{w.sheetName}</p>
-                      </div>
-                      <div className="text-right flex-shrink-0 space-y-0.5">
-                        <p className="text-xs text-muted-foreground">{formatTimeAgo(w.createdAt)}</p>
-                        {w.durationSeconds != null && (
-                          <p className="text-xs font-medium flex items-center gap-1 justify-end text-brand-400">
-                            <Clock className="w-3 h-3" />{formatDuration(w.durationSeconds)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </motion.div>
 
-            {/* Right col */}
-            <motion.div variants={fadeUp} className="space-y-4">
-              {/* Heatmap */}
-              <div className="glass rounded-2xl p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-display font-bold text-sm">Frequência da academia</h3>
-                  <TrendingUp className="w-4 h-4 text-brand-400" />
-                </div>
-                <FrequencyHeatmap />
-                <div className="flex items-center justify-between mt-3 text-[10px] text-muted-foreground">
-                  <span>Menos</span>
-                  <div className="flex gap-1">
-                    {['bg-surface-200','bg-brand-900','bg-brand-700','bg-brand-500','bg-brand-400'].map(c => (
-                      <div key={c} className={cn('w-2.5 h-2.5 rounded-sm', c)} />
-                    ))}
-                  </div>
-                  <span>Mais</span>
-                </div>
-              </div>
+            {/* Left col — financeiro + crescimento */}
+            <motion.div variants={fadeUp} className="xl:col-span-2 space-y-4">
 
-              {/* Quick actions */}
-              <div className="glass rounded-2xl p-4">
-                <h3 className="font-display font-bold text-sm mb-3">Ações rápidas</h3>
-                <QuickAction icon={Dumbbell}    label="Nova ficha de treino"   href="/treinos/novo" color="#6366F1" />
-                <QuickAction icon={UserPlus}    label="Convidar aluno"          href="/alunos"       color="#06B6D4" />
-                <QuickAction icon={ShieldCheck} label="Gerenciar personais"     href="/personais"    color="#8B5CF6" />
-                <QuickAction icon={BookOpen}    label="Banco de exercícios"     href="/exercicios"   color="#10B981" />
-                <QuickAction icon={BarChart3}   label="Ver frequência"          href="/frequencia"   color="#F59E0B" />
-              </div>
-
-              {/* Plano ativo */}
+              {/* Plano / financeiro */}
               {currentAcademy?.plan && OWNER_PLAN_INFO[currentAcademy.plan] && (() => {
                 const p = OWNER_PLAN_INFO[currentAcademy.plan!]
+                const isStarter = currentAcademy.plan === 'starter'
+                const studentUsagePct = isStarter ? Math.min((ownerMetrics.totalStudents / 50) * 100, 100) : 0
+                const personalUsagePct = isStarter ? Math.min((ownerMetrics.activePersonals / 3) * 100, 100) : 0
                 return (
-                  <div className="glass rounded-2xl p-4" style={{ border: `1px solid ${p.color}20` }}>
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-display font-bold text-sm">Plano ativo</h3>
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                        style={{ background: `${p.color}15`, color: p.color }}>
-                        {p.emoji} {p.name}
-                      </span>
+                  <div className="glass rounded-2xl p-5" style={{ border: `1px solid ${p.color}20` }}>
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="font-display font-bold">Plano atual</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">Cobrança mensal recorrente</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-display font-extrabold" style={{ color: p.color }}>{p.price}</p>
+                        {p.trial && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">30 dias grátis</span>}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="text-xs text-muted-foreground">{p.price}</p>
-                      {p.trial && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">30 dias grátis</span>
-                      )}
-                    </div>
-                    <ul className="space-y-1 mb-4">
-                      {p.features.map(f => (
-                        <li key={f} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                          <Check className="w-2.5 h-2.5 flex-shrink-0" style={{ color: p.color }} />{f}
-                        </li>
-                      ))}
-                    </ul>
-                    {currentAcademy.plan !== 'pro' && (
-                      <div className="space-y-2">
-                        {currentAcademy.plan === 'starter' && (
-                          <div className="rounded-xl p-3 mb-1" style={{ background: `${OWNER_PLAN_INFO.pro.color}0A`, border: `1px solid ${OWNER_PLAN_INFO.pro.color}20` }}>
-                            <p className="text-[11px] font-bold mb-1.5" style={{ color: OWNER_PLAN_INFO.pro.color }}>👑 Pro desbloqueia:</p>
-                            <ul className="space-y-1">
-                              {PRO_UPGRADE_FEATURES.map(f => (
-                                <li key={f} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                                  <Check className="w-2.5 h-2.5 flex-shrink-0" style={{ color: OWNER_PLAN_INFO.pro.color }} />{f}
-                                </li>
-                              ))}
-                            </ul>
+
+                    {isStarter && (
+                      <div className="space-y-3 mb-4">
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-muted-foreground">Alunos</span>
+                            <span className="text-xs font-semibold">{ownerMetrics.totalStudents} <span className="text-muted-foreground">/ 50</span></span>
                           </div>
-                        )}
-                        <button
-                          onClick={() => handleOwnerPlanChange('pro')}
-                          disabled={!!upgrading}
-                          className="w-full text-xs font-semibold py-2 rounded-xl flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
-                          style={{ background: `${OWNER_PLAN_INFO.pro.color}15`, color: OWNER_PLAN_INFO.pro.color, border: `1px solid ${OWNER_PLAN_INFO.pro.color}25` }}
-                        >
+                          <div className="h-2 rounded-full bg-surface-200 overflow-hidden">
+                            <motion.div initial={{ width: 0 }} animate={{ width: `${studentUsagePct}%` }} transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+                              className={cn('h-full rounded-full', studentUsagePct >= 90 ? 'bg-red-500' : studentUsagePct >= 70 ? 'bg-amber-500' : 'bg-emerald-500')} />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-muted-foreground">Personais</span>
+                            <span className="text-xs font-semibold">{ownerMetrics.activePersonals} <span className="text-muted-foreground">/ 3</span></span>
+                          </div>
+                          <div className="h-2 rounded-full bg-surface-200 overflow-hidden">
+                            <motion.div initial={{ width: 0 }} animate={{ width: `${personalUsagePct}%` }} transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+                              className={cn('h-full rounded-full', personalUsagePct >= 90 ? 'bg-red-500' : 'bg-indigo-500')} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {isStarter && (
+                      <>
+                        <div className="rounded-xl p-3 mb-3" style={{ background: `${OWNER_PLAN_INFO.pro.color}0A`, border: `1px solid ${OWNER_PLAN_INFO.pro.color}20` }}>
+                          <p className="text-[11px] font-bold mb-1.5" style={{ color: OWNER_PLAN_INFO.pro.color }}>👑 Pro desbloqueia:</p>
+                          <ul className="grid grid-cols-2 gap-1">
+                            {PRO_UPGRADE_FEATURES.slice(0, 4).map(f => (
+                              <li key={f} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                <Check className="w-2.5 h-2.5 flex-shrink-0" style={{ color: OWNER_PLAN_INFO.pro.color }} />{f}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        <button onClick={() => handleOwnerPlanChange('pro')} disabled={!!upgrading}
+                          className="w-full text-xs font-semibold py-2.5 rounded-xl flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
+                          style={{ background: `${OWNER_PLAN_INFO.pro.color}15`, color: OWNER_PLAN_INFO.pro.color, border: `1px solid ${OWNER_PLAN_INFO.pro.color}25` }}>
                           {upgrading === 'pro' ? <Loader2 className="w-3 h-3 animate-spin" /> : <>👑 Fazer upgrade para Pro — R$ 397/mês</>}
                         </button>
-                      </div>
+                      </>
                     )}
                     {currentAcademy.plan === 'pro' && (
                       <p className="text-[11px] text-center text-emerald-400 font-semibold">Você está no plano máximo 🎉</p>
@@ -764,105 +730,94 @@ export default function DashboardPage() {
                   </div>
                 )
               })()}
-            </motion.div>
-          </div>
 
-          {/* Bottom 3-col */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Novos alunos */}
-            <div className="glass rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-display font-bold text-sm">Novos alunos</h3>
-                <Link href="/alunos" className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">Ver todos <ChevronRight className="w-3 h-3" /></Link>
-              </div>
-              {recentMembers.length === 0 ? (
-                <EmptyState icon={Users} title="Nenhum aluno ainda" description="Convide seus primeiros alunos." cta="Convidar" ctaHref="/alunos" />
-              ) : (
-                <div className="space-y-2">
-                  {recentMembers.map(m => (
-                    <Link key={m.id} href={`/alunos/${m.userId}`} className="flex items-center gap-3 p-3 rounded-xl bg-surface-100 hover:bg-surface-200 transition-colors">
-                      <div className="w-8 h-8 rounded-full bg-indigo-500/15 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-bold text-indigo-400">{m.fullName.charAt(0).toUpperCase()}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{m.fullName}</p>
-                        <p className="text-xs text-muted-foreground">Entrou {formatTimeAgo(m.joinedAt)}</p>
-                      </div>
-                      <ChevronRight className="w-3 h-3 text-muted-foreground/40" />
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Inativos */}
-            <div className="glass rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-display font-bold text-sm">Sem treino esta semana</h3>
-                  {ownerMetrics.inactiveCount > 0 && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400">{ownerMetrics.inactiveCount}</span>
-                  )}
-                </div>
-                <Link href="/alunos" className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">Ver <ChevronRight className="w-3 h-3" /></Link>
-              </div>
-              {ownerMetrics.inactiveCount === 0 && ownerMetrics.totalStudents > 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
-                    <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+              {/* Crescimento de alunos */}
+              <div className="glass rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="font-display font-bold">Crescimento de alunos</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">Últimos 30 dias</p>
                   </div>
-                  <p className="font-semibold text-sm text-emerald-400">100% engajado!</p>
-                  <p className="text-xs text-muted-foreground">Todos treinaram esta semana.</p>
+                  <Link href="/alunos" className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">Ver todos <ChevronRight className="w-3 h-3" /></Link>
                 </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {inactiveStudents.slice(0, 5).map(s => (
-                    <Link key={s.userId} href={`/alunos/${s.userId}`} className="flex items-center gap-3 p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/10 hover:bg-amber-500/10 transition-colors">
-                      <div className="w-7 h-7 rounded-full bg-amber-500/15 flex items-center justify-center flex-shrink-0">
-                        <span className="text-[11px] font-bold text-amber-400">{s.fullName.charAt(0).toUpperCase()}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium truncate">{s.fullName}</p>
-                        <p className="text-[10px] text-muted-foreground">{s.lastWorkoutAt ? `Último: ${formatTimeAgo(s.lastWorkoutAt)}` : 'Nunca treinou'}</p>
-                      </div>
-                      <AlertTriangle className="w-3 h-3 text-amber-400 flex-shrink-0" />
-                    </Link>
-                  ))}
-                  {inactiveStudents.length > 5 && (
-                    <p className="text-[10px] text-center text-muted-foreground pt-1">e mais {inactiveStudents.length - 5}</p>
-                  )}
-                </div>
-              )}
-            </div>
 
-            {/* Personais */}
-            <div className="glass rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-display font-bold text-sm">Personais</h3>
-                <Link href="/personais" className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">Gerenciar <ChevronRight className="w-3 h-3" /></Link>
-              </div>
-              {personaisPerf.length === 0 ? (
-                <EmptyState icon={ShieldCheck} title="Nenhum personal" description="Convide personal trainers para sua academia." cta="Convidar" ctaHref="/personais" />
-              ) : (
-                <div className="space-y-2">
-                  {personaisPerf.map(p => (
-                    <div key={p.userId} className="flex items-center gap-3 p-3 rounded-xl bg-surface-100">
-                      <div className="w-8 h-8 rounded-full bg-purple-500/15 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-bold text-purple-400">{p.fullName.charAt(0).toUpperCase()}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{p.fullName}</p>
-                        <p className="text-xs text-muted-foreground">{p.studentCount} aluno{p.studentCount !== 1 ? 's' : ''} com ficha ativa</p>
-                      </div>
-                      <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0',
-                        p.studentCount > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-surface-200 text-muted-foreground')}>
-                        {p.studentCount > 0 ? 'Ativo' : 'Sem alunos'}
-                      </span>
-                    </div>
-                  ))}
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="text-center p-3 rounded-xl bg-surface-100">
+                    <p className="text-2xl font-display font-extrabold text-indigo-400">{ownerMetrics.totalStudents}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Total</p>
+                  </div>
+                  <div className="text-center p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/15">
+                    <p className="text-2xl font-display font-extrabold text-emerald-400">+{ownerMetrics.newThisMonth}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Novos</p>
+                  </div>
+                  <div className="text-center p-3 rounded-xl bg-surface-100">
+                    <p className="text-2xl font-display font-extrabold text-cyan-400">{engagementPct}%</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Engajados</p>
+                  </div>
                 </div>
-              )}
-            </div>
+
+                {recentMembers.length === 0 ? (
+                  <EmptyState icon={Users} title="Nenhum aluno ainda" description="Convide seus primeiros alunos." cta="Convidar" ctaHref="/alunos" />
+                ) : (
+                  <div className="space-y-2">
+                    {recentMembers.map(m => (
+                      <Link key={m.id} href={`/alunos/${m.userId}`} className="flex items-center gap-3 p-2.5 rounded-xl bg-surface-100 hover:bg-surface-200 transition-colors">
+                        <div className="w-7 h-7 rounded-full bg-indigo-500/15 flex items-center justify-center flex-shrink-0">
+                          <span className="text-[11px] font-bold text-indigo-400">{m.fullName.charAt(0).toUpperCase()}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{m.fullName}</p>
+                          <p className="text-[10px] text-muted-foreground">Entrou {formatTimeAgo(m.joinedAt)}</p>
+                        </div>
+                        <ChevronRight className="w-3 h-3 text-muted-foreground/40" />
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+
+            {/* Right col */}
+            <motion.div variants={fadeUp} className="space-y-4">
+              {/* Ações rápidas */}
+              <div className="glass rounded-2xl p-4">
+                <h3 className="font-display font-bold text-sm mb-3">Ações rápidas</h3>
+                <QuickAction icon={UserPlus}    label="Convidar aluno"        href="/alunos"       color="#06B6D4" />
+                <QuickAction icon={ShieldCheck} label="Gerenciar personais"   href="/personais"    color="#8B5CF6" />
+                <QuickAction icon={Dumbbell}    label="Nova ficha de treino"  href="/treinos/novo" color="#6366F1" />
+                <QuickAction icon={BarChart3}   label="Ver frequência"        href="/frequencia"   color="#F59E0B" />
+                <QuickAction icon={BookOpen}    label="Banco de exercícios"   href="/exercicios"   color="#10B981" />
+              </div>
+
+              {/* Personais */}
+              <div className="glass rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-display font-bold text-sm">Personais</h3>
+                  <Link href="/personais" className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">Gerenciar <ChevronRight className="w-3 h-3" /></Link>
+                </div>
+                {personaisPerf.length === 0 ? (
+                  <EmptyState icon={ShieldCheck} title="Nenhum personal" description="Convide personal trainers para sua academia." cta="Convidar" ctaHref="/personais" />
+                ) : (
+                  <div className="space-y-2">
+                    {personaisPerf.map(p => (
+                      <div key={p.userId} className="flex items-center gap-3 p-2.5 rounded-xl bg-surface-100">
+                        <div className="w-7 h-7 rounded-full bg-purple-500/15 flex items-center justify-center flex-shrink-0">
+                          <span className="text-[11px] font-bold text-purple-400">{p.fullName.charAt(0).toUpperCase()}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{p.fullName}</p>
+                          <p className="text-[10px] text-muted-foreground">{p.studentCount} aluno{p.studentCount !== 1 ? 's' : ''}</p>
+                        </div>
+                        <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0',
+                          p.studentCount > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-surface-200 text-muted-foreground')}>
+                          {p.studentCount > 0 ? 'Ativo' : 'Sem alunos'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
           </div>
         </>
       )}
@@ -1019,12 +974,126 @@ export default function DashboardPage() {
           )}
 
           {/* KPIs */}
-          <motion.div variants={stagger} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <motion.div variants={stagger} className="grid grid-cols-3 gap-3">
             <StatCard label="Treinos totais" value={studentStats.totalWorkouts} icon={Dumbbell}      color="#6366F1" empty={studentStats.totalWorkouts === 0} />
             <StatCard label="Esta semana"    value={studentStats.weekWorkouts}  icon={Calendar}      color="#10B981" empty={studentStats.weekWorkouts === 0} />
-            <StatCard label="Sequência"      value={studentStats.streak}        icon={Flame}         color="#F97316" suffix="d" empty={studentStats.streak === 0} />
             <StatCard label="Fichas ativas"  value={studentStats.activeSheets}  icon={ClipboardList} color="#F59E0B" empty={studentStats.activeSheets === 0} />
           </motion.div>
+
+          {/* Ofensiva — Duolingo-style */}
+          {(() => {
+            const streakColor  = streakAtRisk ? '#F59E0B' : studentStats.streak > 0 ? '#F97316' : '#6366F1'
+            const streakMsg    = studentStats.streak === 0    ? 'Complete um treino para começar a sua ofensiva!'
+                               : studentStats.streak < 3     ? 'Ótima largada! Treine amanhã também.'
+                               : studentStats.streak < 7     ? 'Está pegando fogo! Não pare agora.'
+                               : studentStats.streak < 14    ? 'Uma semana de dedicação pura!'
+                               : studentStats.streak < 30    ? 'Você é imparável. Continue assim.'
+                               : studentStats.streak < 60    ? 'Um mês de consistência — lendário!'
+                               : 'Status: fenômeno absoluto. 👑'
+            const flameEmoji   = studentStats.streak === 0   ? '🌱'
+                               : studentStats.streak < 7     ? '🔥'
+                               : studentStats.streak < 30    ? '💥'
+                               : '👑'
+            return (
+              <motion.div variants={fadeUp} className={cn(
+                'glass rounded-2xl p-5 overflow-hidden relative',
+                streakAtRisk && 'border-amber-500/25 bg-amber-500/5',
+              )}>
+                {/* Fundo decorativo */}
+                <div className="pointer-events-none absolute -right-6 -top-6 w-28 h-28 rounded-full blur-2xl opacity-10"
+                  style={{ background: streakColor }} />
+
+                {/* Topo: número + emoji */}
+                <div className="flex items-start justify-between mb-5">
+                  <div>
+                    <div className="flex items-end gap-2.5">
+                      <motion.span
+                        key={studentStats.streak}
+                        initial={{ scale: 1.3, opacity: 0 }}
+                        animate={{ scale: 1,   opacity: 1 }}
+                        transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+                        className="text-6xl font-display font-extrabold leading-none tabular-nums"
+                        style={{ color: streakColor }}
+                      >
+                        {studentStats.streak}
+                      </motion.span>
+                      <div className="pb-1.5">
+                        <p className="text-[11px] text-muted-foreground leading-tight">dias de</p>
+                        <p className="text-sm font-bold leading-tight">ofensiva</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1.5 max-w-[220px]">{streakMsg}</p>
+                  </div>
+                  <motion.span
+                    animate={trainedToday && studentStats.streak > 0
+                      ? { rotate: [0, -8, 8, -8, 0], scale: [1, 1.15, 1] }
+                      : {}}
+                    transition={{ duration: 0.7, repeat: Infinity, repeatDelay: 4 }}
+                    className="text-5xl leading-none select-none flex-shrink-0"
+                  >
+                    {flameEmoji}
+                  </motion.span>
+                </div>
+
+                {/* Grid de 7 dias */}
+                <div className="flex gap-1.5">
+                  {weekActivity.map((active, i) => {
+                    const isToday = i === 6
+                    const d = new Date(); d.setDate(d.getDate() - (6 - i))
+                    const dayLabel = DAY_LABELS[d.getDay()]
+                    return (
+                      <div key={i} className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
+                        <p className={cn(
+                          'text-[9px] font-semibold uppercase tracking-wide',
+                          isToday ? 'text-foreground' : 'text-muted-foreground/50',
+                        )}>
+                          {dayLabel}
+                        </p>
+                        <div className={cn(
+                          'w-full aspect-square rounded-xl flex items-center justify-center text-xs font-bold transition-all duration-300',
+                          active && isToday  && 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-110',
+                          active && !isToday && 'bg-orange-500/20 text-orange-400 border border-orange-500/25',
+                          !active && isToday && streakAtRisk && 'border-2 border-dashed border-amber-400/60 text-amber-400/60',
+                          !active && isToday && !streakAtRisk && 'border-2 border-dashed border-brand-500/40 text-brand-400/50',
+                          !active && !isToday && 'bg-surface-100 text-muted-foreground/20',
+                        )}>
+                          {active ? '✓' : isToday ? '·' : '·'}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Banner: ofensiva em risco */}
+                {streakAtRisk && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-3 flex items-center gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20"
+                  >
+                    <span className="text-lg flex-shrink-0">⚠️</span>
+                    <p className="text-xs text-amber-300 font-medium leading-snug">
+                      Sua ofensiva de <span className="font-bold text-amber-200">{studentStats.streak} dia{studentStats.streak !== 1 ? 's' : ''}</span> está em risco! Treine hoje para não perder.
+                    </p>
+                  </motion.div>
+                )}
+
+                {/* Banner: treinou hoje */}
+                {trainedToday && studentStats.streak > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-3 flex items-center gap-2.5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20"
+                  >
+                    <span className="text-lg flex-shrink-0">🎉</span>
+                    <p className="text-xs text-emerald-300 font-medium">
+                      Ofensiva garantida hoje! Amanhã você chega a <span className="font-bold text-emerald-200">{studentStats.streak + 1} dias</span>.
+                    </p>
+                  </motion.div>
+                )}
+              </motion.div>
+            )
+          })()}
 
           {/* Meta semanal */}
           <motion.div variants={fadeUp} className="glass rounded-2xl p-5">
@@ -1084,6 +1153,87 @@ export default function DashboardPage() {
               </div>
             </motion.div>
           )}
+
+          {/* Treino livre */}
+          <motion.div variants={fadeUp} className="glass rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-500/10 flex items-center justify-center flex-shrink-0">
+                  <Dumbbell className="w-4 h-4 text-indigo-400" />
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-sm">Treino livre</h3>
+                  <p className="text-xs text-muted-foreground">Por conta própria, sem ficha</p>
+                </div>
+              </div>
+              {freeLoggedToday && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex-shrink-0">
+                  ✓ Registrado hoje
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 mb-1">
+              {FREE_CATEGORIES.map(cat => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setFreeCategory(freeCategory === cat.id ? null : cat.id)}
+                  className={cn(
+                    'flex flex-col items-center gap-1 py-2.5 rounded-xl text-xs font-medium transition-all',
+                    freeCategory === cat.id
+                      ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                      : 'bg-surface-100 text-muted-foreground hover:bg-surface-200',
+                  )}
+                >
+                  <span className="text-base leading-none">{cat.emoji}</span>
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
+            <AnimatePresence>
+              {freeCategory && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden space-y-3 pt-3"
+                >
+                  <div>
+                    <p className="text-[11px] text-muted-foreground mb-1.5">Duração (opcional)</p>
+                    <div className="flex gap-2">
+                      {FREE_DURATIONS.map(d => (
+                        <button
+                          key={d.value}
+                          type="button"
+                          onClick={() => setFreeDuration(freeDuration === d.value ? null : d.value)}
+                          className={cn(
+                            'flex-1 py-1.5 rounded-lg text-[11px] font-medium transition-all',
+                            freeDuration === d.value
+                              ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                              : 'bg-surface-100 text-muted-foreground hover:bg-surface-200',
+                          )}
+                        >
+                          {d.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    onClick={logFreeWorkout}
+                    disabled={freeLogging}
+                    className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-50 bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 hover:bg-indigo-500/25"
+                  >
+                    {freeLogging
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <><CheckCircle2 className="w-4 h-4" /> Registrar treino</>
+                    }
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
 
           {/* Próximo treino */}
           {!todayWorkout && nextWorkout && (
