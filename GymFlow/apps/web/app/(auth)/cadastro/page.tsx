@@ -126,6 +126,7 @@ function CadastroInner() {
   const [inviteCode, setInviteCode] = useState('')
   const [inviteSaving, setInviteSaving] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
   const [document, setDocument] = useState('')
@@ -630,15 +631,20 @@ function CadastroInner() {
                 <div className="relative">
                   <input
                     {...register('confirmPassword')}
-                    type="password"
+                    type={showConfirmPassword ? 'text' : 'password'}
                     placeholder="••••••••"
                     autoComplete="new-password"
                     className={cn('field pr-11', errors.confirmPassword && 'border-destructive/60')}
                   />
-                  {password && watch('confirmPassword') === password && (
+                  {password && watch('confirmPassword') === password ? (
                     <div className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
                       <Check className="w-3 h-3 text-emerald-400" />
                     </div>
+                  ) : (
+                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   )}
                 </div>
                 {errors.confirmPassword && <p className="text-xs text-red-400">{errors.confirmPassword.message}</p>}
