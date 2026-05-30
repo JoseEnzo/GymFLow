@@ -349,11 +349,11 @@ interface StripeInvoice {
   pdfUrl: string | null
 }
 
-const PLAN_ORDER = ['free', 'starter', 'pro'] as const
+const PLAN_ORDER = ['starter', 'pro'] as const
 
 function PlanTab() {
   const { currentAcademy } = useAuthStore()
-  const currentPlan = currentAcademy?.plan ?? 'free'
+  const currentPlan = currentAcademy?.plan ?? 'starter'
   const status = currentAcademy?.subscription_status
   const hasSubscription = !!currentAcademy?.stripe_subscription_id
 
@@ -450,9 +450,8 @@ function PlanTab() {
   }
 
   const plans: { id: string; name: string; price: string; limit: string; color: string }[] = [
-    { id: 'free', name: 'Free', price: 'R$ 0', limit: '30 alunos · 1 personal', color: '#6366F1' },
-    { id: 'starter', name: 'Starter', price: 'R$ 99/mês', limit: '100 alunos · 3 personais', color: '#06B6D4' },
-    { id: 'pro', name: 'Pro', price: 'R$ 199/mês', limit: 'Ilimitado', color: '#10B981' },
+    { id: 'starter', name: 'Starter', price: 'R$ 197/mês', limit: 'Até 50 alunos · Até 3 personais', color: '#06B6D4' },
+    { id: 'pro',     name: 'Pro',     price: 'R$ 397/mês', limit: 'Alunos e personais ilimitados',   color: '#10B981' },
   ]
 
   return (
@@ -494,8 +493,8 @@ function PlanTab() {
           const isCurrentPlan = currentPlan === plan.id
           const planRank = PLAN_ORDER.indexOf(plan.id as typeof PLAN_ORDER[number])
           const currentRank = PLAN_ORDER.indexOf(currentPlan as typeof PLAN_ORDER[number])
-          const isUpgrade = planRank > currentRank && plan.id !== 'free'
-          const isDowngrade = planRank < currentRank && plan.id !== 'free'
+          const isUpgrade = planRank > currentRank
+          const isDowngrade = planRank < currentRank
 
           return (
             <div

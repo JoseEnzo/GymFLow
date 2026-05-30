@@ -89,25 +89,20 @@ export function validateCNPJ(cnpj: string): boolean {
   if (digits.length !== 14) return false
   if (/^(\d)\1+$/.test(digits)) return false
 
-  let sum = 0
-  let pos = digits.length - 2
+  const nums = digits.split('').map(Number)
 
-  for (let i = digits.length - 2; i >= 0; i--) {
-    sum += Number(digits[i]) * (pos >= 2 ? pos : pos + 8)
-    pos--
+  const checkDigit = (slice: number[]) => {
+    const n = slice.length
+    let sum = 0
+    let weight = n - 7
+    for (let i = 0; i < n; i++) {
+      sum += slice[i] * weight--
+      if (weight < 2) weight = 9
+    }
+    const rest = sum % 11
+    return rest < 2 ? 0 : 11 - rest
   }
 
-  let result = sum % 11 < 2 ? 0 : 11 - (sum % 11)
-  if (result !== Number(digits[12])) return false
-
-  sum = 0
-  pos = digits.length - 1
-
-  for (let i = digits.length - 2; i >= 0; i--) {
-    sum += Number(digits[i]) * (pos >= 2 ? pos : pos + 8)
-    pos--
-  }
-
-  result = sum % 11 < 2 ? 0 : 11 - (sum % 11)
-  return result === Number(digits[13])
+  return checkDigit(nums.slice(0, 12)) === nums[12]
+      && checkDigit(nums.slice(0, 13)) === nums[13]
 }
