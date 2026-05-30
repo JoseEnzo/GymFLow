@@ -35,36 +35,16 @@ export default function ConvitePage() {
     void loadInvite()
   }, [token])
 
-  async function doAccept(inviteData: InviteDetails, user: { id: string }) {
+  async function doAccept(inviteData: InviteDetails, _user: { id: string }) {
     setStatus('accepting')
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: academyData } = await (supabase as any)
-        .from('academies')
-        .select('id')
-        .eq('slug', inviteData.academySlug)
-        .single()
-
-      if (!academyData) throw new Error('Academia não encontrada')
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: memberError } = await (supabase as any)
-        .from('academy_members')
-        .upsert({
-          academy_id: academyData.id,
-          user_id: user.id,
-          role: inviteData.role,
-          is_active: true,
-          joined_at: new Date().toISOString(),
-        }, { onConflict: 'academy_id,user_id' })
-
-      if (memberError) throw memberError
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any)
-        .from('invites')
-        .update({ uses_count: inviteData.usesCount + 1 })
-        .eq('token', token)
+      const res = await fetch('/api/invites/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      })
+      const json = await res.json() as { error?: string }
+      if (!res.ok) throw new Error(json.error ?? 'Erro ao aceitar convite')
 
       setStatus('done')
       toast.success(`Você entrou para ${inviteData.academyName}!`)

@@ -521,21 +521,36 @@ export default function PersonaisPage() {
     if (!currentAcademy) { setLoading(false); return }
     setLoading(true)
 
-    // Load personais
+    // Load personais (sem join para evitar erro de FK ausente entre academy_members e profiles)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: members } = await (supabase as any)
       .from('academy_members')
-      .select('id, user_id, joined_at, is_active, profile:profiles(full_name)')
+      .select('id, user_id, joined_at, is_active')
       .eq('academy_id', currentAcademy.id)
       .eq('role', 'personal')
       .order('joined_at', { ascending: false })
 
-    setPersonais(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const memberList = (members ?? []) as any[]
+    const userIds: string[] = memberList.map((m) => m.user_id).filter(Boolean)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let profileMap: Record<string, string | null> = {}
+    if (userIds.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (members ?? []).map((m: any) => ({
+      const { data: profiles } = await (supabase as any)
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      profileMap = Object.fromEntries((profiles ?? []).map((p: any) => [p.id, p.full_name ?? null]))
+    }
+
+    setPersonais(
+      memberList.map((m) => ({
         memberId: m.id,
         userId: m.user_id,
-        fullName: m.profile?.full_name ?? null,
+        fullName: profileMap[m.user_id] ?? null,
         joinedAt: m.joined_at ?? null,
         isActive: m.is_active,
       }))

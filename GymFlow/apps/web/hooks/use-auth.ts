@@ -80,11 +80,11 @@ export function useAuth() {
     router.push(redirectTo ?? (academies.length > 0 ? '/dashboard' : '/onboarding'))
   }
 
-  async function signUp(email: string, password: string, fullName: string, accountType: 'owner' | 'personal' | 'student' = 'owner', redirectTo?: string, document?: string) {
+  async function signUp(email: string, password: string, fullName: string, accountType: 'owner' | 'personal' | 'student' = 'owner', redirectTo?: string, document?: string, phone?: string) {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName, account_type: accountType, document: document ? document.replace(/\D/g, '') : null } },
+      options: { data: { full_name: fullName, account_type: accountType, document: document ? document.replace(/\D/g, '') : null, phone: phone ? phone.replace(/\D/g, '') : null } },
     })
     if (error) throw error
     toast.success('Conta criada com sucesso!')

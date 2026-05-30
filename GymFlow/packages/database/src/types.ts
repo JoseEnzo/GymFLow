@@ -104,6 +104,7 @@ export type Database = {
           updated_at: string
           full_name: string | null
           avatar_url: string | null
+          cpf: string | null
           phone: string | null
           birth_date: string | null
           gender: 'male' | 'female' | 'other' | null
@@ -118,6 +119,7 @@ export type Database = {
           updated_at?: string
           full_name?: string | null
           avatar_url?: string | null
+          cpf?: string | null
           phone?: string | null
           birth_date?: string | null
           gender?: 'male' | 'female' | 'other' | null

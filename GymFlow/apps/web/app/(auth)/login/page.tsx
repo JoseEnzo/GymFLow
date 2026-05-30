@@ -106,13 +106,15 @@ const fadeUp = {
 
 function LoginInner() {
   const { signIn, signInWithProvider } = useAuth()
+  const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect')
 
   const [role, setRole] = useState<Role | null>(null)
-  const [step, setStep] = useState<'role' | 'invite' | 'form'>('role')
+  const [step, setStep] = useState<'role' | 'code' | 'invite' | 'form'>('role')
   const [hasInvite, setHasInvite] = useState<boolean | null>(null)
   const [inviteCode, setInviteCode] = useState('')
+  const [inviteToken, setInviteToken] = useState<string | null>(null)
   const [inviteSaving, setInviteSaving] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -129,12 +131,25 @@ function LoginInner() {
     setIdentifier('')
     setHasInvite(null)
     setInviteCode('')
+    setInviteToken(null)
     reset()
     setStep(r === 'personal' || r === 'student' ? 'invite' : 'form')
   }
 
   function handleBack() {
+    if (step === 'code') {
+      setInviteCode('')
+      setStep('role')
+      return
+    }
+    if (step === 'form' && inviteToken) {
+      setInviteToken(null)
+      setRole(null)
+      setStep('code')
+      return
+    }
     if (step === 'form' && (role === 'personal' || role === 'student')) {
+      setInviteToken(null)
       setStep('invite')
       return
     }
@@ -153,12 +168,15 @@ function LoginInner() {
       const supabase = createClient()
       const { data, error } = await supabase
         .from('invites')
-        .select('token')
+        .select('token, role')
         .eq('code', trimmed)
         .eq('is_active', true)
         .single()
       if (error || !data) { toast.error('Código inválido ou expirado.'); return }
-      router.push(`/convite/${(data as { token: string }).token}`)
+      const inv = data as { token: string; role: Role }
+      setInviteToken(inv.token)
+      setRole(inv.role)
+      setStep('form')
     } catch {
       toast.error('Erro ao verificar código. Tente novamente.')
     } finally {
@@ -210,7 +228,8 @@ function LoginInner() {
         email = json.email
       }
 
-      await signIn(email, data.password, redirect ?? undefined)
+      const effectiveRedirect = inviteToken ? `/convite/${inviteToken}` : redirect ?? undefined
+      await signIn(email, data.password, effectiveRedirect)
     } catch (err: unknown) {
       const msg = (err as Error).message
       setServerError(msg.includes('Invalid login credentials') ? 'Credenciais inválidas' : msg)
@@ -276,10 +295,61 @@ function LoginInner() {
 
         <motion.p variants={fadeUp} custom={7} className="text-center text-sm text-muted-foreground">
           Recebeu um código de convite?{' '}
-          <Link href="/codigo" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
+          <button
+            type="button"
+            onClick={() => setStep('code')}
+            className="text-brand-400 hover:text-brand-300 font-semibold transition-colors"
+          >
             Entrar com código
-          </Link>
+          </button>
         </motion.p>
+      </motion.div>
+    )
+  }
+
+  /* ── Step 1b: enter invite code first (auto-detects role) ───────── */
+  if (step === 'code') {
+    return (
+      <motion.div initial="hidden" animate="show" className="space-y-7">
+        <motion.div variants={fadeUp} custom={0} className="space-y-3">
+          <button onClick={handleBack} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="w-4 h-4" /> Voltar
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-500/15">
+              <Ticket className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-display font-bold">Código de convite</h1>
+              <p className="text-xs text-muted-foreground">Insira o código para entrar automaticamente</p>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div variants={fadeUp} custom={1} className="space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Código de convite</label>
+            <input
+              type="text"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+              placeholder="ABC123"
+              maxLength={6}
+              autoComplete="off"
+              autoFocus
+              className="field tracking-widest font-mono"
+              onKeyDown={(e) => e.key === 'Enter' && inviteCode.length === 6 && redeemInvite()}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={redeemInvite}
+            disabled={inviteSaving || inviteCode.length !== 6}
+            className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
+          >
+            {inviteSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4" /> Confirmar código</>}
+          </button>
+        </motion.div>
       </motion.div>
     )
   }
@@ -378,6 +448,9 @@ function LoginInner() {
   }
 
   /* ── Step 3: login form ─────────────────────────────────────────── */
+  const signupHref = inviteToken
+    ? `/cadastro?token=${inviteToken}`
+    : role ? `/cadastro?role=${role}` : '/cadastro'
   const roleInfo = ROLES.find(r => r.key === role)!
   const idLabel       = role === 'owner' ? 'CNPJ' : role === 'personal' ? 'CPF' : 'E-mail'
   const idPlaceholder = role === 'owner' ? '00.000.000/0001-00' : role === 'personal' ? '000.000.000-00' : 'seu@email.com'
@@ -479,20 +552,11 @@ function LoginInner() {
       </form>
 
       {/* Footer links */}
-      {role === 'student' && (
+      {(role === 'student' || role === 'personal') && (
         <motion.p variants={fadeUp} custom={6} className="text-center text-sm text-muted-foreground">
           Não tem uma conta?{' '}
-          <Link href="/cadastro" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
+          <Link href={signupHref} className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
             Criar conta grátis
-          </Link>
-        </motion.p>
-      )}
-
-      {role === 'student' && (
-        <motion.p variants={fadeUp} custom={7} className="text-center text-sm text-muted-foreground">
-          Recebeu um código de convite?{' '}
-          <Link href="/codigo" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
-            Entrar com código
           </Link>
         </motion.p>
       )}
@@ -500,26 +564,8 @@ function LoginInner() {
       {role === 'owner' && (
         <motion.p variants={fadeUp} custom={6} className="text-center text-sm text-muted-foreground">
           Ainda não tem academia?{' '}
-          <Link href="/cadastro" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
+          <Link href={signupHref} className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
             Cadastrar academia
-          </Link>
-        </motion.p>
-      )}
-
-      {role === 'personal' && (
-        <motion.p variants={fadeUp} custom={6} className="text-center text-sm text-muted-foreground">
-          Não tem uma conta?{' '}
-          <Link href="/cadastro" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
-            Criar conta grátis
-          </Link>
-        </motion.p>
-      )}
-
-      {role === 'personal' && (
-        <motion.p variants={fadeUp} custom={7} className="text-center text-sm text-muted-foreground">
-          Recebeu um código de convite?{' '}
-          <Link href="/codigo" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
-            Entrar com código
           </Link>
         </motion.p>
       )}

@@ -31,6 +31,16 @@ interface Student {
   status: 'active' | 'inactive'
 }
 
+interface SavedInvite {
+  id: string
+  code: string
+  token: string
+  expiresAt: string | null
+  usesCount: number
+  usesLimit: number | null
+  isActive: boolean
+}
+
 function getInitials(name: string | null) {
   if (!name) return 'A'
   return name.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
@@ -101,7 +111,7 @@ function StudentCard({ student }: { student: Student }) {
   )
 }
 
-function InvitePanel({ onClose, academyId, role }: { onClose: () => void; academyId: string; role: 'student' | 'personal' }) {
+function InvitePanel({ onClose, academyId, role, onCreated }: { onClose: () => void; academyId: string; role: 'student' | 'personal'; onCreated?: (invite: SavedInvite) => void }) {
   const supabase = createClient()
   const [status, setStatus] = useState<'idle' | 'generating' | 'done'>('idle')
   const [invite, setInvite] = useState<{ code: string; token: string; expiresAt: string | null; usesLimit: number | null } | null>(null)
@@ -126,7 +136,7 @@ function InvitePanel({ onClose, academyId, role }: { onClose: () => void; academ
       if (expiry === '30d') expiresAt = new Date(Date.now() + 30 * 86_400_000).toISOString()
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any).from('invites').insert({
+      const { data: newInvite, error } = await (supabase as any).from('invites').insert({
         academy_id: academyId,
         created_by: user.id,
         code,
@@ -134,11 +144,12 @@ function InvitePanel({ onClose, academyId, role }: { onClose: () => void; academ
         role,
         expires_at: expiresAt,
         uses_limit: multiUse ? null : 1,
-      })
+      }).select('id').single()
 
       if (error) throw error
       setInvite({ code, token, expiresAt, usesLimit: multiUse ? null : 1 })
       setStatus('done')
+      onCreated?.({ id: (newInvite as { id: string }).id, code, token, expiresAt, usesCount: 0, usesLimit: multiUse ? null : 1, isActive: true })
       toast.success('Convite gerado!')
     } catch (err: unknown) {
       toast.error((err as Error).message ?? 'Erro ao gerar convite.')
@@ -300,6 +311,7 @@ export default function AlunosPage() {
   const [inviteRole, setInviteRole] = useState<'student' | 'personal' | null>(null)
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [students, setStudents] = useState<Student[]>([])
+  const [invites, setInvites] = useState<SavedInvite[]>([])
   const [loading, setLoading] = useState(true)
   const { currentAcademy, currentRole } = useAuthStore()
   const supabase = createClient()
@@ -309,8 +321,14 @@ export default function AlunosPage() {
       if (!currentAcademy) { setLoading(false); return }
 
       // Load academy members with role=student
+      let personalUserId: string | null = null
+      if (currentRole === 'personal') {
+        const { data: { user } } = await supabase.auth.getUser()
+        personalUserId = user?.id ?? null
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: members, error } = await (supabase as any)
+      let query = (supabase as any)
         .from('academy_members')
         .select(`
           user_id, is_active,
@@ -318,6 +336,27 @@ export default function AlunosPage() {
         `)
         .eq('academy_id', currentAcademy.id)
         .eq('role', 'student')
+
+      // Personal trainers only see their own students (invited by them or with sheets from them)
+      if (currentRole === 'personal' && personalUserId) {
+        // Get student IDs from workout sheets created by this personal
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: sheetsStudents } = await (supabase as any)
+          .from('workout_sheets')
+          .select('student_id')
+          .eq('academy_id', currentAcademy.id)
+          .eq('personal_id', personalUserId)
+        const sheetStudentIds: string[] = (sheetsStudents ?? []).map((s: { student_id: string }) => s.student_id)
+
+        // Students invited by this personal OR who have sheets from them
+        const invitedFilter = `invited_by.eq.${personalUserId}`
+        const sheetsFilter = sheetStudentIds.length > 0
+          ? `,user_id.in.(${sheetStudentIds.join(',')})`
+          : ''
+        query = query.or(`${invitedFilter}${sheetsFilter}`)
+      }
+
+      const { data: members, error } = await query
 
       if (error || !members) { setLoading(false); return }
 
@@ -350,6 +389,36 @@ export default function AlunosPage() {
       }))
 
       setStudents(enriched)
+
+      // Load student invites created by current user (personal or owner)
+      if (personalUserId || currentRole === 'owner') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let inviteQuery = (supabase as any)
+          .from('invites')
+          .select('id, code, token, expires_at, uses_count, uses_limit, is_active')
+          .eq('academy_id', currentAcademy.id)
+          .eq('role', 'student')
+          .order('created_at', { ascending: false })
+
+        if (personalUserId) {
+          inviteQuery = inviteQuery.eq('created_by', personalUserId)
+        }
+
+        const { data: inviteData } = await inviteQuery
+        setInvites(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (inviteData ?? []).map((i: any) => ({
+            id: i.id,
+            code: i.code,
+            token: i.token,
+            expiresAt: i.expires_at,
+            usesCount: i.uses_count ?? 0,
+            usesLimit: i.uses_limit,
+            isActive: i.is_active,
+          }))
+        )
+      }
+
       setLoading(false)
     }
     load()
@@ -382,8 +451,7 @@ export default function AlunosPage() {
                 Convidar personal
               </button>
             )}
-            {/* "Convidar aluno" só aparece para owner ou personal — nunca para student, e só após o role ser conhecido */}
-            {currentRole === 'owner' && (
+            {(currentRole === 'owner' || currentRole === 'personal') && (
               <button
                 onClick={() => setInviteRole(inviteRole === 'student' ? null : 'student')}
                 className="btn-primary text-sm py-2.5 px-5 rounded-xl"
@@ -398,7 +466,51 @@ export default function AlunosPage() {
 
       {/* Invite panel */}
       {inviteRole && currentAcademy && (
-        <InvitePanel onClose={() => setInviteRole(null)} academyId={currentAcademy.id} role={inviteRole} />
+        <InvitePanel
+          onClose={() => setInviteRole(null)}
+          academyId={currentAcademy.id}
+          role={inviteRole}
+          onCreated={(inv) => setInvites((prev) => [inv, ...prev])}
+        />
+      )}
+
+      {/* Active student invites */}
+      {invites.filter((i) => i.isActive && (!i.expiresAt || new Date(i.expiresAt) > new Date()) && (i.usesLimit == null || i.usesCount < i.usesLimit)).length > 0 && (
+        <motion.div variants={fadeUp} className="space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+            <Link2 className="w-3.5 h-3.5" />
+            Convites de aluno ativos
+          </p>
+          <div className="space-y-2">
+            {invites
+              .filter((i) => i.isActive && (!i.expiresAt || new Date(i.expiresAt) > new Date()) && (i.usesLimit == null || i.usesCount < i.usesLimit))
+              .map((inv) => (
+                <div key={inv.id} className="glass rounded-xl p-3 border border-border/40 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-brand-500/10 flex items-center justify-center flex-shrink-0">
+                    <Link2 className="w-4 h-4 text-brand-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-mono font-bold text-sm text-brand-300 tracking-wider">{inv.code}</span>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {inv.expiresAt ? `Expira ${new Date(inv.expiresAt).toLocaleDateString('pt-BR')}` : 'Sem validade'}
+                      {inv.usesLimit ? ` · ${inv.usesCount}/${inv.usesLimit} uso${inv.usesLimit !== 1 ? 's' : ''}` : ' · Usos ilimitados'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      const link = `${window.location.origin}/convite/${inv.token}`
+                      try { await navigator.clipboard.writeText(link); toast.success('Link copiado!') }
+                      catch { toast.error('Não foi possível copiar.') }
+                    }}
+                    className="p-2 rounded-lg border border-border/60 hover:bg-surface-200 transition-all text-muted-foreground hover:text-foreground flex-shrink-0"
+                    title="Copiar link"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+          </div>
+        </motion.div>
       )}
 
       {/* Filters */}

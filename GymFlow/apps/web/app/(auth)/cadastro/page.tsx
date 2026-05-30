@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Eye, EyeOff, Loader2, AlertCircle, Check, Building2, Dumbbell, ArrowLeft, ShieldCheck, UserCheck, ChevronRight, Ticket, CreditCard, ArrowRight } from 'lucide-react'
+import { Eye, EyeOff, Loader2, AlertCircle, Check, Building2, Dumbbell, ArrowLeft, ShieldCheck, UserCheck, ChevronRight, Ticket, CreditCard, ArrowRight, Mail, Phone } from 'lucide-react'
 
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -45,6 +45,14 @@ const passwordStrength = (pwd: string) => {
 
 const strengthLabels = ['Muito fraca', 'Fraca', 'Regular', 'Boa', 'Forte', 'Excelente']
 const strengthColors = ['bg-red-500', 'bg-red-400', 'bg-amber-400', 'bg-amber-300', 'bg-emerald-400', 'bg-emerald-500']
+
+function maskPhone(value: string) {
+  const d = value.replace(/\D/g, '').slice(0, 11)
+  if (d.length <= 2) return d.length ? `(${d}` : ''
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
+}
 
 const fadeUp = {
   hidden: { opacity: 0, y: 14 },
@@ -97,10 +105,22 @@ function CadastroInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const inviteToken = searchParams.get('token')
+  const roleParam = searchParams.get('role') as 'owner' | 'personal' | 'student' | null
 
-  // If arriving via invite, skip type selection
-  const [step, setStep] = useState<0 | 'invite' | 1>(inviteToken ? 1 : 0)
-  const [accountType, setAccountType] = useState<'owner' | 'personal' | 'student'>(inviteToken ? 'student' : 'owner')
+  const _initialStep = (): 0 | 'invite' | 1 => {
+    if (inviteToken) return 1
+    if (roleParam === 'owner') return 1
+    if (roleParam === 'personal' || roleParam === 'student') return 1
+    return 0
+  }
+  const _initialType = (): 'owner' | 'personal' | 'student' => {
+    if (inviteToken) return 'student'
+    if (roleParam) return roleParam
+    return 'owner'
+  }
+
+  const [step, setStep] = useState<0 | 'invite' | 1>(_initialStep)
+  const [accountType, setAccountType] = useState<'owner' | 'personal' | 'student'>(_initialType)
   const [inviteRole, setInviteRole] = useState<'personal' | 'student' | null>(null)
   const [hasInvite, setHasInvite] = useState<boolean | null>(null)
   const [inviteCode, setInviteCode] = useState('')
@@ -110,6 +130,9 @@ function CadastroInner() {
   const [serverError, setServerError] = useState<string | null>(null)
   const [document, setDocument] = useState('')
   const [documentError, setDocumentError] = useState<string | null>(null)
+  const [contactMethod, setContactMethod] = useState<'email' | 'phone'>('email')
+  const [phone, setPhone] = useState('')
+  const [phoneError, setPhoneError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!inviteToken) return
@@ -122,7 +145,11 @@ function CadastroInner() {
       .single()
       .then(({ data }) => {
         const d = data as { role?: string } | null
-        if (d?.role) setInviteRole(d.role as 'personal' | 'student')
+        if (d?.role) {
+          const role = d.role as 'personal' | 'student'
+          setInviteRole(role)
+          setAccountType(role)
+        }
       })
   }, [inviteToken])
 
@@ -162,17 +189,23 @@ function CadastroInner() {
 
   async function onSubmit(data: FormData) {
     setDocumentError(null)
+    setPhoneError(null)
     if (accountType === 'owner') {
       if (!validateCNPJ(document)) { setDocumentError('CNPJ inválido'); return }
     } else if (accountType === 'personal') {
+      if (!document.trim()) { setDocumentError('CPF é obrigatório para personal trainer'); return }
       if (!validateCPF(document)) { setDocumentError('CPF inválido'); return }
+    } else if (accountType === 'student' && contactMethod === 'phone' && phone.trim()) {
+      const digits = phone.replace(/\D/g, '')
+      if (digits.length < 10 || digits.length > 11) { setPhoneError('Telefone inválido'); return }
     }
 
     setIsLoading(true)
     setServerError(null)
     try {
       const redirectTo = inviteToken ? `/convite/${inviteToken}` : undefined
-      await signUp(data.email, data.password, data.fullName, accountType, redirectTo, document)
+      const studentPhone = accountType === 'student' && contactMethod === 'phone' ? phone : undefined
+      await signUp(data.email, data.password, data.fullName, accountType, redirectTo, accountType !== 'student' ? document : undefined, studentPhone)
     } catch (err: unknown) {
       const msg = (err as Error).message
       if (msg.includes('already registered')) {
@@ -464,28 +497,79 @@ function CadastroInner() {
                 {errors.fullName && <p className="text-xs text-red-400">{errors.fullName.message}</p>}
               </motion.div>
 
-              {/* CPF / CNPJ */}
-              <motion.div variants={fadeUp} className="space-y-1.5">
-                <label className="text-sm font-medium flex items-center gap-1.5">
-                  {accountType === 'owner' ? 'CNPJ da academia' : 'CPF'}
-                  {accountType === 'student' && (
-                    <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
-                  )}
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={document}
-                  placeholder={accountType === 'owner' ? '00.000.000/0000-00' : '000.000.000-00'}
-                  autoComplete="off"
-                  onChange={(e) => {
-                    setDocumentError(null)
-                    setDocument(accountType === 'owner' ? maskCNPJ(e.target.value) : maskCPF(e.target.value))
-                  }}
-                  className={cn('field', documentError && 'border-destructive/60 focus:ring-destructive/40')}
-                />
-                {documentError && <p className="text-xs text-red-400">{documentError}</p>}
-              </motion.div>
+              {/* CPF / CNPJ (owner e personal) ou contato (student) */}
+              {accountType === 'student' ? (
+                <motion.div variants={fadeUp} className="space-y-2">
+                  <label className="text-sm font-medium">Contato preferido</label>
+                  <div className="flex gap-2">
+                    {([
+                      { value: 'email' as const, label: 'E-mail', icon: Mail },
+                      { value: 'phone' as const, label: 'Telefone', icon: Phone },
+                    ]).map(({ value, label, icon: Icon }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => { setContactMethod(value); setPhoneError(null) }}
+                        className={cn(
+                          'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-medium transition-all',
+                          contactMethod === value
+                            ? 'border-brand-500/40 bg-brand-500/10 text-brand-300'
+                            : 'border-border/60 text-muted-foreground hover:bg-surface-200'
+                        )}
+                      >
+                        <Icon className="w-4 h-4" />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <AnimatePresence>
+                    {contactMethod === 'phone' && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="space-y-1.5 pt-1">
+                          <input
+                            type="tel"
+                            inputMode="numeric"
+                            value={phone}
+                            onChange={(e) => { setPhoneError(null); setPhone(maskPhone(e.target.value)) }}
+                            placeholder="(11) 99999-9999"
+                            autoComplete="tel"
+                            className={cn('field', phoneError && 'border-destructive/60')}
+                          />
+                          {phoneError && <p className="text-xs text-red-400">{phoneError}</p>}
+                          <p className="text-xs text-muted-foreground">Opcional — para contato do seu personal trainer</p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              ) : (
+                <motion.div variants={fadeUp} className="space-y-1.5">
+                  <label className="text-sm font-medium flex items-center gap-1.5">
+                    {accountType === 'owner' ? 'CNPJ da academia' : 'CPF'}
+                    {accountType === 'personal' && (
+                      <span className="text-xs font-normal text-red-400">*</span>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={document}
+                    placeholder={accountType === 'owner' ? '00.000.000/0000-00' : '000.000.000-00'}
+                    autoComplete="off"
+                    onChange={(e) => {
+                      setDocumentError(null)
+                      setDocument(accountType === 'owner' ? maskCNPJ(e.target.value) : maskCPF(e.target.value))
+                    }}
+                    className={cn('field', documentError && 'border-destructive/60 focus:ring-destructive/40')}
+                  />
+                  {documentError && <p className="text-xs text-red-400">{documentError}</p>}
+                </motion.div>
+              )}
 
               {/* Email */}
               <motion.div variants={fadeUp}className="space-y-1.5">

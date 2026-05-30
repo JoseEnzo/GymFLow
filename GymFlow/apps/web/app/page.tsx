@@ -6,7 +6,7 @@ import { useRef, useState, useEffect } from 'react'
 import {
   Dumbbell, Users, TrendingUp, Shield, Zap, BarChart2,
   ChevronRight, Check, Star, ArrowRight, Play, Menu, X,
-  Smartphone, Clock, Award, Target, Activity, Lock,
+  Smartphone, Clock, Award, Target, Activity, Lock, Ticket,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -390,6 +390,14 @@ function Hero() {
                   </div>
                   Ver demonstração
                 </a>
+              </motion.div>
+
+              {/* Invite banner */}
+              <motion.div variants={fadeUp}>
+                <div className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm">
+                  <Ticket className="w-4 h-4 flex-shrink-0" />
+                  <span>Com convite do seu personal ou da sua academia, você tem acesso de graça</span>
+                </div>
               </motion.div>
 
               {/* Social proof */}
