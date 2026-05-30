@@ -117,7 +117,8 @@ function InvitePanel({ onClose, academyId, role }: { onClose: () => void; academ
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Não autenticado')
 
-      const code = Math.random().toString(36).substring(2, 8).toUpperCase()
+      const SAFE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // sem 0,1,I,O
+      const code = Array.from({ length: 6 }, () => SAFE_CHARS[Math.floor(Math.random() * SAFE_CHARS.length)]).join('')
       const token = crypto.randomUUID()
 
       let expiresAt: string | null = null
@@ -168,7 +169,10 @@ function InvitePanel({ onClose, academyId, role }: { onClose: () => void; academ
               {invite.code}
             </div>
             <button
-              onClick={() => { navigator.clipboard.writeText(invite.code); toast.success('Código copiado!') }}
+              onClick={async () => {
+                try { await navigator.clipboard.writeText(invite.code); toast.success('Código copiado!') }
+                catch { toast.error('Não foi possível copiar — copie o código manualmente.') }
+              }}
               className="p-3 rounded-xl border border-border/60 hover:bg-surface-200 transition-all text-muted-foreground hover:text-foreground"
             >
               <Copy className="w-4 h-4" />
@@ -183,7 +187,10 @@ function InvitePanel({ onClose, academyId, role }: { onClose: () => void; academ
           <div className="flex items-center gap-2">
             <input readOnly value={link} className="field text-xs flex-1" />
             <button
-              onClick={() => { navigator.clipboard.writeText(link); toast.success('Link copiado!') }}
+              onClick={async () => {
+                try { await navigator.clipboard.writeText(link); toast.success('Link copiado!') }
+                catch { toast.error('Não foi possível copiar — copie o link manualmente.') }
+              }}
               className="p-3 rounded-xl border border-border/60 hover:bg-surface-200 transition-all text-muted-foreground hover:text-foreground flex-shrink-0"
             >
               <Copy className="w-4 h-4" />
@@ -375,13 +382,16 @@ export default function AlunosPage() {
                 Convidar personal
               </button>
             )}
-            <button
-              onClick={() => setInviteRole(inviteRole === 'student' ? null : 'student')}
-              className="btn-primary text-sm py-2.5 px-5 rounded-xl"
-            >
-              <UserPlus className="w-4 h-4" />
-              Convidar aluno
-            </button>
+            {/* "Convidar aluno" só aparece para owner ou personal — nunca para student, e só após o role ser conhecido */}
+            {currentRole === 'owner' && (
+              <button
+                onClick={() => setInviteRole(inviteRole === 'student' ? null : 'student')}
+                className="btn-primary text-sm py-2.5 px-5 rounded-xl"
+              >
+                <UserPlus className="w-4 h-4" />
+                Convidar aluno
+              </button>
+            )}
           </div>
         )}
       </motion.div>

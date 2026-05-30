@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Dumbbell, ArrowRight, ArrowLeft, Check, Loader2,
-  Building2, Users, Ticket, CreditCard, Zap, Lock,
+  Building2, Users, Ticket, CreditCard, Zap, Lock, Mail,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -22,64 +22,137 @@ const slide = {
 // ── Planos ────────────────────────────────────────────────────
 const PLANS = [
   {
-    id: 'free',
-    name: 'Free',
-    price: 0,
-    label: 'para sempre',
-    color: '#6366F1',
-    features: ['Até 30 alunos', '1 personal', 'Fichas ilimitadas', 'PWA mobile'],
-  },
-  {
     id: 'starter',
     name: 'Starter',
-    price: 99,
+    emoji: '⚡',
+    price: 197,
     label: '/mês',
     color: '#06B6D4',
     popular: true,
-    features: ['Até 100 alunos', '3 personais', 'Dashboard analítico', 'Suporte prioritário'],
+    trial: true,
+    features: ['Até 50 alunos', 'Até 3 personais', 'Fichas ilimitadas', 'Dashboard básico', 'Convites por código'],
   },
   {
     id: 'pro',
     name: 'Pro',
-    price: 199,
+    emoji: '👑',
+    price: 397,
     label: '/mês',
     color: '#10B981',
-    features: ['Alunos ilimitados', 'Personais ilimitados', 'Relatórios avançados', 'SLA garantido'],
+    features: ['Alunos ilimitados', 'Personais ilimitados', 'Relatórios avançados', 'Mapa de frequência', 'Exportar dados (CSV)', 'Notificações de inatividade', 'Personalização da academia', 'Histórico completo por aluno', 'Suporte prioritário'],
   },
 ]
 
-// ── Plano individual para alunos sem convite ──────────────────
-const STUDENT_PLAN = {
-  price: 29,
-  features: [
-    'Acesso completo ao app',
-    'Crie suas próprias fichas',
-    'Histórico e gráficos de evolução',
-    'PWA instalável no celular',
-    'Cancele quando quiser',
-  ],
-}
+// ── Planos individuais para alunos sem convite ────────────────
+const STUDENT_PLANS = [
+  {
+    id: 'solo',
+    name: 'Solo',
+    price: 29,
+    color: '#6366F1',
+    popular: false,
+    features: [
+      'Acesso completo ao app',
+      'Crie suas próprias fichas',
+      'Histórico e gráficos de evolução',
+      'PWA instalável no celular',
+      'Cancele quando quiser',
+    ],
+  },
+  {
+    id: 'plus',
+    name: 'Plus',
+    price: 49,
+    color: '#06B6D4',
+    popular: true,
+    features: [
+      'Tudo do Solo',
+      'Acompanhamento nutricional',
+      'Treinos sugeridos por IA',
+      'Metas e notificações semanais',
+      'Cancele quando quiser',
+    ],
+  },
+  {
+    id: 'elite',
+    name: 'Elite',
+    price: 89,
+    color: '#10B981',
+    popular: false,
+    features: [
+      'Tudo do Plus',
+      'Vídeos de execução dos exercícios',
+      'Suporte prioritário',
+      'Acesso antecipado a novidades',
+      'Cancele quando quiser',
+    ],
+  },
+]
 
 // ─────────────────────────────────────────────────────────────
 type Role = 'owner' | 'personal' | 'student' | null
 
 function OnboardingContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const { profile, academies } = useAuthStore()
 
   const [role, setRole] = useState<Role>(null)
-  const [plan, setPlan] = useState('free')
+  const [plan, setPlan] = useState(() => {
+    const p = searchParams.get('plan')
+    return PLANS.some(x => x.id === p) ? p! : 'starter'
+  })
   const [academyName, setAcademyName] = useState('')
   const [inviteCode, setInviteCode] = useState('')
   const [hasInvite, setHasInvite] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
   const [step, setStep] = useState<'role' | 'plan' | 'academy' | 'invite' | 'payment'>('role')
+  const [selectedStudentPlan, setSelectedStudentPlan] = useState(() => {
+    const p = searchParams.get('plan')
+    return STUDENT_PLANS.find(x => x.id === p) ?? STUDENT_PLANS[0]
+  })
 
   // Usuário já configurado → direto ao dashboard
   useEffect(() => {
     if (academies.length > 0) router.replace('/dashboard')
   }, [academies, router])
+
+  // Pula seleção de perfil se account_type já está no metadata (login com credenciais)
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const accountType = data.user?.user_metadata?.account_type as string | undefined
+      const planFromUrl       = searchParams.get('plan')
+      const isAcademyPlan     = PLANS.some(x => x.id === planFromUrl)
+      const isStudentPlan     = STUDENT_PLANS.some(x => x.id === planFromUrl)
+
+      // Plano de aluno → pagamento individual
+      if (isStudentPlan) {
+        setRole('student')
+        setStep('payment')
+        return
+      }
+
+      // Plano de academia → pula direto para nomear a academia
+      if (isAcademyPlan) {
+        setRole('owner')
+        setStep('academy')
+        return
+      }
+
+      if (accountType === 'student') {
+        setRole('student')
+        setStep('invite')
+      } else if (accountType === 'owner') {
+        setRole('owner')
+        setStep('plan')
+      } else if (accountType === 'personal') {
+        setRole('personal')
+        setStep('plan')
+      }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const firstName = profile?.full_name?.split(' ')[0] ?? 'você'
 
@@ -89,44 +162,26 @@ function OnboardingContent() {
     if (!name.trim()) return
     setSaving(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Não autenticado')
-
-      const slug =
-        name
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[̀-ͯ]/g, '')
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/(^-|-$)/g, '') +
-        '-' +
-        Date.now().toString(36)
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: newAcademy, error: academyError } = await (supabase.from('academies') as any).insert({
-        owner_id: user.id,
-        name,
-        slug,
-        plan,
-      }).select().single()
-      if (academyError) throw academyError
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: memberError } = await (supabase.from('academy_members') as any).insert({
-        academy_id: newAcademy.id,
-        user_id: user.id,
-        role: 'owner',
-        is_active: true,
+      const res = await fetch('/api/academy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), plan }),
       })
-      if (memberError) throw memberError
+      const { academy: newAcademy, checkoutUrl, error } = await res.json()
+      if (!res.ok) throw new Error(error ?? 'Erro ao criar academia')
 
       useAuthStore.getState().setCurrentAcademy(newAcademy, 'owner')
       useAuthStore.getState().setAcademies([{ academy: newAcademy, role: 'owner' }])
 
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl
+        return
+      }
+
       toast.success('Academia criada com sucesso!')
       router.push('/dashboard')
-    } catch {
-      toast.error('Erro ao criar academia. Tente novamente.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao criar academia.')
     } finally {
       setSaving(false)
     }
@@ -143,12 +198,12 @@ function OnboardingContent() {
         .select('token')
         .eq('code', trimmed)
         .eq('is_active', true)
-        .single()
-      if (error || !data) {
+        .limit(1)
+      if (error || !data || data.length === 0) {
         toast.error('Código inválido ou expirado. Verifique e tente novamente.')
         return
       }
-      router.push(`/convite/${(data as { token: string }).token}`)
+      router.push(`/convite/${(data[0] as { token: string }).token}`)
     } catch {
       toast.error('Erro ao verificar código. Tente novamente.')
     } finally {
@@ -157,8 +212,22 @@ function OnboardingContent() {
   }
 
   // ── Stripe checkout placeholder ───────────────────────────
-  function handleStudentPayment() {
-    toast('Em breve! Pagamento individual será habilitado.', { icon: '🚧' })
+  async function handleStudentPayment() {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/billing/student-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId: selectedStudentPlan.id }),
+      })
+      const { url, error } = await res.json()
+      if (url) { window.location.href = url; return }
+      toast.error(error ?? 'Erro ao iniciar checkout.')
+    } catch {
+      toast.error('Erro ao iniciar checkout. Tente novamente.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   // ─────────────────────────────────────────────────────────
@@ -258,45 +327,72 @@ function OnboardingContent() {
               </div>
 
               <div className="grid gap-3">
-                {PLANS.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => setPlan(p.id)}
-                    className={cn(
-                      'relative flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-200',
-                      plan === p.id
-                        ? 'border-brand-500/50 bg-brand-500/8 shadow-glow-sm'
-                        : 'border-border/60 hover:border-border hover:bg-surface-100'
-                    )}
-                  >
-                    {p.popular && (
-                      <span className="absolute -top-2.5 right-4 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-brand-500 to-cyan-500 text-white">
-                        Mais popular
-                      </span>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-display font-bold" style={{ color: p.color }}>{p.name}</span>
-                        <span className="text-sm font-semibold">
-                          {p.price === 0 ? 'Grátis' : `R$ ${p.price}`}
-                          <span className="text-xs font-normal text-muted-foreground"> {p.label}</span>
+                {PLANS.map((p) => {
+                  const selected = plan === p.id
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setPlan(p.id)}
+                      className="relative p-4 rounded-2xl border text-left transition-all duration-200"
+                      style={{
+                        borderColor: selected ? p.color : 'rgba(255,255,255,0.1)',
+                        background: selected ? `${p.color}0D` : undefined,
+                      }}
+                    >
+                      {p.popular && (
+                        <span className="absolute -top-2.5 right-4 text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
+                          style={{ background: p.color }}>
+                          Mais popular
                         </span>
+                      )}
+                      <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0"
+                          style={{ background: `${p.color}20` }}>
+                          {p.emoji}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="font-display font-bold text-sm" style={{ color: p.color }}>{p.name}</span>
+                            {'trial' in p && p.trial && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">
+                                30 dias grátis
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-lg font-display font-bold mb-2">
+                            R$ {p.price}
+                            <span className="text-xs font-normal text-muted-foreground"> {p.label}</span>
+                          </p>
+                          <ul className="space-y-1">
+                            {p.features.map((f) => (
+                              <li key={f} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <Check className="w-3 h-3 flex-shrink-0" style={{ color: p.color }} />
+                                {f}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all"
+                          style={{
+                            borderColor: selected ? p.color : 'rgba(255,255,255,0.2)',
+                            background: selected ? p.color : 'transparent',
+                          }}>
+                          {selected && <Check className="w-3 h-3 text-white" />}
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                        {p.features.map((f) => (
-                          <span key={f} className="text-xs text-muted-foreground">{f}</span>
-                        ))}
-                      </div>
-                    </div>
-                    <div className={cn(
-                      'w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                      plan === p.id ? 'bg-brand-500 border-brand-500' : 'border-border/60'
-                    )}>
-                      {plan === p.id && <Check className="w-3 h-3 text-white" />}
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  )
+                })}
               </div>
+
+              {plan === 'starter' && (
+                <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                  <Mail className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-emerald-300/80 leading-relaxed">
+                    Você terá <strong className="text-emerald-300">30 dias grátis</strong>. Após esse período, será cobrado R$ 197/mês automaticamente. Cancele quando quiser.
+                  </p>
+                </div>
+              )}
 
               <button
                 onClick={() => role === 'personal'
@@ -318,7 +414,10 @@ function OnboardingContent() {
           {step === 'academy' && (
             <motion.div key="academy" variants={slide} initial="hidden" animate="show" exit="exit" className="space-y-6">
               <div>
-                <button onClick={() => setStep('plan')} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors">
+                <button
+                  onClick={() => PLANS.some(x => x.id === searchParams.get('plan')) ? router.back() : setStep('plan')}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors"
+                >
                   <ArrowLeft className="w-3.5 h-3.5" /> Voltar
                 </button>
                 <h1 className="text-2xl font-display font-bold">Crie sua academia 🏢</h1>
@@ -385,9 +484,6 @@ function OnboardingContent() {
           {step === 'invite' && (
             <motion.div key="invite" variants={slide} initial="hidden" animate="show" exit="exit" className="space-y-6">
               <div>
-                <button onClick={() => setStep('role')} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors">
-                  <ArrowLeft className="w-3.5 h-3.5" /> Voltar
-                </button>
                 <h1 className="text-2xl font-display font-bold">Você tem um convite? 🎯</h1>
                 <p className="text-muted-foreground mt-1.5 text-sm">
                   Se seu professor ou academia enviou um código, use-o para entrar gratuitamente.
@@ -495,14 +591,6 @@ function OnboardingContent() {
                 </div>
               )}
 
-              {hasInvite === null && (
-                <button
-                  onClick={() => router.replace('/dashboard')}
-                  className="w-full py-3 rounded-xl text-sm text-muted-foreground hover:text-foreground transition-colors text-center"
-                >
-                  Pular por agora
-                </button>
-              )}
             </motion.div>
           )}
 
@@ -510,7 +598,10 @@ function OnboardingContent() {
           {step === 'payment' && (
             <motion.div key="payment" variants={slide} initial="hidden" animate="show" exit="exit" className="space-y-6">
               <div>
-                <button onClick={() => setStep('invite')} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors">
+                <button
+                  onClick={() => STUDENT_PLANS.some(x => x.id === searchParams.get('plan')) ? router.back() : setStep('invite')}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors"
+                >
                   <ArrowLeft className="w-3.5 h-3.5" /> Voltar
                 </button>
                 <h1 className="text-2xl font-display font-bold">Plano individual</h1>
@@ -519,42 +610,73 @@ function OnboardingContent() {
                 </p>
               </div>
 
-              <div
-                className="glass rounded-2xl p-6 space-y-5"
-                style={{ border: '1px solid rgba(99,102,241,0.3)' }}
-              >
-                <div className="flex items-end gap-1">
-                  <span className="text-4xl font-display font-extrabold gradient-text">
-                    R$ {STUDENT_PLAN.price}
-                  </span>
-                  <span className="text-muted-foreground text-sm mb-1">/mês</span>
-                </div>
-
-                <ul className="space-y-2.5">
-                  {STUDENT_PLAN.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2.5 text-sm">
-                      <div className="w-5 h-5 rounded-full flex items-center justify-center bg-brand-500/15 flex-shrink-0">
-                        <Check className="w-3 h-3 text-brand-400" />
+              {/* Plan cards */}
+              <div className="grid grid-cols-1 gap-3">
+                {STUDENT_PLANS.map((p) => {
+                  const selected = selectedStudentPlan.id === p.id
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setSelectedStudentPlan(p)}
+                      className="glass rounded-2xl p-5 text-left transition-all duration-200"
+                      style={{
+                        border: `1px solid ${selected ? p.color : 'rgba(255,255,255,0.08)'}`,
+                        background: selected ? `${p.color}0D` : undefined,
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div>
+                          {p.popular && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full mb-1.5 inline-block"
+                              style={{ background: `${p.color}20`, color: p.color }}>
+                              Mais popular
+                            </span>
+                          )}
+                          <p className="font-display font-bold text-base">{p.name}</p>
+                          <div className="flex items-end gap-1 mt-0.5">
+                            <span className="text-2xl font-display font-extrabold" style={{ color: p.color }}>
+                              R$ {p.price}
+                            </span>
+                            <span className="text-xs text-muted-foreground mb-0.5">/mês</span>
+                          </div>
+                        </div>
+                        <div className="w-5 h-5 rounded-full border-2 flex-shrink-0 mt-1 flex items-center justify-center transition-all"
+                          style={{
+                            borderColor: selected ? p.color : 'rgba(255,255,255,0.2)',
+                            background: selected ? p.color : 'transparent',
+                          }}>
+                          {selected && <Check className="w-3 h-3 text-white" />}
+                        </div>
                       </div>
-                      <span className="text-muted-foreground">{f}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <button
-                  onClick={handleStudentPayment}
-                  className="w-full py-3.5 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2"
-                  style={{ background: 'linear-gradient(135deg, #6366F1, #4F46E5)' }}
-                >
-                  <CreditCard className="w-4 h-4" />
-                  Assinar por R$ {STUDENT_PLAN.price}/mês
-                </button>
-
-                <p className="text-center text-xs text-muted-foreground flex items-center justify-center gap-1">
-                  <Lock className="w-3 h-3" />
-                  Pagamento seguro · Cancele quando quiser
-                </p>
+                      <ul className="space-y-1.5">
+                        {p.features.map((f) => (
+                          <li key={f} className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Check className="w-3 h-3 flex-shrink-0" style={{ color: p.color }} />
+                            {f}
+                          </li>
+                        ))}
+                      </ul>
+                    </button>
+                  )
+                })}
               </div>
+
+              <button
+                onClick={handleStudentPayment}
+                disabled={saving}
+                className="w-full py-3.5 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{ background: `linear-gradient(135deg, ${selectedStudentPlan.color}, ${selectedStudentPlan.color}CC)` }}
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                  <><CreditCard className="w-4 h-4" />Assinar {selectedStudentPlan.name} por R$ {selectedStudentPlan.price}/mês</>
+                )}
+              </button>
+
+              <p className="text-center text-xs text-muted-foreground flex items-center justify-center gap-1">
+                <Lock className="w-3 h-3" />
+                Pagamento seguro · Cancele quando quiser
+              </p>
 
               <div className="glass rounded-xl p-4 flex gap-3">
                 <Ticket className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />

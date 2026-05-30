@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowRight, AlertCircle, Loader2 } from 'lucide-react'
+import { ArrowRight, ArrowLeft, AlertCircle, Loader2 } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -18,8 +18,10 @@ const fadeUp = {
   }),
 }
 
-export default function CodigoPage() {
+function CodigoContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const isLoggedIn = searchParams.get('from') === 'dashboard'
   const supabase = createClient()
 
   const [code, setCode] = useState('')
@@ -58,6 +60,12 @@ export default function CodigoPage() {
   return (
     <motion.div initial="hidden" animate="show" className="space-y-6">
       <motion.div variants={fadeUp} custom={0} className="space-y-1.5">
+        <button
+          onClick={() => router.back()}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" /> Voltar
+        </button>
         <h1 className="text-2xl font-display font-bold">Entrar com código</h1>
         <p className="text-sm text-muted-foreground">
           Digite o código de 6 caracteres recebido da sua academia
@@ -120,12 +128,22 @@ export default function CodigoPage() {
         </motion.div>
       </form>
 
-      <motion.p variants={fadeUp} custom={3} className="text-center text-sm text-muted-foreground">
-        Já tem uma conta?{' '}
-        <Link href="/login" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
-          Fazer login
-        </Link>
-      </motion.p>
+      {!isLoggedIn && (
+        <motion.p variants={fadeUp} custom={3} className="text-center text-sm text-muted-foreground">
+          Já tem uma conta?{' '}
+          <Link href="/login" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
+            Fazer login
+          </Link>
+        </motion.p>
+      )}
     </motion.div>
+  )
+}
+
+export default function CodigoPage() {
+  return (
+    <Suspense fallback={null}>
+      <CodigoContent />
+    </Suspense>
   )
 }

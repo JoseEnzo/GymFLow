@@ -25,6 +25,7 @@ export async function GET(request: Request) {
         if (members && members.length > 0) {
           return NextResponse.redirect(`${origin}/dashboard`)
         }
+        return NextResponse.redirect(`${origin}/onboarding`)
       }
 
       return NextResponse.redirect(`${origin}/onboarding`)
