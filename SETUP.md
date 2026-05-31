@@ -108,7 +108,7 @@ git add .                     # todos os arquivos
 git commit -m "Adicionei mais exercicios 236 - 640, corrigi erros de CNPJ com CPF, agora os perfis mostram seus emails"
 
 # 6. Enviar pro GitHub
-git push origin main
+git push origin JoseEnzo
 ```
 ```
 
