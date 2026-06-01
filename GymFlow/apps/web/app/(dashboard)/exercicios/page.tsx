@@ -168,6 +168,96 @@ function NewExerciseModal({ onClose, onCreated }: { onClose: () => void; onCreat
   )
 }
 
+interface AddToSheetConfig { sets: number; reps: string; notes: string }
+
+function AddToSheetModal({
+  exercise,
+  onClose,
+  onConfirm,
+  saving,
+}: {
+  exercise: Exercise
+  onClose: () => void
+  onConfirm: (cfg: AddToSheetConfig) => void
+  saving: boolean
+}) {
+  const [sets, setSets] = useState(3)
+  const [reps, setReps] = useState('12')
+  const [notes, setNotes] = useState('')
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }}
+        className="glass w-full max-w-sm rounded-2xl p-6 space-y-5 border border-border/60"
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-display font-bold text-sm">Adicionar exercício</h3>
+            <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[220px]">{exercise.name_pt}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface-200 transition-all text-muted-foreground">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Séries</label>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSets((s) => Math.max(1, s - 1))}
+                className="w-8 h-8 rounded-lg border border-border/60 flex items-center justify-center text-sm font-bold hover:bg-surface-100 transition-all"
+              >−</button>
+              <span className="flex-1 text-center font-bold text-lg">{sets}</span>
+              <button
+                onClick={() => setSets((s) => Math.min(20, s + 1))}
+                className="w-8 h-8 rounded-lg border border-border/60 flex items-center justify-center text-sm font-bold hover:bg-surface-100 transition-all"
+              >+</button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Repetições</label>
+            <input
+              value={reps}
+              onChange={(e) => setReps(e.target.value)}
+              placeholder="Ex: 12 ou 8-12"
+              className="field text-center text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Comentário <span className="normal-case text-[10px]">(opcional)</span></label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Ex: Foco na contração, não trancar os joelhos..."
+            rows={2}
+            className="field text-sm resize-none"
+          />
+        </div>
+
+        <div className="flex gap-3 pt-1">
+          <button onClick={onClose} className="flex-1 btn-secondary py-2.5 rounded-xl text-sm">Cancelar</button>
+          <button
+            onClick={() => onConfirm({ sets, reps: reps.trim() || '12', notes })}
+            disabled={saving}
+            className="flex-1 btn-primary py-2.5 rounded-xl text-sm"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Adicionar'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 function ExerciciosContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -187,6 +277,7 @@ function ExerciciosContent() {
   const [adding, setAdding] = useState<string | null>(null)
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set())
   const [sheetName, setSheetName] = useState('')
+  const [pendingExercise, setPendingExercise] = useState<Exercise | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -215,7 +306,7 @@ function ExerciciosContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentAcademy, addTo])
 
-  async function handleAddToSheet(exerciseId: string) {
+  async function handleAddToSheet(exerciseId: string, cfg: AddToSheetConfig) {
     if (!addTo || addedIds.has(exerciseId)) return
     setAdding(exerciseId)
     try {
@@ -226,10 +317,19 @@ function ExerciciosContent() {
 
       const { error } = await supabase
         .from('sheet_exercises')
-        .insert({ sheet_id: addTo, exercise_id: exerciseId, order_index: count ?? 0, sets: 3, reps: '12', rest_seconds: 60 })
+        .insert({
+          sheet_id: addTo,
+          exercise_id: exerciseId,
+          order_index: count ?? 0,
+          sets: cfg.sets,
+          reps: cfg.reps,
+          rest_seconds: 60,
+          notes: cfg.notes || null,
+        })
 
       if (error) throw error
       setAddedIds((prev) => new Set([...prev, exerciseId]))
+      setPendingExercise(null)
       toast.success('Exercício adicionado à ficha!')
     } catch (err: unknown) {
       toast.error((err as Error).message ?? 'Erro ao adicionar exercício.')
@@ -394,7 +494,7 @@ function ExerciciosContent() {
                   </div>
                   {addTo && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); handleAddToSheet(ex.id) }}
+                      onClick={(e) => { e.stopPropagation(); if (!isAdded) setPendingExercise(ex) }}
                       disabled={isAdded || isAddingThis}
                       className={cn(
                         'w-full mt-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5',
@@ -447,7 +547,7 @@ function ExerciciosContent() {
                   </span>
                   {addTo ? (
                     <button
-                      onClick={(e) => { e.stopPropagation(); handleAddToSheet(ex.id) }}
+                      onClick={(e) => { e.stopPropagation(); if (!isAdded) setPendingExercise(ex) }}
                       disabled={isAdded || isAddingThis}
                       className={cn('p-2 rounded-lg transition-all',
                         isAdded ? 'text-emerald-400 bg-emerald-500/10 cursor-default' : 'text-brand-400 hover:bg-brand-500/15'
@@ -488,6 +588,14 @@ function ExerciciosContent() {
           <NewExerciseModal
             onClose={() => setShowModal(false)}
             onCreated={(ex) => { setExercises((prev) => [ex, ...prev]); setShowModal(false) }}
+          />
+        )}
+        {pendingExercise && (
+          <AddToSheetModal
+            exercise={pendingExercise}
+            saving={adding === pendingExercise.id}
+            onClose={() => setPendingExercise(null)}
+            onConfirm={(cfg) => handleAddToSheet(pendingExercise.id, cfg)}
           />
         )}
       </AnimatePresence>

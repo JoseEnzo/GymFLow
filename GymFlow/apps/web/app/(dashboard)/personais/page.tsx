@@ -64,9 +64,11 @@ function isExhausted(usesCount: number, usesLimit: number | null) {
 function InvitePanel({
   academyId,
   onCreated,
+  onClose,
 }: {
   academyId: string
   onCreated: (invite: PendingInvite) => void
+  onClose: () => void
 }) {
   const supabase = createClient()
   const [status, setStatus] = useState<'idle' | 'generating' | 'done'>('idle')
@@ -80,7 +82,8 @@ function InvitePanel({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Não autenticado')
 
-      const code = Math.random().toString(36).substring(2, 8).toUpperCase()
+      const SAFE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+      const code = Array.from({ length: 6 }, () => SAFE_CHARS[Math.floor(Math.random() * SAFE_CHARS.length)]).join('')
       const token = crypto.randomUUID()
 
       let expiresAt: string | null = null
@@ -133,9 +136,12 @@ function InvitePanel({
         animate={{ opacity: 1, y: 0 }}
         className="glass rounded-2xl p-5 border border-brand-500/20 shadow-glow-sm space-y-4"
       >
-        <div className="flex items-center gap-2 text-emerald-400">
-          <CheckCircle2 className="w-4 h-4" />
-          <p className="text-sm font-semibold">Convite gerado com sucesso!</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-emerald-400">
+            <CheckCircle2 className="w-4 h-4" />
+            <p className="text-sm font-semibold">Convite de personal gerado!</p>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xs">Fechar</button>
         </div>
 
         {/* Código */}
@@ -146,7 +152,10 @@ function InvitePanel({
               {invite.code}
             </div>
             <button
-              onClick={() => { navigator.clipboard.writeText(invite.code); toast.success('Código copiado!') }}
+              onClick={async () => {
+                try { await navigator.clipboard.writeText(invite.code); toast.success('Código copiado!') }
+                catch { toast.error('Não foi possível copiar — copie manualmente.') }
+              }}
               className="p-3 rounded-xl border border-border/60 hover:bg-surface-200 transition-all text-muted-foreground hover:text-foreground"
             >
               <Copy className="w-4 h-4" />
@@ -162,7 +171,10 @@ function InvitePanel({
           <div className="flex items-center gap-2">
             <input readOnly value={link} className="field text-xs flex-1" />
             <button
-              onClick={() => { navigator.clipboard.writeText(link); toast.success('Link copiado!') }}
+              onClick={async () => {
+                try { await navigator.clipboard.writeText(link); toast.success('Link copiado!') }
+                catch { toast.error('Não foi possível copiar — copie manualmente.') }
+              }}
               className="p-3 rounded-xl border border-border/60 hover:bg-surface-200 transition-all text-muted-foreground hover:text-foreground flex-shrink-0"
             >
               <Copy className="w-4 h-4" />
@@ -462,9 +474,12 @@ function InviteCard({
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {!invalid && (
               <button
-                onClick={() => { navigator.clipboard.writeText(link); toast.success('Link copiado!') }}
+                onClick={async () => {
+                  try { await navigator.clipboard.writeText(invite.code); toast.success('Código copiado!') }
+                  catch { toast.error('Não foi possível copiar.') }
+                }}
                 className="p-2 rounded-lg border border-border/60 hover:bg-surface-200 transition-all text-muted-foreground hover:text-foreground"
-                title="Copiar link"
+                title="Copiar código"
               >
                 <Copy className="w-3.5 h-3.5" />
               </button>
@@ -568,7 +583,6 @@ export default function PersonaisPage() {
 
   function handleInviteCreated(invite: PendingInvite) {
     setInvites((prev) => [invite, ...prev])
-    setShowInvitePanel(false)
   }
 
   const activePersonais = personais.filter((p) => p.isActive)
@@ -645,6 +659,7 @@ export default function PersonaisPage() {
             <InvitePanel
               academyId={currentAcademy.id}
               onCreated={handleInviteCreated}
+              onClose={() => setShowInvitePanel(false)}
             />
           </motion.div>
         )}

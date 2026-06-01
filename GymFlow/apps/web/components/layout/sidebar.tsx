@@ -6,7 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Dumbbell, LayoutDashboard, Users, ClipboardList, BookOpen,
   Settings, ChevronLeft, ChevronRight, LogOut, ChevronsUpDown,
-  Activity, CalendarDays, History, TrendingUp, ShieldCheck, UserCircle,
+  Activity, CalendarDays, History, TrendingUp, ShieldCheck, UserCircle, Video,
+  UserCog, BarChart2,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -17,17 +18,31 @@ import { getInitials } from '@/lib/utils'
 import type { NavItem } from '@/types'
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['owner', 'personal', 'student'] },
-  { label: 'Personais', href: '/personais', icon: ShieldCheck, roles: ['owner'] },
-  { label: 'Alunos', href: '/alunos', icon: Users, roles: ['owner', 'personal'] },
-  { label: 'Treinos', href: '/treinos', icon: ClipboardList, roles: ['owner', 'personal', 'student'] },
-  { label: 'Agenda', href: '/agenda', icon: CalendarDays, roles: ['student'] },
-  { label: 'Histórico', href: '/historico', icon: History, roles: ['student'] },
-  { label: 'Evolução', href: '/evolucao', icon: TrendingUp, roles: ['student'] },
-  { label: 'Exercícios', href: '/exercicios', icon: BookOpen, roles: ['owner', 'personal'] },
-  { label: 'Frequência', href: '/frequencia', icon: Activity, roles: ['owner', 'personal'] },
-  { label: 'Perfil', href: '/perfil', icon: UserCircle, roles: ['owner', 'personal', 'student'] },
-  { label: 'Configurações', href: '/configuracoes', icon: Settings, roles: ['owner', 'personal', 'student'] },
+  // Todos
+  { label: 'Dashboard',        href: '/dashboard',    icon: LayoutDashboard, roles: ['owner', 'personal', 'student'] },
+
+  // ── Owner: foco em administração ──────────────────────────────
+  { label: 'Alunos',           href: '/alunos',       icon: Users,           roles: ['owner'] },
+  { label: 'Personais',        href: '/personais',    icon: UserCog,         roles: ['owner'] },
+  { label: 'Frequência',       href: '/frequencia',   icon: BarChart2,       roles: ['owner'] },
+
+  // ── Personal: foco em treino ──────────────────────────────────
+  { label: 'Meus alunos',      href: '/alunos',       icon: Users,           roles: ['personal'] },
+  { label: 'Fichas & Treinos', href: '/treinos',      icon: ClipboardList,   roles: ['personal'] },
+  { label: 'Exercícios',       href: '/exercicios',   icon: BookOpen,        roles: ['personal'] },
+  { label: 'Frequência',       href: '/frequencia',   icon: Activity,        roles: ['personal'] },
+
+  // ── Student ───────────────────────────────────────────────────
+  { label: 'Meus treinos',     href: '/treinos',      icon: Dumbbell,        roles: ['student'] },
+  { label: 'Agenda',           href: '/agenda',       icon: CalendarDays,    roles: ['student'] },
+  { label: 'Histórico',        href: '/historico',    icon: History,         roles: ['student'] },
+  { label: 'Evolução',         href: '/evolucao',     icon: TrendingUp,      roles: ['student'] },
+  { label: 'Frequência',       href: '/frequencia',   icon: Activity,        roles: ['student'] },
+  { label: 'Vídeos',           href: '/videos',       icon: Video,           roles: ['student'] },
+
+  // Todos
+  { label: 'Perfil',           href: '/perfil',       icon: UserCircle,      roles: ['owner', 'personal', 'student'] },
+  { label: 'Configurações',    href: '/configuracoes',icon: Settings,        roles: ['owner', 'personal', 'student'] },
 ]
 
 function AcademySwitcher() {
@@ -246,7 +261,7 @@ export function Sidebar() {
               </div>
               <button
                 onClick={signOut}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-all"
+className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-all"
                 title="Sair"
               >
                 <LogOut className="w-3.5 h-3.5" />

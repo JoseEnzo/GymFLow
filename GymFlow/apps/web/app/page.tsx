@@ -939,39 +939,39 @@ function HowItWorksSection() {
 // ──────────────────────────────────────────────
 const plans = [
   {
-    id: 'free',
-    name: 'Free',
-    price: 0,
-    period: 'para sempre',
-    description: 'Para começar e validar',
+    id: 'personal',
+    name: 'Personal',
+    price: 97,
+    period: '/mês',
+    description: 'Para personal trainers independentes',
     features: [
-      'Até 30 alunos',
-      '1 personal',
+      'Até 20 alunos',
       'Fichas ilimitadas',
       'Biblioteca de exercícios',
       'Histórico de treinos',
-      'PWA mobile',
+      'Convites por link',
+      '14 dias grátis',
     ],
     cta: 'Começar grátis',
-    href: '/cadastro',
+    href: '/cadastro?plan=personal',
     popular: false,
-    color: '#6366F1',
+    color: '#8B5CF6',
   },
   {
     id: 'starter',
     name: 'Starter',
-    price: 99,
+    price: 197,
     period: '/mês',
     description: 'Para academias em crescimento',
     features: [
-      'Até 100 alunos',
-      '3 personais',
-      'Tudo do Free',
+      'Até 50 alunos',
+      'Até 3 personais',
+      'Fichas ilimitadas',
       'Dashboard analítico',
-      'Convites por e-mail',
-      'Suporte prioritário',
+      'Convites por código',
+      '30 dias grátis',
     ],
-    cta: 'Assinar Starter',
+    cta: 'Começar grátis por 30 dias',
     href: '/cadastro?plan=starter',
     popular: true,
     color: '#06B6D4',
@@ -979,16 +979,16 @@ const plans = [
   {
     id: 'pro',
     name: 'Pro',
-    price: 199,
+    price: 397,
     period: '/mês',
     description: 'Para academias estabelecidas',
     features: [
       'Alunos ilimitados',
       'Personais ilimitados',
-      'Tudo do Starter',
       'Relatórios avançados',
-      'API access',
-      'SLA garantido',
+      'Exportar dados (CSV)',
+      'Notificações de inatividade',
+      'Suporte prioritário',
     ],
     cta: 'Assinar Pro',
     href: '/cadastro?plan=pro',
@@ -1290,8 +1290,8 @@ function Footer() {
             {
               title: 'Produto',
               links: [
-                { label: 'Funcionalidades', href: '#' },
-                { label: 'Preços', href: '#' },
+                { label: 'Funcionalidades', href: '#funcionalidades' },
+                { label: 'Preços', href: '#preços' },
                 { label: 'Segurança', href: '#' },
                 { label: 'Roadmap', href: '#' },
               ],
@@ -1299,7 +1299,7 @@ function Footer() {
             {
               title: 'Empresa',
               links: [
-                { label: 'Sobre', href: '#' },
+                { label: 'Sobre', href: '#sobre' },
                 { label: 'Blog', href: '#' },
                 { label: 'Parceiros', href: '#' },
                 { label: 'Contato', href: '#' },
@@ -1311,7 +1311,7 @@ function Footer() {
                 { label: 'Privacidade', href: '/privacidade' },
                 { label: 'Termos', href: '/termos' },
                 { label: 'Cookies', href: '/privacidade#cookies' },
-                { label: 'LGPD', href: '/privacidade#seus-direitos' },
+                { label: 'LGPD', href: '/privacidade#lgpd' },
               ],
             },
           ].map((col) => (
@@ -1320,9 +1320,9 @@ function Footer() {
               <ul className="space-y-2.5">
                 {col.links.map((link) => (
                   <li key={link.label}>
-                    <a href={link.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                    <Link href={link.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                       {link.label}
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>

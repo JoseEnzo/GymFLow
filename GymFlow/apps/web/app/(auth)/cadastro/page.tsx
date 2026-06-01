@@ -7,13 +7,15 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Eye, EyeOff, Loader2, AlertCircle, Check, Building2, Dumbbell, ArrowLeft, ShieldCheck, UserCheck } from 'lucide-react'
-import { toast } from 'sonner'
+import { Eye, EyeOff, Loader2, AlertCircle, Check, Building2, Dumbbell, ArrowLeft, ShieldCheck, UserCheck, ChevronRight, Ticket, CreditCard, ArrowRight } from 'lucide-react'
 
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { validateCPF, validateCNPJ, maskCPF, maskCNPJ } from '@/lib/cnpj'
+import { SocialButtons } from '@/components/auth/social-buttons'
 
 const schema = z.object({
   fullName: z.string().min(3, 'Nome muito curto'),
@@ -94,17 +96,21 @@ const TYPES = [
 ]
 
 function CadastroInner() {
-  const { signUp, signInWithGoogle } = useAuth()
+  const { signUp, signInWithProvider } = useAuth()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const inviteToken = searchParams.get('token')
 
   // If arriving via invite, skip type selection
-  const [step, setStep] = useState<0 | 1>(inviteToken ? 1 : 0)
+  const [step, setStep] = useState<0 | 'invite' | 1>(inviteToken ? 1 : 0)
   const [accountType, setAccountType] = useState<'owner' | 'personal' | 'student'>(inviteToken ? 'student' : 'owner')
   const [inviteRole, setInviteRole] = useState<'personal' | 'student' | null>(null)
+  const [hasInvite, setHasInvite] = useState<boolean | null>(null)
+  const [inviteCode, setInviteCode] = useState('')
+  const [inviteSaving, setInviteSaving] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
   const [document, setDocument] = useState('')
   const [documentError, setDocumentError] = useState<string | null>(null)
@@ -123,6 +129,30 @@ function CadastroInner() {
         if (d?.role) setInviteRole(d.role as 'personal' | 'student')
       })
   }, [inviteToken])
+
+  async function redeemInvite() {
+    const trimmed = inviteCode.trim().toUpperCase()
+    if (!trimmed) return
+    setInviteSaving(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('invites')
+        .select('token')
+        .eq('code', trimmed)
+        .eq('is_active', true)
+        .limit(1)
+      if (error || !data || data.length === 0) {
+        toast.error('Código inválido ou expirado.')
+        return
+      }
+      router.push(`/convite/${(data[0] as { token: string }).token}`)
+    } catch {
+      toast.error('Erro ao verificar código. Tente novamente.')
+    } finally {
+      setInviteSaving(false)
+    }
+  }
 
   const {
     register,
@@ -190,7 +220,7 @@ function CadastroInner() {
                     type="button"
                     onClick={() => {
                       setAccountType(type.value)
-                      setStep(1)
+                      setStep(type.value === 'student' || type.value === 'personal' ? 'invite' : 1)
                     }}
                     className={cn(
                       'w-full flex items-center gap-4 p-5 rounded-2xl border-2 text-left transition-all duration-200 group',
@@ -206,12 +236,7 @@ function CadastroInner() {
                       <p className="font-semibold text-base">{type.title}</p>
                       <p className="text-sm text-muted-foreground mt-0.5">{type.description}</p>
                     </div>
-                    <div className={cn(
-                      'w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all',
-                      selected ? `border-current ${type.iconColor}` : 'border-border'
-                    )}>
-                      {selected && <div className="w-2.5 h-2.5 rounded-full bg-current" />}
-                    </div>
+                    <ChevronRight className={cn('w-4 h-4 opacity-50 flex-shrink-0', type.iconColor)} />
                   </button>
                 )
               })}
@@ -227,35 +252,7 @@ function CadastroInner() {
               </div>
             </div>
 
-            {/* Google OAuth */}
-            <button
-              type="button"
-              onClick={async () => {
-                setIsGoogleLoading(true)
-                try {
-                  await signInWithGoogle()
-                } catch {
-                  toast.error('Erro ao continuar com Google')
-                  setIsGoogleLoading(false)
-                }
-              }}
-              disabled={isGoogleLoading}
-              className="w-full flex items-center justify-center gap-2.5 py-3 rounded-xl border border-border/60 hover:bg-surface-100 transition-all text-sm font-medium disabled:opacity-60"
-            >
-              {isGoogleLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                  </svg>
-                  Continuar com Google
-                </>
-              )}
-            </button>
+            <SocialButtons onLogin={signInWithProvider} />
 
             <p className="text-center text-sm text-muted-foreground">
               Já tem uma conta?{' '}
@@ -263,6 +260,125 @@ function CadastroInner() {
                 Fazer login
               </Link>
             </p>
+          </motion.div>
+        )}
+
+        {/* ── Etapa convite (aluno) ── */}
+        {step === 'invite' && (
+          <motion.div
+            key="step-invite"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-6"
+          >
+            <div className="space-y-1.5">
+              <button
+                type="button"
+                onClick={() => { setStep(0); setHasInvite(null); setInviteCode('') }}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-3"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Voltar
+              </button>
+              <h1 className="text-2xl font-display font-bold">Você tem um convite? 🎯</h1>
+              <p className="text-sm text-muted-foreground">
+                Se seu professor ou academia enviou um código, use-o para entrar gratuitamente.
+              </p>
+            </div>
+
+            <div className="grid gap-3">
+              <button
+                type="button"
+                onClick={() => setHasInvite(true)}
+                className={cn(
+                  'flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-200',
+                  hasInvite === true
+                    ? 'border-emerald-500/50 bg-emerald-500/8'
+                    : 'border-border/60 hover:border-border hover:bg-surface-100'
+                )}
+              >
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-500/15 flex-shrink-0">
+                  <Ticket className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm">Sim, tenho um código de convite</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Entro gratuitamente via convite do professor</p>
+                </div>
+                {hasInvite === true && (
+                  <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+                    <Check className="w-3 h-3 text-white" />
+                  </div>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setHasInvite(false)}
+                className={cn(
+                  'flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-200',
+                  hasInvite === false
+                    ? 'border-indigo-500/50 bg-indigo-500/8'
+                    : 'border-border/60 hover:border-border hover:bg-surface-100'
+                )}
+              >
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-500/15 flex-shrink-0">
+                  <CreditCard className="w-5 h-5 text-indigo-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm">Não tenho convite</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Quero criar minha conta e usar o app</p>
+                </div>
+                {hasInvite === false && (
+                  <div className="w-5 h-5 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0">
+                    <Check className="w-3 h-3 text-white" />
+                  </div>
+                )}
+              </button>
+            </div>
+
+            <AnimatePresence>
+              {hasInvite === true && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="space-y-3 overflow-hidden"
+                >
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Código de convite</label>
+                    <input
+                      type="text"
+                      value={inviteCode}
+                      onChange={(e) => setInviteCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+                      placeholder="ABC123"
+                      maxLength={6}
+                      autoComplete="off"
+                      className="field tracking-widest font-mono"
+                      onKeyDown={(e) => e.key === 'Enter' && inviteCode.length === 6 && redeemInvite()}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={redeemInvite}
+                    disabled={inviteSaving || inviteCode.length !== 6}
+                    className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
+                  >
+                    {inviteSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4" /> Entrar com convite</>}
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {hasInvite === false && (
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
+              >
+                Criar conta <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
           </motion.div>
         )}
 
@@ -281,7 +397,7 @@ function CadastroInner() {
               {!inviteToken && (
                 <button
                   type="button"
-                  onClick={() => setStep(0)}
+                  onClick={() => setStep(accountType === 'student' ? 'invite' : 0)}
                   className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-3"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
@@ -434,15 +550,20 @@ function CadastroInner() {
                 <div className="relative">
                   <input
                     {...register('confirmPassword')}
-                    type="password"
+                    type={showConfirmPassword ? 'text' : 'password'}
                     placeholder="••••••••"
                     autoComplete="new-password"
                     className={cn('field pr-11', errors.confirmPassword && 'border-destructive/60')}
                   />
-                  {password && watch('confirmPassword') === password && (
+                  {password && watch('confirmPassword') === password ? (
                     <div className="absolute right-3.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
                       <Check className="w-3 h-3 text-emerald-400" />
                     </div>
+                  ) : (
+                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   )}
                 </div>
                 {errors.confirmPassword && <p className="text-xs text-red-400">{errors.confirmPassword.message}</p>}

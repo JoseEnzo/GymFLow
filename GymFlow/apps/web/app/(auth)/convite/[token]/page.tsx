@@ -35,10 +35,51 @@ export default function ConvitePage() {
     void loadInvite()
   }, [token])
 
+  async function doAccept(inviteData: InviteDetails, user: { id: string }) {
+    setStatus('accepting')
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: academyData } = await (supabase as any)
+        .from('academies')
+        .select('id')
+        .eq('slug', inviteData.academySlug)
+        .single()
+
+      if (!academyData) throw new Error('Academia não encontrada')
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: memberError } = await (supabase as any)
+        .from('academy_members')
+        .upsert({
+          academy_id: academyData.id,
+          user_id: user.id,
+          role: inviteData.role,
+          is_active: true,
+          joined_at: new Date().toISOString(),
+        }, { onConflict: 'academy_id,user_id' })
+
+      if (memberError) throw memberError
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any)
+        .from('invites')
+        .update({ uses_count: inviteData.usesCount + 1 })
+        .eq('token', token)
+
+      setStatus('done')
+      toast.success(`Você entrou para ${inviteData.academyName}!`)
+      setTimeout(() => router.push('/dashboard'), 2000)
+    } catch (err: unknown) {
+      setError((err as Error).message)
+      setStatus('error')
+    }
+  }
+
   async function loadInvite() {
     setStatus('loading')
     try {
-      const { data, error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
         .from('invites')
         .select('*, academy:academies(name, slug)')
         .eq('token', token)
@@ -58,15 +99,23 @@ export default function ConvitePage() {
         throw new Error('Este convite já foi utilizado')
       }
 
-      setInvite({
+      const inviteDetails: InviteDetails = {
         academyName: academy.name,
         academySlug: academy.slug,
         role: data.role,
         code: data.code,
         expiresAt: data.expires_at,
         usesCount: data.uses_count ?? 0,
-      })
-      setStatus('found')
+      }
+      setInvite(inviteDetails)
+
+      // Se já estiver logado, aceita automaticamente
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await doAccept(inviteDetails, user)
+      } else {
+        setStatus('found')
+      }
     } catch (err: unknown) {
       setError((err as Error).message)
       setStatus('error')
@@ -75,52 +124,12 @@ export default function ConvitePage() {
 
   async function acceptInvite() {
     if (!invite) return
-    setStatus('accepting')
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (!user) {
-        // Redirect to register with token pre-filled
-        router.push(`/cadastro?token=${token}`)
-        return
-      }
-
-      // Get academy_id
-      const { data: academyData } = await supabase
-        .from('academies')
-        .select('id')
-        .eq('slug', invite.academySlug)
-        .single()
-
-      if (!academyData) throw new Error('Academia não encontrada')
-
-      // Add member (conflict on unique(academy_id, user_id) → update instead of error)
-      const { error: memberError } = await supabase
-        .from('academy_members')
-        .upsert({
-          academy_id: academyData.id,
-          user_id: user.id,
-          role: invite.role,
-          is_active: true,
-          joined_at: new Date().toISOString(),
-        }, { onConflict: 'academy_id,user_id' })
-
-      if (memberError) throw memberError
-
-      // Increment uses_count
-      await supabase
-        .from('invites')
-        .update({ uses_count: invite.usesCount + 1 })
-        .eq('token', token)
-
-      setStatus('done')
-      toast.success(`Você entrou para ${invite.academyName}!`)
-      setTimeout(() => router.push('/dashboard'), 2000)
-    } catch (err: unknown) {
-      setError((err as Error).message)
-      setStatus('error')
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      router.push(`/cadastro?token=${token}`)
+      return
     }
+    await doAccept(invite, user)
   }
 
   const roleLabel = invite?.role === 'personal' ? 'Personal Trainer' : 'Aluno'
@@ -231,39 +240,26 @@ export default function ConvitePage() {
               </div>
 
               {profile ? (
-                <div className="space-y-3">
+                <div className="flex flex-col items-center gap-3 py-2">
+                  <Loader2 className="w-5 h-5 animate-spin text-brand-400" />
                   <p className="text-sm text-muted-foreground text-center">
-                    Entrando como <span className="text-foreground font-medium">{profile.full_name}</span>
+                    Entrando como <span className="text-foreground font-medium">{profile.full_name}</span>...
                   </p>
-                  <button
-                    onClick={acceptInvite}
-                    disabled={status === 'accepting'}
-                    className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm"
-                  >
-                    {status === 'accepting' ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      `Aceitar e entrar para ${invite.academyName}`
-                    )}
-                  </button>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <button
-                    onClick={acceptInvite}
+                    onClick={() => router.push(`/login?redirect=/convite/${token}`)}
                     className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm"
                   >
-                    Criar conta e aceitar convite
+                    Fazer login e aceitar convite
                   </button>
-                  <p className="text-center text-xs text-muted-foreground">
-                    Já tem conta?{' '}
-                    <button
-                      onClick={() => router.push(`/login?redirect=/convite/${token}`)}
-                      className="text-brand-400 hover:underline"
-                    >
-                      Fazer login
-                    </button>
-                  </p>
+                  <button
+                    onClick={acceptInvite}
+                    className="w-full btn-secondary py-3.5 rounded-xl font-semibold text-sm"
+                  >
+                    Criar conta nova
+                  </button>
                 </div>
               )}
             </motion.div>
