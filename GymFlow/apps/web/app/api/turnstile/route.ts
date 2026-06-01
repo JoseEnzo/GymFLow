@@ -5,10 +5,25 @@
  */
 import { NextResponse } from 'next/server'
 import { turnstileVerifySchema } from '@/lib/validations'
+import { limiters } from '@/lib/rate-limit'
 
 const VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
 
 export async function POST(request: Request) {
+  // Rate limit por IP: 5 tentativas por 15 min (mesmo limiter do fluxo de auth)
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    request.headers.get('x-real-ip') ??
+    'unknown'
+
+  const { success: rateLimitOk } = await limiters.auth.limit(ip)
+  if (!rateLimitOk) {
+    return NextResponse.json(
+      { error: 'Muitas tentativas. Aguarde 15 minutos antes de tentar novamente.' },
+      { status: 429 },
+    )
+  }
+
   // Parse body
   let rawBody: unknown
   try {
@@ -27,8 +42,6 @@ export async function POST(request: Request) {
     // Se não configurado, deixa passar (para dev sem Turnstile)
     return NextResponse.json({ success: true })
   }
-
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined
 
   const form = new URLSearchParams()
   form.set('secret', secretKey)

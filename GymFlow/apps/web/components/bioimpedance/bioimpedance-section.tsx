@@ -150,6 +150,13 @@ export function BioimpedanceSection({
   const [showHistory, setShowHistory] = useState(false)
   const [form, setForm] = useState<BioForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const [bioConsent, setBioConsent] = useState(false)
+
+  function closeModal() {
+    setShowModal(false)
+    setBioConsent(false)
+    setForm(EMPTY_FORM)
+  }
 
   function setField(field: keyof BioForm, value: string) {
     setForm((prev) => {
@@ -217,8 +224,7 @@ export function BioimpedanceSection({
           (a, b) => new Date(b.assessed_at).getTime() - new Date(a.assessed_at).getTime()
         )
       )
-      setForm(EMPTY_FORM)
-      setShowModal(false)
+      closeModal()
       toast.success('Avaliação de bioimpedância salva!')
     } catch (err: unknown) {
       toast.error((err as Error).message ?? 'Erro ao salvar avaliação.')
@@ -362,7 +368,7 @@ export function BioimpedanceSection({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setShowModal(false)}
+              onClick={closeModal}
               className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
             />
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -385,7 +391,7 @@ export function BioimpedanceSection({
                     </div>
                   </div>
                   <button
-                    onClick={() => setShowModal(false)}
+                    onClick={closeModal}
                     className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-200 transition-all"
                   >
                     <X className="w-4 h-4" />
@@ -487,17 +493,33 @@ export function BioimpedanceSection({
                   />
                 </div>
 
+                {/* Consent */}
+                <label className="flex items-start gap-2.5 cursor-pointer mb-4">
+                  <input
+                    type="checkbox"
+                    checked={bioConsent}
+                    onChange={(e) => setBioConsent(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 flex-shrink-0 cursor-pointer accent-brand-500"
+                  />
+                  <span className="text-xs text-muted-foreground leading-relaxed">
+                    Confirmo que o aluno autorizou a coleta e armazenamento destes dados de saúde, conforme a{' '}
+                    <a href="/privacidade" target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:underline">
+                      Política de Privacidade
+                    </a>
+                  </span>
+                </label>
+
                 {/* Actions */}
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setShowModal(false)}
+                    onClick={closeModal}
                     className="btn-secondary flex-1 py-3 rounded-xl text-sm"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={save}
-                    disabled={saving || !form.weight_kg}
+                    disabled={saving || !form.weight_kg || !bioConsent}
                     className="btn-primary flex-1 py-3 rounded-xl text-sm font-semibold"
                   >
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Salvar avaliação'}

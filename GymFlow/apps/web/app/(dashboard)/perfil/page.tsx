@@ -14,6 +14,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
 import { StudentBioView } from '@/components/bioimpedance/student-bio-view'
 import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
 import type { Profile } from '@/types'
 
 // ─── animation variants ────────────────────────────────────────────────────
@@ -308,7 +309,7 @@ export default function PerfilPage() {
       </motion.div>
 
       {/* ── Avatar + nome ── */}
-      <motion.div variants={fadeUp} className="glass rounded-2xl p-6 flex flex-col sm:flex-row items-center sm:items-start gap-5">
+      <motion.div variants={fadeUp} className={cn('glass rounded-2xl p-6 flex flex-col sm:flex-row items-center sm:items-start gap-5 transition-shadow', editing && 'ring-1 ring-brand-500/30')}>
         {/* Avatar */}
         <div className="relative flex-shrink-0">
           <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-brand-500/30">
@@ -364,28 +365,28 @@ export default function PerfilPage() {
           {
             icon: Dumbbell,
             label: 'Treinos',
-            value: loadingStats ? '…' : String(stats.totalWorkouts),
+            value: String(stats.totalWorkouts),
             color: 'text-brand-400',
             bg: 'bg-brand-500/10',
           },
           {
             icon: CalendarDays,
             label: 'Dias ativos',
-            value: loadingStats ? '…' : String(stats.activeDays),
+            value: String(stats.activeDays),
             color: 'text-cyan-400',
             bg: 'bg-cyan-500/10',
           },
           {
             icon: Flame,
             label: 'Sequência',
-            value: loadingStats ? '…' : `${stats.currentStreak}d`,
+            value: `${stats.currentStreak}d`,
             color: 'text-amber-400',
             bg: 'bg-amber-500/10',
           },
           {
             icon: TrendingUp,
             label: 'Volume total',
-            value: loadingStats ? '…' : stats.totalVolume >= 1000
+            value: stats.totalVolume >= 1000
               ? `${(stats.totalVolume / 1000).toFixed(0)}t`
               : `${stats.totalVolume}kg`,
             color: 'text-emerald-400',
@@ -396,17 +397,26 @@ export default function PerfilPage() {
             <div className={cn('w-8 h-8 rounded-xl flex items-center justify-center', bg)}>
               <Icon className={cn('w-4 h-4', color)} />
             </div>
-            <p className={cn('font-display font-bold text-lg leading-none', color)}>{value}</p>
+            {loadingStats ? (
+              <Skeleton className="h-5 w-10 rounded-lg" />
+            ) : (
+              <p className={cn('font-display font-bold text-lg leading-none', color)}>{value}</p>
+            )}
             <p className="text-[11px] text-muted-foreground">{label}</p>
           </div>
         ))}
       </motion.div>
 
       {/* ── Dados pessoais ── */}
-      <motion.div variants={fadeUp} className="glass rounded-2xl p-6 space-y-5">
+      <motion.div variants={fadeUp} className={cn('glass rounded-2xl p-6 space-y-5 transition-shadow', editing && 'ring-1 ring-brand-500/30')}>
         <div className="flex items-center gap-2 mb-1">
           <User className="w-4 h-4 text-brand-400" />
           <h3 className="font-display font-bold text-sm">Dados pessoais</h3>
+          {editing && (
+            <span className="text-[10px] font-medium text-brand-400 bg-brand-500/10 border border-brand-500/20 px-2 py-0.5 rounded-full">
+              editando
+            </span>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
@@ -479,10 +489,15 @@ export default function PerfilPage() {
       </motion.div>
 
       {/* ── Dados físicos ── */}
-      <motion.div variants={fadeUp} className="glass rounded-2xl p-6 space-y-5">
+      <motion.div variants={fadeUp} className={cn('glass rounded-2xl p-6 space-y-5 transition-shadow', editing && 'ring-1 ring-brand-500/30')}>
         <div className="flex items-center gap-2 mb-1">
           <Ruler className="w-4 h-4 text-cyan-400" />
           <h3 className="font-display font-bold text-sm">Dados físicos</h3>
+          {editing && (
+            <span className="text-[10px] font-medium text-brand-400 bg-brand-500/10 border border-brand-500/20 px-2 py-0.5 rounded-full">
+              editando
+            </span>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-x-6 gap-y-4">

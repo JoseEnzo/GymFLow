@@ -1,11 +1,57 @@
 import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
 
-const PUBLIC_ROUTES = ['/', '/login', '/cadastro', '/convite', '/onboarding', '/recuperar-senha', '/redefinir-senha', '/codigo']
+const PUBLIC_ROUTES = ['/', '/login', '/cadastro', '/convite', '/onboarding', '/recuperar-senha', '/redefinir-senha', '/codigo', '/privacidade', '/termos']
 const AUTH_ROUTES = ['/login', '/cadastro', '/recuperar-senha']
+
+// Rotas de API chamadas por serviços externos (sem Origin header) — excluídas do CORS restritivo
+const EXTERNAL_API_ROUTES = ['/api/webhooks/']
+
+function applyCors(request: NextRequest): NextResponse | null {
+  const { pathname } = request.nextUrl
+  if (!pathname.startsWith('/api/')) return null
+
+  // Webhooks de terceiros chegam sem Origin — deixa passar
+  if (EXTERNAL_API_ROUTES.some((r) => pathname.startsWith(r))) return null
+
+  const origin = request.headers.get('origin')
+  if (!origin) return null // Chamadas server-to-server sem Origin são OK
+
+  const appUrl = process.env['NEXT_PUBLIC_APP_URL'] ?? ''
+  const isDev = process.env.NODE_ENV === 'development'
+
+  const isAllowed =
+    (appUrl && origin === appUrl) ||
+    (isDev && (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')))
+
+  // Preflight OPTIONS — responde sem tocar no Supabase
+  if (request.method === 'OPTIONS') {
+    if (!isAllowed) return new NextResponse(null, { status: 403 })
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Max-Age': '86400',
+        Vary: 'Origin',
+      },
+    })
+  }
+
+  if (!isAllowed) {
+    return NextResponse.json({ error: 'Origem não permitida' }, { status: 403 })
+  }
+
+  return null // Origem válida — continua o fluxo normal
+}
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
+
+  // CORS — resposta antecipada para OPTIONS ou origem inválida
+  const corsResponse = applyCors(request)
+  if (corsResponse) return corsResponse
 
   let supabaseResponse = NextResponse.next({ request })
 

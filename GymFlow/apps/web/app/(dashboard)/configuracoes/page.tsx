@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form'
 import {
   User, Building2, Bell, CreditCard, Shield,
   Loader2, Check, ExternalLink, Eye, EyeOff,
+  Download, Trash2, AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -609,6 +610,49 @@ function SegurancaTab() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [form, setForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [exporting, setExporting] = useState(false)
+  const [showDangerZone, setShowDangerZone] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deleting, setDeleting] = useState(false)
+
+  async function handleExport() {
+    setExporting(true)
+    try {
+      const res = await fetch('/api/account/export')
+      if (!res.ok) throw new Error('Falha ao exportar dados')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `gymflow-dados-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Dados exportados com sucesso!')
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? 'Erro ao exportar dados.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (deleteConfirm !== 'EXCLUIR') return
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/account/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmation: 'EXCLUIR' }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error)
+      await supabase.auth.signOut()
+      window.location.href = '/login'
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? 'Erro ao excluir conta.')
+      setDeleting(false)
+    }
+  }
 
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault()
@@ -677,6 +721,81 @@ function SegurancaTab() {
         {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> :
           saved ? <><Check className="w-3.5 h-3.5" /> Senha alterada!</> : 'Alterar senha'}
       </button>
+
+      <div className="divider" />
+
+      {/* Exportar dados */}
+      <div>
+        <p className="text-sm font-medium mb-1">Exportar meus dados</p>
+        <p className="text-xs text-muted-foreground mb-3">
+          Baixe uma cópia de todos os seus dados em formato JSON (LGPD Art. 18).
+        </p>
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={exporting}
+          className="btn-secondary text-sm py-2.5 px-5 rounded-xl flex items-center gap-2"
+        >
+          {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+          Exportar dados
+        </button>
+      </div>
+
+      <div className="divider" />
+
+      {/* Zona de perigo */}
+      <div>
+        <p className="text-sm font-medium text-red-400 mb-1 flex items-center gap-1.5">
+          <AlertTriangle className="w-4 h-4" />
+          Zona de perigo
+        </p>
+        <p className="text-xs text-muted-foreground mb-3">
+          A exclusão é permanente e irreversível. Todos os seus dados, treinos e histórico serão removidos.
+          Se você for proprietário de uma academia, ela também será excluída.
+        </p>
+        {!showDangerZone ? (
+          <button
+            type="button"
+            onClick={() => setShowDangerZone(true)}
+            className="flex items-center gap-2 text-sm text-red-400 border border-red-500/30 hover:bg-red-500/10 px-5 py-2.5 rounded-xl transition-all"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Excluir minha conta
+          </button>
+        ) : (
+          <div className="space-y-3 p-4 rounded-xl border border-red-500/30 bg-red-500/5">
+            <p className="text-xs text-muted-foreground">
+              Digite <span className="font-mono font-bold text-red-400">EXCLUIR</span> para confirmar:
+            </p>
+            <input
+              type="text"
+              value={deleteConfirm}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              placeholder="EXCLUIR"
+              className="field text-sm font-mono"
+              autoComplete="off"
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setShowDangerZone(false); setDeleteConfirm('') }}
+                className="btn-secondary flex-1 text-sm py-2.5 rounded-xl"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirm !== 'EXCLUIR' || deleting}
+                className="flex-1 text-sm py-2.5 rounded-xl bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5"
+              >
+                {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                Excluir conta
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </form>
   )
 }

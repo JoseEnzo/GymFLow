@@ -31,6 +31,20 @@ interface Student {
   status: 'active' | 'inactive'
 }
 
+function computeStreak(timestamps: string[]): number {
+  if (timestamps.length === 0) return 0
+  const daySet = new Set(timestamps.map((t) => t.slice(0, 10)))
+  const cursor = new Date()
+  cursor.setHours(0, 0, 0, 0)
+  if (!daySet.has(cursor.toISOString().slice(0, 10))) cursor.setDate(cursor.getDate() - 1)
+  let streak = 0
+  while (daySet.has(cursor.toISOString().slice(0, 10))) {
+    streak++
+    cursor.setDate(cursor.getDate() - 1)
+  }
+  return streak
+}
+
 function getInitials(name: string | null) {
   if (!name) return 'A'
   return name.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
@@ -60,8 +74,13 @@ function StudentCard({ student }: { student: Student }) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <p className="font-semibold text-sm truncate">{student.full_name ?? 'Aluno'}</p>
-                {student.streak >= 7 && (
-                  <span className="flex items-center gap-0.5 text-amber-400 text-[10px] font-bold">
+                {student.streak > 0 && (
+                  <span className={cn(
+                    'flex items-center gap-0.5 text-[10px] font-bold',
+                    student.streak >= 7 ? 'text-amber-400' :
+                    student.streak >= 3 ? 'text-amber-400/60' :
+                    'text-amber-400/35',
+                  )}>
                     <Flame className="w-3 h-3" /> {student.streak}
                   </span>
                 )}
@@ -82,7 +101,13 @@ function StudentCard({ student }: { student: Student }) {
               <p className="text-[10px] text-muted-foreground">Fichas</p>
             </div>
             <div className="text-center">
-              <p className="font-bold text-sm text-amber-400 flex items-center justify-center gap-0.5">
+              <p className={cn(
+                'font-bold text-sm flex items-center justify-center gap-0.5',
+                student.streak >= 7 ? 'text-amber-400' :
+                student.streak >= 3 ? 'text-amber-400/60' :
+                student.streak > 0 ? 'text-amber-400/35' :
+                'text-muted-foreground/40',
+              )}>
                 <Flame className="w-3 h-3" />{student.streak}
               </p>
               <p className="text-[10px] text-muted-foreground">Streak</p>
@@ -301,48 +326,56 @@ export default function AlunosPage() {
     async function load() {
       if (!currentAcademy) { setLoading(false); return }
 
-      // Load academy members with role=student
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: members, error } = await (supabase as any)
+      const sb = supabase as any
+      const { data: members, error } = await sb
         .from('academy_members')
-        .select(`
-          user_id, is_active,
-          profile:profiles ( full_name, goal )
-        `)
+        .select('user_id, is_active, profile:profiles ( full_name, goal )')
         .eq('academy_id', currentAcademy.id)
         .eq('role', 'student')
 
       if (error || !members) { setLoading(false); return }
 
       const studentIds: string[] = (members as { user_id: string }[]).map((m) => m.user_id)
+      const ids = studentIds.length > 0 ? studentIds : ['00000000-0000-0000-0000-000000000000']
 
-      // Fetch active sheet counts per student
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: sheetsData } = await (supabase as any)
-        .from('workout_sheets')
-        .select('student_id')
-        .eq('academy_id', currentAcademy!.id)
-        .eq('is_active', true)
-        .in('student_id', studentIds.length > 0 ? studentIds : ['00000000-0000-0000-0000-000000000000'])
+      const [{ data: sheetsData }, { data: logsData }] = await Promise.all([
+        sb.from('workout_sheets')
+          .select('student_id')
+          .eq('academy_id', currentAcademy.id)
+          .eq('is_active', true)
+          .in('student_id', ids),
+        sb.from('workout_logs')
+          .select('student_id, created_at')
+          .eq('academy_id', currentAcademy.id)
+          .in('student_id', ids)
+          .order('created_at', { ascending: false }),
+      ])
 
       const sheetCounts: Record<string, number> = {}
-      ;(sheetsData ?? []).forEach((s: { student_id: string }) => {
+      for (const s of (sheetsData ?? [])) {
         sheetCounts[s.student_id] = (sheetCounts[s.student_id] ?? 0) + 1
-      })
+      }
+
+      const workoutAgg: Record<string, { total: number; last: string | null; dates: string[] }> = {}
+      for (const log of (logsData ?? [])) {
+        if (!workoutAgg[log.student_id]) workoutAgg[log.student_id] = { total: 0, last: null, dates: [] }
+        workoutAgg[log.student_id].total++
+        if (!workoutAgg[log.student_id].last) workoutAgg[log.student_id].last = log.created_at
+        workoutAgg[log.student_id].dates.push(log.created_at)
+      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const enriched: Student[] = (members as any[]).map((m) => ({
+      setStudents((members as any[]).map((m) => ({
         id: m.user_id,
         full_name: m.profile?.full_name ?? null,
         goal: m.profile?.goal ?? null,
-        lastWorkout: null,
-        totalWorkouts: 0,
+        lastWorkout: workoutAgg[m.user_id]?.last ?? null,
+        totalWorkouts: workoutAgg[m.user_id]?.total ?? 0,
         activeSheets: sheetCounts[m.user_id] ?? 0,
-        streak: 0,
+        streak: computeStreak(workoutAgg[m.user_id]?.dates ?? []),
         status: m.is_active ? 'active' : 'inactive',
-      }))
-
-      setStudents(enriched)
+      })))
       setLoading(false)
     }
     load()

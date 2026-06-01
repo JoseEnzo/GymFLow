@@ -1289,24 +1289,39 @@ function Footer() {
           {[
             {
               title: 'Produto',
-              links: ['Funcionalidades', 'Preços', 'Segurança', 'Roadmap'],
+              links: [
+                { label: 'Funcionalidades', href: '#' },
+                { label: 'Preços', href: '#' },
+                { label: 'Segurança', href: '#' },
+                { label: 'Roadmap', href: '#' },
+              ],
             },
             {
               title: 'Empresa',
-              links: ['Sobre', 'Blog', 'Parceiros', 'Contato'],
+              links: [
+                { label: 'Sobre', href: '#' },
+                { label: 'Blog', href: '#' },
+                { label: 'Parceiros', href: '#' },
+                { label: 'Contato', href: '#' },
+              ],
             },
             {
               title: 'Legal',
-              links: ['Privacidade', 'Termos', 'Cookies', 'LGPD'],
+              links: [
+                { label: 'Privacidade', href: '/privacidade' },
+                { label: 'Termos', href: '/termos' },
+                { label: 'Cookies', href: '/privacidade#cookies' },
+                { label: 'LGPD', href: '/privacidade#seus-direitos' },
+              ],
             },
           ].map((col) => (
             <div key={col.title}>
               <h4 className="font-semibold text-sm mb-4">{col.title}</h4>
               <ul className="space-y-2.5">
                 {col.links.map((link) => (
-                  <li key={link}>
-                    <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                      {link}
+                  <li key={link.label}>
+                    <a href={link.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                      {link.label}
                     </a>
                   </li>
                 ))}

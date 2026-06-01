@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server'
 
 import { createClient } from '@/lib/supabase/server'
 import { ALLOWED_IMAGE_TYPES, MAX_AVATAR_BYTES } from '@/lib/validations'
+import { limiters } from '@/lib/rate-limit'
 
 export async function POST(request: Request) {
   // 1. Auth
@@ -16,7 +17,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 
-  // 2. Extrair form data
+  // 2. Rate limit por user
+  const { success: rateLimitOk } = await limiters.api.limit(user.id)
+  if (!rateLimitOk) {
+    return NextResponse.json({ error: 'Muitas requisições. Tente novamente em breve.' }, { status: 429 })
+  }
+
+  // 3. Extrair form data
   let formData: FormData
   try {
     formData = await request.formData()
@@ -29,7 +36,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Campo "file" obrigatório' }, { status: 400 })
   }
 
-  // 3. Validar tipo MIME (servidor — não confia no cliente)
+  // 4. Validar tipo MIME (servidor — não confia no cliente)
   if (!(ALLOWED_IMAGE_TYPES as readonly string[]).includes(file.type)) {
     return NextResponse.json(
       { error: `Tipo não permitido. Use: ${ALLOWED_IMAGE_TYPES.join(', ')}` },
@@ -37,18 +44,18 @@ export async function POST(request: Request) {
     )
   }
 
-  // 4. Validar tamanho (servidor)
+  // 5. Validar tamanho (servidor)
   if (file.size > MAX_AVATAR_BYTES) {
     return NextResponse.json({ error: 'Arquivo muito grande. Máximo: 2 MB' }, { status: 413 })
   }
 
-  // 5. Validar magic bytes (primeiros bytes devem bater com o tipo declarado)
+  // 6. Validar magic bytes (primeiros bytes devem bater com o tipo declarado)
   const bytes = new Uint8Array(await file.arrayBuffer())
   if (!isValidImageBytes(bytes, file.type)) {
     return NextResponse.json({ error: 'Arquivo corrompido ou tipo divergente' }, { status: 422 })
   }
 
-  // 6. Upload no Storage (nome = user_id para prevenir sobrescrever arquivos de outros)
+  // 7. Upload no Storage (nome = user_id para prevenir sobrescrever arquivos de outros)
   const ext = file.type.split('/')[1]?.replace('jpeg', 'jpg') ?? 'jpg'
   const path = `avatars/${user.id}.${ext}`
 
@@ -65,7 +72,7 @@ export async function POST(request: Request) {
   const { data: urlData } = (supabase as any).storage.from('avatars').getPublicUrl(path)
   const avatarUrl: string = urlData?.publicUrl ?? ''
 
-  // 7. Atualizar profile
+  // 8. Atualizar profile
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: profile, error: updateError } = await (supabase as any)
     .from('profiles')

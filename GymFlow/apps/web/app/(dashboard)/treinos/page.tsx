@@ -9,10 +9,11 @@ import {
 import Link from 'next/link'
 import { toast } from 'sonner'
 
-import { cn } from '@/lib/utils'
+import { cn, formatRelativeDate } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
 import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/ui/empty-state'
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } }
 const fadeUp = {
@@ -28,6 +29,8 @@ interface Sheet {
   created_at: string
   student_name?: string | null
   exercise_count?: number
+  lastExecution?: string | null
+  executionCount?: number
 }
 
 function MoreVertical({ className }: { className?: string }) {
@@ -138,7 +141,7 @@ function SheetCard({ sheet, isPersonal, onDelete }: {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 mb-4">
+        <div className="grid grid-cols-2 gap-2 mb-3">
           <div className="flex items-center gap-2 p-2 rounded-lg bg-surface-100">
             <Dumbbell className="w-3.5 h-3.5 text-muted-foreground" />
             <div>
@@ -153,6 +156,15 @@ function SheetCard({ sheet, isPersonal, onDelete }: {
               <p className="text-[10px] text-muted-foreground">objetivo</p>
             </div>
           </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 mb-3 text-[11px] text-muted-foreground">
+          <Clock className="w-3 h-3 flex-shrink-0" />
+          {(sheet.executionCount ?? 0) > 0 ? (
+            <span>{formatRelativeDate(sheet.lastExecution!)} · {sheet.executionCount}×</span>
+          ) : (
+            <span className="opacity-50 italic">Ainda não executada</span>
+          )}
         </div>
 
         <div className="flex gap-2">
@@ -202,9 +214,29 @@ export default function TreinosPage() {
       const { data, error } = await query
       if (error) { toast.error('Erro ao carregar fichas.'); setLoading(false); return }
 
-      setSheets((data ?? []).map((s: any) => ({
+      const raw = data ?? []
+      if (raw.length === 0) { setSheets([]); setLoading(false); return }
+
+      const sheetIds = raw.map((s: any) => s.id)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: execData } = await (supabase as any)
+        .from('workout_logs')
+        .select('sheet_id, created_at')
+        .in('sheet_id', sheetIds)
+        .order('created_at', { ascending: false })
+
+      const lastExecMap: Record<string, string> = {}
+      const execCountMap: Record<string, number> = {}
+      for (const log of (execData ?? [])) {
+        if (!lastExecMap[log.sheet_id]) lastExecMap[log.sheet_id] = log.created_at
+        execCountMap[log.sheet_id] = (execCountMap[log.sheet_id] ?? 0) + 1
+      }
+
+      setSheets(raw.map((s: any) => ({
         ...s,
         exercise_count: s.sheet_exercises?.length ?? 0,
+        lastExecution: lastExecMap[s.id] ?? null,
+        executionCount: execCountMap[s.id] ?? 0,
       })))
       setLoading(false)
     }
@@ -291,24 +323,19 @@ export default function TreinosPage() {
 
       {/* Empty state */}
       {!loading && sheets.length === 0 && (
-        <motion.div variants={fadeUp} className="text-center py-20">
-          <div className="w-14 h-14 rounded-2xl bg-surface-200 flex items-center justify-center mx-auto mb-4">
-            <ClipboardList className="w-7 h-7 text-muted-foreground/40" />
-          </div>
-          <p className="font-semibold text-muted-foreground">
-            {isPersonal ? 'Nenhuma ficha criada ainda' : 'Nenhuma ficha atribuída a você'}
-          </p>
-          <p className="text-sm text-muted-foreground/60 mt-1">
-            {isPersonal
+        <motion.div variants={fadeUp}>
+          <EmptyState
+            icon={ClipboardList}
+            title={isPersonal ? 'Nenhuma ficha criada ainda' : 'Nenhuma ficha atribuída a você'}
+            description={isPersonal
               ? 'Crie fichas de treino e atribua aos seus alunos.'
               : 'Aguarde seu personal trainer criar uma ficha para você.'}
-          </p>
-          {isPersonal && (
-            <Link href="/treinos/novo" className="btn-primary text-sm py-2 px-4 rounded-xl mt-4 inline-flex items-center gap-1.5">
-              <Plus className="w-3.5 h-3.5" />
-              Criar primeira ficha
-            </Link>
-          )}
+            action={isPersonal ? {
+              label: 'Criar primeira ficha',
+              href: '/treinos/novo',
+              icon: Plus,
+            } : undefined}
+          />
         </motion.div>
       )}
 

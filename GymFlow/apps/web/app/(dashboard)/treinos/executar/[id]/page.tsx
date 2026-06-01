@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, useRouter } from 'next/navigation'
 import {
@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { cn, formatDuration } from '@/lib/utils'
 import { useInterval } from '@/hooks/use-debounce'
 import { ProgressRing } from '@/components/ui/progress-ring'
+import { Skeleton } from '@/components/ui/skeleton'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -341,8 +342,38 @@ export default function ExecutarTreinoPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="w-6 h-6 animate-spin text-brand-400" />
+      <div className="max-w-lg mx-auto space-y-4">
+        <div className="flex items-center justify-between">
+          <Skeleton className="w-9 h-9 rounded-xl" />
+          <div className="flex flex-col items-center gap-1">
+            <Skeleton className="h-3 w-28 rounded" />
+            <Skeleton className="h-5 w-16 rounded" />
+          </div>
+          <Skeleton className="w-9 h-9 rounded-xl" />
+        </div>
+        <div className="glass rounded-2xl p-4 space-y-3">
+          <Skeleton className="h-2 w-full rounded-full" />
+          <div className="flex justify-center gap-1.5">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="w-1.5 h-1.5 rounded-full" />
+            ))}
+          </div>
+        </div>
+        <div className="glass rounded-2xl p-5 space-y-4">
+          <div className="space-y-2">
+            <Skeleton className="h-3 w-24 rounded" />
+            <Skeleton className="h-6 w-48 rounded" />
+          </div>
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full rounded-xl" />
+            ))}
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <Skeleton className="flex-1 h-12 rounded-xl" />
+          <Skeleton className="flex-1 h-12 rounded-xl" />
+        </div>
       </div>
     )
   }
@@ -366,19 +397,19 @@ export default function ExecutarTreinoPage() {
       <div className="flex items-center justify-between">
         <button
           onClick={() => setShowExitDialog(true)}
-          className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all"
+          className="p-3 rounded-xl text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all"
         >
           <X className="w-5 h-5" />
         </button>
 
         <div className="text-center">
           <p className="text-xs text-muted-foreground truncate max-w-[160px]">{sheetName}</p>
-          <p className="font-mono font-bold text-brand-400">{formatDuration(timer)}</p>
+          <p className="font-mono font-bold text-xl tabular-nums text-brand-400">{formatDuration(timer)}</p>
         </div>
 
         <button
           onClick={() => setSoundEnabled(!soundEnabled)}
-          className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all"
+          className="p-3 rounded-xl text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all"
         >
           {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
         </button>
@@ -428,9 +459,10 @@ export default function ExecutarTreinoPage() {
               <button
                 key={ex.sheetExerciseId}
                 onClick={() => setExerciseIdx(i)}
+                aria-label={`Exercício ${i + 1}`}
                 className={cn(
-                  'h-1.5 rounded-full transition-all duration-300',
-                  i === exerciseIdx ? 'w-6' : 'w-1.5',
+                  'h-2 rounded-full transition-all duration-300',
+                  i === exerciseIdx ? 'w-6' : 'w-2',
                   done ? 'bg-emerald-500' : partial ? 'bg-brand-400' : i === exerciseIdx ? 'bg-brand-500' : 'bg-surface-300'
                 )}
               />
@@ -448,14 +480,17 @@ export default function ExecutarTreinoPage() {
             exit={{ opacity: 0, scale: 0.9 }}
             className="glass rounded-2xl p-6 text-center border border-cyan-500/20 shadow-glow-cyan"
           >
-            <p className="text-xs text-muted-foreground mb-3">⏱️ Descanso</p>
-            <div className="flex items-center justify-center mb-3">
-              <ProgressRing value={restTimer} max={exercise.restSeconds} size={80} color="#06B6D4">
-                <span className="font-mono font-black text-2xl text-cyan-400">{restTimer}</span>
+            <p className="text-sm font-medium text-muted-foreground mb-4">⏱️ Descansando</p>
+            <div className="flex items-center justify-center mb-4">
+              <ProgressRing value={restTimer} max={exercise.restSeconds} size={108} color="#06B6D4" strokeWidth={6}>
+                <span className="font-mono font-black text-4xl tabular-nums text-cyan-400">{restTimer}</span>
               </ProgressRing>
             </div>
             <p className="text-sm text-muted-foreground">Próxima série em breve</p>
-            <button onClick={() => setRestTimer(null)} className="mt-3 text-xs text-cyan-400 hover:underline">
+            <button
+              onClick={() => setRestTimer(null)}
+              className="mt-4 px-5 py-2.5 rounded-xl border border-cyan-500/20 text-sm font-medium text-cyan-400 hover:bg-cyan-500/10 transition-all"
+            >
               Pular descanso
             </button>
           </motion.div>
@@ -481,14 +516,14 @@ export default function ExecutarTreinoPage() {
                 {exercise.sets} x {exercise.reps}
               </span>
             </div>
-            <h3 className="font-display font-bold text-lg leading-snug">{exercise.name}</h3>
+            <h3 className="font-display font-bold text-xl leading-snug">{exercise.name}</h3>
             {exercise.notes && (
               <p className="text-xs text-muted-foreground mt-1 italic">{exercise.notes}</p>
             )}
           </div>
 
           <div className="space-y-2">
-            <div className="grid grid-cols-[2rem_1fr_1fr_2.5rem] gap-2 text-[10px] text-muted-foreground font-medium uppercase tracking-wide px-1">
+            <div className="grid grid-cols-[2.5rem_1fr_1fr_3rem] gap-2 text-[10px] text-muted-foreground font-medium uppercase tracking-wide px-1">
               <span>Série</span><span>Peso (kg)</span><span>Reps</span><span></span>
             </div>
 
@@ -502,7 +537,7 @@ export default function ExecutarTreinoPage() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.05 }}
                 className={cn(
-                  'grid grid-cols-[2rem_1fr_1fr_2.5rem] gap-2 items-center p-2 rounded-xl transition-all',
+                  'grid grid-cols-[2.5rem_1fr_1fr_3rem] gap-2 items-center p-2 rounded-xl transition-all',
                   isPrRow
                     ? 'bg-amber-500/10 border border-amber-500/30'
                     : set.done
@@ -511,7 +546,7 @@ export default function ExecutarTreinoPage() {
                 )}
               >
                 <span className={cn(
-                  'w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold',
+                  'w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold',
                   isPrRow
                     ? 'bg-amber-500/20 text-amber-400'
                     : set.done
@@ -523,33 +558,35 @@ export default function ExecutarTreinoPage() {
 
                 <input
                   type="number"
+                  inputMode="decimal"
                   value={set.weight}
                   onChange={(e) => updateSet(i, 'weight', e.target.value === '' ? '' : Number(e.target.value))}
                   disabled={set.done}
                   placeholder={String(exercise.weightSuggestion ?? 0)}
-                  className={cn('field text-center py-1.5 text-sm font-mono', set.done && 'opacity-60')}
+                  className={cn('field text-center py-2.5 text-base font-mono', set.done && 'opacity-60')}
                 />
 
                 <input
                   type="number"
+                  inputMode="numeric"
                   value={set.reps}
                   onChange={(e) => updateSet(i, 'reps', e.target.value === '' ? '' : Number(e.target.value))}
                   disabled={set.done}
                   placeholder={exercise.reps.split('-')[0]}
-                  className={cn('field text-center py-1.5 text-sm font-mono', set.done && 'opacity-60')}
+                  className={cn('field text-center py-2.5 text-base font-mono', set.done && 'opacity-60')}
                 />
 
                 <button
                   onClick={() => completeSet(i)}
                   disabled={set.done}
                   className={cn(
-                    'w-9 h-9 rounded-xl flex items-center justify-center transition-all',
+                    'w-11 h-11 rounded-xl flex items-center justify-center transition-all',
                     set.done
                       ? 'bg-emerald-500/20 text-emerald-400 cursor-default'
                       : 'bg-brand-500/15 text-brand-400 hover:bg-brand-500/25 active:scale-90'
                   )}
                 >
-                  <Check className="w-4 h-4" />
+                  <Check className="w-5 h-5" />
                 </button>
               </motion.div>
             )})}
@@ -608,30 +645,30 @@ export default function ExecutarTreinoPage() {
         <button
           onClick={() => setExerciseIdx((i) => Math.max(i - 1, 0))}
           disabled={exerciseIdx === 0}
-          className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-border/60 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all disabled:opacity-30"
+          className="flex-1 flex items-center justify-center gap-2 py-4 rounded-xl border border-border/60 text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all disabled:opacity-30"
         >
-          <ChevronLeft className="w-4 h-4" /> Anterior
+          <ChevronLeft className="w-5 h-5" /> Anterior
         </button>
 
         {exerciseIdx < exercises.length - 1 ? (
           <button
             onClick={() => setExerciseIdx((i) => i + 1)}
-            className="flex-1 btn-primary py-3 rounded-xl text-sm"
+            className="flex-1 btn-primary py-4 rounded-xl text-sm flex items-center justify-center gap-2"
           >
-            Próximo <ChevronRight className="w-4 h-4" />
+            Próximo <ChevronRight className="w-5 h-5" />
           </button>
         ) : (
           <button
             onClick={finishWorkout}
             disabled={!allExercisesDone || saving}
             className={cn(
-              'flex-1 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2',
+              'flex-1 py-4 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2',
               allExercisesDone && !saving
                 ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-glow-emerald'
                 : 'bg-surface-200 text-muted-foreground cursor-not-allowed'
             )}
           >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Trophy className="w-4 h-4" /> Concluir treino</>}
+            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Trophy className="w-5 h-5" /> Concluir treino</>}
           </button>
         )}
       </div>
@@ -650,39 +687,94 @@ function WorkoutComplete({
   onViewProgress: () => void
   onExit: () => void
 }) {
+  const [ringValue, setRingValue] = useState(0)
+
+  useEffect(() => {
+    const t = setTimeout(() => setRingValue(100), 500)
+    return () => clearTimeout(t)
+  }, [])
+
+  const particles = useMemo(
+    () =>
+      Array.from({ length: 14 }, (_, i) => ({
+        angle: (i / 14) * 360,
+        color: i % 3 === 0 ? '#10B981' : i % 3 === 1 ? '#1D9E75' : '#06B6D4',
+        delay: 0.3 + (i % 5) * 0.07,
+        distance: 55 + (i % 4) * 10,
+      })),
+    []
+  )
+
+  const staggerStats = {
+    hidden: {},
+    show: { transition: { staggerChildren: 0.1, delayChildren: 0.7 } },
+  }
+  const statFade = {
+    hidden: { opacity: 0, y: 10 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] } },
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       className="max-w-sm mx-auto text-center space-y-6 py-10"
     >
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
-        className="w-24 h-24 rounded-3xl bg-gradient-to-br from-emerald-500/30 to-brand-500/30 flex items-center justify-center mx-auto border border-emerald-500/20 shadow-glow-emerald"
-      >
-        <Trophy className="w-12 h-12 text-emerald-400" />
-      </motion.div>
+      {/* Trophy com anel de progresso + partículas */}
+      <div className="flex justify-center">
+        <div className="relative">
+          <ProgressRing value={ringValue} max={100} size={112} color="#10B981" strokeWidth={4}>
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
+              className="w-[82px] h-[82px] rounded-3xl bg-gradient-to-br from-emerald-500/30 to-brand-500/30 flex items-center justify-center border border-emerald-500/20 shadow-glow-emerald"
+            >
+              <Trophy className="w-10 h-10 text-emerald-400" />
+            </motion.div>
+          </ProgressRing>
+
+          {particles.map((p, i) => (
+            <motion.div
+              key={i}
+              className="absolute top-1/2 left-1/2 w-2 h-2 rounded-full"
+              style={{ background: p.color, marginLeft: -4, marginTop: -4 }}
+              initial={{ x: 0, y: 0, opacity: 0, scale: 0 }}
+              animate={{
+                x: Math.cos((p.angle * Math.PI) / 180) * p.distance,
+                y: Math.sin((p.angle * Math.PI) / 180) * p.distance,
+                opacity: [0, 1, 1, 0],
+                scale: [0, 1.4, 1, 0],
+              }}
+              transition={{ delay: p.delay, duration: 0.9, ease: 'easeOut' }}
+            />
+          ))}
+        </div>
+      </div>
 
       <div>
         <h2 className="text-3xl font-display font-extrabold gradient-text">Treino concluído!</h2>
         <p className="text-muted-foreground mt-2">Excelente trabalho! Continue assim 💪</p>
       </div>
 
-      <div className="glass rounded-2xl p-5 grid grid-cols-3 gap-4">
+      <motion.div
+        variants={staggerStats}
+        initial="hidden"
+        animate="show"
+        className="glass rounded-2xl p-5 grid grid-cols-3 gap-4"
+      >
         {[
           { label: 'Duração', value: formatDuration(timer), icon: Timer },
           { label: 'Séries', value: String(completedSets), icon: Dumbbell },
           { label: 'Calorias', value: '~320', icon: Flame },
         ].map(({ label, value, icon: Icon }) => (
-          <div key={label} className="text-center">
+          <motion.div key={label} variants={statFade} className="text-center">
             <Icon className="w-4 h-4 text-muted-foreground mx-auto mb-1.5" />
             <p className="font-display font-bold text-lg">{value}</p>
             <p className="text-[10px] text-muted-foreground">{label}</p>
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       <div className="flex flex-col gap-2">
         <button onClick={onViewProgress} className="btn-primary w-full py-3.5 rounded-xl font-semibold">

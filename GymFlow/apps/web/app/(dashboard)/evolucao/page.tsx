@@ -15,6 +15,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/ui/empty-state'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 12 },
@@ -267,16 +268,12 @@ export default function EvolucaoPage() {
 
       {/* Empty */}
       {activeTab === 'treinos' && !loadingWeekly && weeklyData.length === 0 && (
-        <motion.div custom={1} variants={fadeUp} initial="hidden" animate="show"
-          className="text-center py-20"
-        >
-          <div className="w-14 h-14 rounded-2xl bg-surface-200 flex items-center justify-center mx-auto mb-4">
-            <BarChart3 className="w-7 h-7 text-muted-foreground/40" />
-          </div>
-          <p className="font-semibold text-muted-foreground">Nenhum dado ainda</p>
-          <p className="text-sm text-muted-foreground/60 mt-1">
-            Complete treinos para ver sua evolução aqui.
-          </p>
+        <motion.div custom={1} variants={fadeUp} initial="hidden" animate="show">
+          <EmptyState
+            icon={BarChart3}
+            title="Nenhum dado ainda"
+            description="Complete treinos para ver sua evolução aqui."
+          />
         </motion.div>
       )}
 

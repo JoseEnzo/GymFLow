@@ -1,19 +1,30 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 
 import { createClient } from '@/lib/supabase/server'
 import { stripe } from '@/lib/stripe'
+import { limiters } from '@/lib/rate-limit'
+
+const academyIdSchema = z.string().uuid('academyId inválido')
 
 export async function GET(request: Request) {
   const supabaseRaw = await createClient()
   const { data: { user } } = await supabaseRaw.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
-  const { searchParams } = new URL(request.url)
-  const academyId = searchParams.get('academyId')
-
-  if (!academyId) {
-    return NextResponse.json({ error: 'academyId obrigatório' }, { status: 400 })
+  const { success } = await limiters.api.limit(user.id)
+  if (!success) {
+    return NextResponse.json({ error: 'Muitas requisições. Tente novamente em breve.' }, { status: 429 })
   }
+
+  const { searchParams } = new URL(request.url)
+  const parsed = academyIdSchema.safeParse(searchParams.get('academyId'))
+
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'academyId inválido' }, { status: 400 })
+  }
+
+  const academyId = parsed.data
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = supabaseRaw as any

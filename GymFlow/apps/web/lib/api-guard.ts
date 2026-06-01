@@ -9,12 +9,13 @@ import { NextResponse } from 'next/server'
 import type { ZodSchema, ZodError } from 'zod'
 
 import { createClient } from '@/lib/supabase/server'
+import { limiters } from '@/lib/rate-limit'
 
 type GuardedOk<T> = { user: { id: string; email?: string }; body: T }
 type GuardedErr = NextResponse
 
 /**
- * Verifica autenticação e parseia o body com Zod.
+ * Verifica autenticação, aplica rate limit por usuário e parseia o body com Zod.
  * Retorna { user, body } em caso de sucesso ou uma NextResponse de erro.
  */
 export async function guardRoute<T>(
@@ -29,13 +30,22 @@ export async function guardRoute<T>(
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 
-  // 2. Body size guard (≤ 64 KB para JSON)
+  // 2. Rate limit por user (30 req/min)
+  const { success } = await limiters.api.limit(user.id)
+  if (!success) {
+    return NextResponse.json(
+      { error: 'Muitas requisições. Tente novamente em breve.' },
+      { status: 429 },
+    )
+  }
+
+  // 3. Body size guard (≤ 64 KB para JSON)
   const contentLength = request.headers.get('content-length')
   if (contentLength && parseInt(contentLength, 10) > 64 * 1024) {
     return NextResponse.json({ error: 'Payload muito grande' }, { status: 413 })
   }
 
-  // 3. Parse JSON safely
+  // 4. Parse JSON safely
   let rawBody: unknown
   try {
     rawBody = await request.json()
@@ -43,7 +53,7 @@ export async function guardRoute<T>(
     return NextResponse.json({ error: 'JSON inválido' }, { status: 400 })
   }
 
-  // 4. Zod parse
+  // 5. Zod parse
   const result = schema.safeParse(rawBody)
   if (!result.success) {
     const firstError = (result.error as ZodError).errors[0]
@@ -57,7 +67,8 @@ export async function guardRoute<T>(
 }
 
 /**
- * Verifica apenas autenticação (sem body).
+ * Verifica autenticação e aplica rate limit por usuário (sem body).
+ * Retorna { id, email } em caso de sucesso ou uma NextResponse de erro.
  */
 export async function requireAuth(): Promise<{ id: string; email?: string } | NextResponse> {
   const supabase = await createClient()
@@ -65,6 +76,14 @@ export async function requireAuth(): Promise<{ id: string; email?: string } | Ne
 
   if (error || !user) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  }
+
+  const { success } = await limiters.api.limit(user.id)
+  if (!success) {
+    return NextResponse.json(
+      { error: 'Muitas requisições. Tente novamente em breve.' },
+      { status: 429 },
+    )
   }
 
   return { id: user.id, email: user.email }

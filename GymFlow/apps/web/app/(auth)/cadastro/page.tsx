@@ -24,6 +24,9 @@ const schema = z.object({
     .regex(/[A-Z]/, 'Deve conter letra maiúscula')
     .regex(/[0-9]/, 'Deve conter número'),
   confirmPassword: z.string(),
+  termsAccepted: z.literal(true, {
+    errorMap: () => ({ message: 'Você precisa aceitar os termos para continuar' }),
+  }),
 }).refine((d) => d.password === d.confirmPassword, {
   message: 'Senhas não coincidem',
   path: ['confirmPassword'],
@@ -446,13 +449,23 @@ function CadastroInner() {
               </motion.div>
 
               {/* Terms */}
-              <motion.div variants={fadeUp}>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Ao criar a conta você aceita nossos{' '}
-                  <a href="#" className="text-brand-400 hover:underline">Termos de Uso</a>
-                  {' '}e{' '}
-                  <a href="#" className="text-brand-400 hover:underline">Política de Privacidade</a>.
-                </p>
+              <motion.div variants={fadeUp} className="space-y-1">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    {...register('termsAccepted')}
+                    type="checkbox"
+                    className="mt-0.5 w-4 h-4 flex-shrink-0 cursor-pointer accent-brand-500"
+                  />
+                  <span className="text-xs text-muted-foreground leading-relaxed">
+                    Li e aceito os{' '}
+                    <a href="/termos" target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:underline">Termos de Uso</a>
+                    {' '}e a{' '}
+                    <a href="/privacidade" target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:underline">Política de Privacidade</a>
+                  </span>
+                </label>
+                {errors.termsAccepted && (
+                  <p className="text-xs text-red-400 pl-6">{errors.termsAccepted.message}</p>
+                )}
               </motion.div>
 
               {/* Submit */}

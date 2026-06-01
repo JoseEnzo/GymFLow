@@ -52,22 +52,41 @@ const BIO_TABS: { key: BioKey; label: string; unit: string; color: string; lower
   { key: 'bmi',            label: 'IMC',       unit: '',    color: '#06B6D4'  },
 ]
 
-const MEASURE_CARDS: { key: MeasureKey; label: string; lowerIsBetter?: boolean }[] = [
-  { key: 'waist_cm',        label: 'Cintura',       lowerIsBetter: true  },
-  { key: 'abdomen_cm',      label: 'Abdômen',       lowerIsBetter: true  },
-  { key: 'hip_cm',          label: 'Quadril'                              },
-  { key: 'chest_cm',        label: 'Tórax'                                },
-  { key: 'thigh_right_cm',  label: 'Coxa D'                               },
-  { key: 'arm_right_cm',    label: 'Braço D'                              },
-  { key: 'calf_right_cm',   label: 'Panturrilha D'                        },
-  { key: 'shoulder_cm',     label: 'Ombro'                                },
-  { key: 'neck_cm',         label: 'Pescoço',       lowerIsBetter: true  },
-  { key: 'arm_left_cm',     label: 'Braço E'                              },
-  { key: 'forearm_right_cm',label: 'Antebraço D'                          },
-  { key: 'thigh_left_cm',   label: 'Coxa E'                               },
-  { key: 'calf_left_cm',    label: 'Panturrilha E'                        },
-  { key: 'forearm_left_cm', label: 'Antebraço E'                          },
+type MeasureCardDef = { key: MeasureKey; label: string; lowerIsBetter?: boolean }
+
+const MEASURE_GROUPS: { label: string; cards: MeasureCardDef[] }[] = [
+  {
+    label: 'Membros superiores',
+    cards: [
+      { key: 'neck_cm',          label: 'Pescoço',     lowerIsBetter: true },
+      { key: 'shoulder_cm',      label: 'Ombro'                             },
+      { key: 'chest_cm',         label: 'Tórax'                             },
+      { key: 'arm_right_cm',     label: 'Braço D'                           },
+      { key: 'arm_left_cm',      label: 'Braço E'                           },
+      { key: 'forearm_right_cm', label: 'Antebraço D'                       },
+      { key: 'forearm_left_cm',  label: 'Antebraço E'                       },
+    ],
+  },
+  {
+    label: 'Core',
+    cards: [
+      { key: 'waist_cm',   label: 'Cintura', lowerIsBetter: true },
+      { key: 'abdomen_cm', label: 'Abdômen', lowerIsBetter: true },
+      { key: 'hip_cm',     label: 'Quadril'                       },
+    ],
+  },
+  {
+    label: 'Membros inferiores',
+    cards: [
+      { key: 'thigh_right_cm', label: 'Coxa D'        },
+      { key: 'thigh_left_cm',  label: 'Coxa E'         },
+      { key: 'calf_right_cm',  label: 'Panturrilha D' },
+      { key: 'calf_left_cm',   label: 'Panturrilha E' },
+    ],
+  },
 ]
+
+const MEASURE_CARDS_FLAT = MEASURE_GROUPS.flatMap((g) => g.cards)
 
 const RING_COLORS = {
   fat:    '#EF9F27',
@@ -285,9 +304,13 @@ export function BodyEvolutionSection() {
   const bioLast  = bioChart.at(-1)?.value
 
   // ── Active measure cards ─────────────────────────────────────
-  const availCards = useMemo(() =>
-    MEASURE_CARDS.filter(({ key }) => meas.filter((r) => r[key] != null).length >= 1),
+  const availGroups = useMemo(() =>
+    MEASURE_GROUPS
+      .map((g) => ({ ...g, cards: g.cards.filter(({ key }) => meas.some((r) => r[key] != null)) }))
+      .filter((g) => g.cards.length > 0),
   [meas])
+
+  const availCards = useMemo(() => availGroups.flatMap((g) => g.cards), [availGroups])
 
   // auto-select first card
   useEffect(() => {
@@ -297,7 +320,7 @@ export function BodyEvolutionSection() {
   }, [availCards])
 
   // ── Measure chart ────────────────────────────────────────────
-  const measOpt   = MEASURE_CARDS.find((c) => c.key === activeMeasKey)
+  const measOpt   = MEASURE_CARDS_FLAT.find((c) => c.key === activeMeasKey)
   const measChart = activeMeasKey
     ? meas.filter((r) => r[activeMeasKey] != null)
         .map((r) => ({ date: fmtDate(r.measured_at), value: r[activeMeasKey] as number }))
@@ -473,30 +496,47 @@ export function BodyEvolutionSection() {
             Medidas Corporais
           </motion.p>
 
-          {/* Cards grid */}
-          <motion.div custom={6} variants={fadeUp} initial="hidden" animate="show"
-            className="grid grid-cols-2 sm:grid-cols-3 gap-3"
-          >
-            {availCards.map(({ key, label, lowerIsBetter }) => {
-              const pts = meas.filter((r) => r[key] != null)
-              const current = pts.at(-1)?.[key] as number
-              const first   = pts[0]?.[key] as number
-              const sparkData = pts.map((r) => ({ date: fmtDate(r.measured_at), [key]: r[key] }))
-              return (
-                <MeasureCard
-                  key={key}
-                  label={label}
-                  current={current}
-                  first={first}
-                  sparkData={sparkData}
-                  dataKey={key}
-                  selected={activeMeasKey === key}
-                  lowerIsBetter={lowerIsBetter}
-                  onClick={() => setActiveMeasKey(key)}
-                />
-              )
-            })}
-          </motion.div>
+          {/* Cards grid — grouped by region */}
+          {availGroups.map((group, gi) => (
+            <div key={group.label} className="space-y-2">
+              <motion.p
+                custom={6 + gi * 2}
+                variants={fadeUp}
+                initial="hidden"
+                animate="show"
+                className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest pl-0.5"
+              >
+                {group.label}
+              </motion.p>
+              <motion.div
+                custom={7 + gi * 2}
+                variants={fadeUp}
+                initial="hidden"
+                animate="show"
+                className="grid grid-cols-2 sm:grid-cols-3 gap-3"
+              >
+                {group.cards.map(({ key, label, lowerIsBetter }) => {
+                  const pts = meas.filter((r) => r[key] != null)
+                  const current = pts.at(-1)?.[key] as number
+                  const first   = pts[0]?.[key] as number
+                  const sparkData = pts.map((r) => ({ date: fmtDate(r.measured_at), [key]: r[key] }))
+                  return (
+                    <MeasureCard
+                      key={key}
+                      label={label}
+                      current={current}
+                      first={first}
+                      sparkData={sparkData}
+                      dataKey={key}
+                      selected={activeMeasKey === key}
+                      lowerIsBetter={lowerIsBetter}
+                      onClick={() => setActiveMeasKey(key)}
+                    />
+                  )
+                })}
+              </motion.div>
+            </div>
+          ))}
 
           {/* Expanded chart for selected measure */}
           <AnimatePresence mode="wait">
