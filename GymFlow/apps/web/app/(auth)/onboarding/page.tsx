@@ -279,7 +279,7 @@ function OnboardingContent() {
                 </button>
 
                 <button
-                  onClick={() => { setRole('personal'); setStep('plan') }}
+                  onClick={() => { setRole('personal'); setPlan('personal'); setStep('plan') }}
                   className="flex items-center gap-4 p-5 rounded-2xl border border-border/60 hover:border-brand-500/40 hover:bg-brand-500/5 text-left transition-all duration-200 group"
                 >
                   <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-500/15 flex-shrink-0 group-hover:scale-105 transition-transform">
@@ -313,8 +313,8 @@ function OnboardingContent() {
             </motion.div>
           )}
 
-          {/* ── STEP: plan (owner / personal independente) ── */}
-          {step === 'plan' && (
+          {/* ── STEP: plan (owner) ── */}
+          {step === 'plan' && role !== 'personal' && (
             <motion.div key="plan" variants={slide} initial="hidden" animate="show" exit="exit" className="space-y-6">
               <div>
                 <button onClick={() => setStep('role')} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors">
@@ -395,16 +395,79 @@ function OnboardingContent() {
               )}
 
               <button
-                onClick={() => role === 'personal'
-                  ? saveAcademy(`${firstName} Personal`)
-                  : setStep('academy')
-                }
+                onClick={() => setStep('academy')}
                 disabled={saving}
                 className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
               >
                 {saving
                   ? <Loader2 className="w-4 h-4 animate-spin" />
                   : <>Continuar <ArrowRight className="w-4 h-4" /></>
+                }
+              </button>
+            </motion.div>
+          )}
+
+          {/* ── STEP: plan (personal independente) ── */}
+          {step === 'plan' && role === 'personal' && (
+            <motion.div key="plan-personal" variants={slide} initial="hidden" animate="show" exit="exit" className="space-y-6">
+              <div>
+                <button onClick={() => setStep('role')} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors">
+                  <ArrowLeft className="w-3.5 h-3.5" /> Voltar
+                </button>
+                <h1 className="text-2xl font-display font-bold">Plano Personal 💪</h1>
+                <p className="text-muted-foreground mt-1.5 text-sm">
+                  Gerencie seus alunos de forma independente.
+                </p>
+              </div>
+
+              <div className="p-5 rounded-2xl border text-left" style={{ borderColor: '#10B981', background: '#10B9810D' }}>
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0" style={{ background: '#10B98120' }}>
+                    🏋️
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="font-display font-bold text-sm" style={{ color: '#10B981' }}>Personal</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">
+                        30 dias grátis
+                      </span>
+                    </div>
+                    <p className="text-lg font-display font-bold mb-2">
+                      R$ 97<span className="text-xs font-normal text-muted-foreground">/mês</span>
+                    </p>
+                    <ul className="space-y-1">
+                      {[
+                        'Alunos ilimitados',
+                        'Fichas de treino ilimitadas',
+                        'Histórico e evolução por aluno',
+                        'Convites por código',
+                        'Dashboard completo',
+                      ].map((f) => (
+                        <li key={f} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Check className="w-3 h-3 flex-shrink-0 text-emerald-400" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                <Mail className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-emerald-300/80 leading-relaxed">
+                  Você terá <strong className="text-emerald-300">30 dias grátis</strong>. Após esse período, será cobrado R$ 97/mês automaticamente. Cancele quando quiser.
+                </p>
+              </div>
+
+              <button
+                onClick={() => saveAcademy(`${firstName} Personal`)}
+                disabled={saving}
+                className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
+              >
+                {saving
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <><Check className="w-4 h-4" /> Começar 30 dias grátis</>
                 }
               </button>
             </motion.div>

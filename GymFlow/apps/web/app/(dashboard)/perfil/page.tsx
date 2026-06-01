@@ -79,7 +79,8 @@ function Field({
 
 // ─── main page ─────────────────────────────────────────────────────────────
 export default function PerfilPage() {
-  const { profile: storeProfile, setProfile, currentAcademy } = useAuthStore()
+  const { profile: storeProfile, setProfile, currentAcademy, currentRole } = useAuthStore()
+  const isStudent = currentRole === 'student'
   const supabase = createClient()
 
   const [profile, setLocalProfile] = useState<Profile | null>(storeProfile)
@@ -358,8 +359,8 @@ export default function PerfilPage() {
         </div>
       </motion.div>
 
-      {/* ── Stats rápidos ── */}
-      <motion.div variants={fadeUp} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* ── Stats rápidos — apenas alunos ── */}
+      {isStudent && <motion.div variants={fadeUp} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           {
             icon: Dumbbell,
@@ -400,7 +401,7 @@ export default function PerfilPage() {
             <p className="text-[11px] text-muted-foreground">{label}</p>
           </div>
         ))}
-      </motion.div>
+      </motion.div>}
 
       {/* ── Dados pessoais ── */}
       <motion.div variants={fadeUp} className="glass rounded-2xl p-6 space-y-5">
@@ -460,8 +461,8 @@ export default function PerfilPage() {
             </div>
           </Field>
 
-          {/* Objetivo */}
-          <Field label="Objetivo" value={profile?.goal ?? ''} editing={editing}>
+          {/* Objetivo — apenas alunos e personais */}
+          {isStudent && <Field label="Objetivo" value={profile?.goal ?? ''} editing={editing}>
             <div className="relative">
               <Target className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <select
@@ -474,12 +475,12 @@ export default function PerfilPage() {
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
             </div>
-          </Field>
+          </Field>}
         </div>
       </motion.div>
 
-      {/* ── Dados físicos ── */}
-      <motion.div variants={fadeUp} className="glass rounded-2xl p-6 space-y-5">
+      {/* ── Dados físicos — apenas alunos ── */}
+      {isStudent && <motion.div variants={fadeUp} className="glass rounded-2xl p-6 space-y-5">
         <div className="flex items-center gap-2 mb-1">
           <Ruler className="w-4 h-4 text-cyan-400" />
           <h3 className="font-display font-bold text-sm">Dados físicos</h3>
@@ -567,10 +568,10 @@ export default function PerfilPage() {
             </div>
           </motion.div>
         )}
-      </motion.div>
+      </motion.div>}
 
-      {/* ── Bioimpedância & Medidas ── */}
-      {profile && (
+      {/* ── Bioimpedância & Medidas — apenas alunos ── */}
+      {isStudent && profile && (
         <motion.div variants={fadeUp}>
           <StudentBioView studentId={profile.id} />
         </motion.div>

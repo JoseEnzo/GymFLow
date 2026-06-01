@@ -51,6 +51,12 @@ export async function POST(request: Request) {
 
   if (academyError) {
     console.error('[academy] insert error:', academyError)
+    if (academyError.code === '23505' && academyError.message.includes('cnpj')) {
+      return NextResponse.json(
+        { error: 'Este CNPJ já está cadastrado em outra academia. Verifique seus dados ou entre em contato com o suporte.' },
+        { status: 409 }
+      )
+    }
     return NextResponse.json({ error: academyError.message }, { status: 500 })
   }
 
@@ -70,11 +76,11 @@ export async function POST(request: Request) {
   const origin = request.headers.get('origin') ?? process.env['NEXT_PUBLIC_APP_URL'] ?? ''
 
   // Plano pago → gera checkout URL na mesma request (evita segundo roundtrip com RLS)
-  if (plan === 'starter' || plan === 'pro') {
+  if (plan === 'starter' || plan === 'pro' || plan === 'personal') {
     try {
       const session = await createCheckoutSession({
         academyId: academy.id,
-        planId: plan as 'starter' | 'pro',
+        planId: plan as 'starter' | 'pro' | 'personal',
         successUrl: `${origin}/configuracoes?tab=plano&success=1`,
         cancelUrl:  `${origin}/configuracoes?tab=plano`,
       })

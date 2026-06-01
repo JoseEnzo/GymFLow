@@ -7,7 +7,7 @@ import {
   Dumbbell, ChevronRight, Plus, UserPlus, Building2,
   ClipboardList, ArrowRight, Flame, AlertTriangle, Clock, Play, CheckCircle2,
   ShieldCheck, BarChart3, BookOpen, CalendarCheck, Trophy, Timer, Check,
-  Video, Sparkles, X, Loader2,
+  Video, Sparkles, X, Loader2, Settings,
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import Link from 'next/link'
@@ -782,11 +782,10 @@ export default function DashboardPage() {
               {/* Ações rápidas */}
               <div className="glass rounded-2xl p-4">
                 <h3 className="font-display font-bold text-sm mb-3">Ações rápidas</h3>
-                <QuickAction icon={UserPlus}    label="Convidar aluno"        href="/alunos"       color="#06B6D4" />
-                <QuickAction icon={ShieldCheck} label="Gerenciar personais"   href="/personais"    color="#8B5CF6" />
-                <QuickAction icon={Dumbbell}    label="Nova ficha de treino"  href="/treinos/novo" color="#6366F1" />
-                <QuickAction icon={BarChart3}   label="Ver frequência"        href="/frequencia"   color="#F59E0B" />
-                <QuickAction icon={BookOpen}    label="Banco de exercícios"   href="/exercicios"   color="#10B981" />
+                <QuickAction icon={UserPlus}    label="Convidar aluno"          href="/alunos"        color="#06B6D4" />
+                <QuickAction icon={ShieldCheck} label="Convidar personal"      href="/personais"    color="#8B5CF6" />
+                <QuickAction icon={Activity}    label="Frequência da academia" href="/frequencia"   color="#F59E0B" />
+                <QuickAction icon={Settings}    label="Configurações"          href="/configuracoes" color="#6366F1" />
               </div>
 
               {/* Personais */}

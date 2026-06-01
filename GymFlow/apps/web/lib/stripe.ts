@@ -16,6 +16,11 @@ export const PLANS = {
     name: 'Pro',
     price: 19900,
   },
+  personal: {
+    priceId: process.env['STRIPE_PRICE_PERSONAL_MONTHLY']!,
+    name: 'Personal',
+    price: 9700,
+  },
 } as const
 
 export const STUDENT_PLANS_STRIPE = {
@@ -44,7 +49,7 @@ export async function createCheckoutSession({
   cancelUrl,
 }: {
   academyId: string
-  planId: 'starter' | 'pro'
+  planId: 'starter' | 'pro' | 'personal'
   customerId?: string
   successUrl: string
   cancelUrl: string
@@ -61,7 +66,7 @@ export async function createCheckoutSession({
     metadata: { academyId, planId },
     subscription_data: {
       metadata: { academyId },
-      ...(planId === 'starter' ? { trial_period_days: 30 } : {}),
+      ...(planId === 'starter' || planId === 'personal' ? { trial_period_days: 30 } : {}),
     },
     locale: 'pt-BR',
   })

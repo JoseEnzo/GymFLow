@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, ClipboardList, CalendarDays,
-  History, TrendingUp, Users, BookOpen, Activity,
+  History, TrendingUp, Users, BookOpen, Activity, UserCog, BarChart2,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 
@@ -19,10 +19,19 @@ const STUDENT_ITEMS = [
   { label: 'Evolução',  href: '/evolucao',  icon: TrendingUp      },
 ]
 
-const STAFF_ITEMS = [
+// Owner: foco em administração
+const OWNER_ITEMS = [
   { label: 'Início',     href: '/dashboard',  icon: LayoutDashboard },
   { label: 'Alunos',     href: '/alunos',     icon: Users           },
-  { label: 'Treinos',    href: '/treinos',    icon: ClipboardList   },
+  { label: 'Personais',  href: '/personais',  icon: UserCog         },
+  { label: 'Frequência', href: '/frequencia', icon: BarChart2       },
+]
+
+// Personal: foco em treino
+const PERSONAL_ITEMS = [
+  { label: 'Início',     href: '/dashboard',  icon: LayoutDashboard },
+  { label: 'Alunos',     href: '/alunos',     icon: Users           },
+  { label: 'Fichas',     href: '/treinos',    icon: ClipboardList   },
   { label: 'Exercícios', href: '/exercicios', icon: BookOpen        },
   { label: 'Frequência', href: '/frequencia', icon: Activity        },
 ]
@@ -33,7 +42,9 @@ export function BottomNav() {
 
   if (!currentRole) return null
 
-  const items = currentRole === 'student' ? STUDENT_ITEMS : STAFF_ITEMS
+  const items =
+    currentRole === 'student' ? STUDENT_ITEMS :
+    currentRole === 'owner'   ? OWNER_ITEMS   : PERSONAL_ITEMS
 
   function isActive(href: string) {
     return pathname === href || (href !== '/dashboard' && pathname.startsWith(href))

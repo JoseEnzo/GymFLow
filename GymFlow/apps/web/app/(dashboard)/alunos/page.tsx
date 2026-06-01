@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import {
   Search, UserPlus, Filter, Dumbbell, Flame,
   Clock, ChevronRight, Copy, Loader2, Users,
-  Link2, CheckCircle2,
+  Link2, CheckCircle2, ClipboardList,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -36,14 +36,14 @@ function getInitials(name: string | null) {
   return name.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 }
 
-function StudentCard({ student }: { student: Student }) {
+function StudentCard({ student, isPersonal }: { student: Student; isPersonal?: boolean }) {
   const colors = ['#6366F1', '#06B6D4', '#10B981', '#F59E0B', '#F97316', '#EC4899']
   const color = colors[(student.full_name?.charCodeAt(0) ?? 0) % colors.length]!
 
   return (
     <motion.div variants={fadeUp}>
-      <Link href={`/alunos/${student.id}`}>
-        <div className="glass rounded-2xl p-4 hover:border-brand-500/20 hover:-translate-y-0.5 transition-all duration-300 hover:shadow-card-hover cursor-pointer group">
+      <div className="glass rounded-2xl p-4 hover:border-brand-500/20 hover:-translate-y-0.5 transition-all duration-300 hover:shadow-card-hover">
+        <Link href={`/alunos/${student.id}`} className="block">
           <div className="flex items-start gap-3">
             <div className="relative flex-shrink-0">
               <div
@@ -69,7 +69,7 @@ function StudentCard({ student }: { student: Student }) {
               <p className="text-[11px] text-muted-foreground truncate">{student.goal ?? 'Sem objetivo definido'}</p>
             </div>
 
-            <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors flex-shrink-0 mt-0.5" />
+            <ChevronRight className="w-4 h-4 text-muted-foreground/40 flex-shrink-0 mt-0.5" />
           </div>
 
           <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-border/40">
@@ -95,8 +95,21 @@ function StudentCard({ student }: { student: Student }) {
               <span>Último treino: {formatRelativeDate(student.lastWorkout)}</span>
             </div>
           )}
-        </div>
-      </Link>
+        </Link>
+
+        {/* Ação rápida exclusiva para personal */}
+        {isPersonal && (
+          <div className="mt-3 pt-3 border-t border-border/40">
+            <Link
+              href={`/treinos/novo?studentId=${student.id}`}
+              className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-semibold transition-all bg-brand-500/10 text-brand-300 hover:bg-brand-500/20 border border-brand-500/20"
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              {student.activeSheets > 0 ? 'Nova ficha' : 'Atribuir ficha'}
+            </Link>
+          </div>
+        )}
+      </div>
     </motion.div>
   )
 }
@@ -366,7 +379,9 @@ export default function AlunosPage() {
       {/* Header */}
       <motion.div variants={fadeUp} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="section-title">Alunos</h2>
+          <h2 className="section-title">
+            {currentRole === 'personal' ? 'Meus alunos' : 'Alunos'}
+          </h2>
           <p className="section-subtitle mt-1">
             {loading ? 'Carregando...' : `${students.length} ${students.length === 1 ? 'aluno' : 'alunos'} · ${students.filter((s) => s.status === 'active').length} ativos`}
           </p>
@@ -382,8 +397,13 @@ export default function AlunosPage() {
                 Convidar personal
               </button>
             )}
-            {/* "Convidar aluno" só aparece para owner ou personal — nunca para student, e só após o role ser conhecido */}
-            {currentRole === 'owner' && (
+            {currentRole === 'personal' && (
+              <Link href="/treinos/novo" className="btn-secondary text-sm py-2.5 px-5 rounded-xl flex items-center gap-2">
+                <ClipboardList className="w-4 h-4" />
+                Nova ficha
+              </Link>
+            )}
+            {(currentRole === 'owner' || currentRole === 'personal') && (
               <button
                 onClick={() => setInviteRole(inviteRole === 'student' ? null : 'student')}
                 className="btn-primary text-sm py-2.5 px-5 rounded-xl"
@@ -445,7 +465,7 @@ export default function AlunosPage() {
       {!loading && filtered.length > 0 && (
         <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtered.map((student) => (
-            <StudentCard key={student.id} student={student} />
+            <StudentCard key={student.id} student={student} isPersonal={currentRole === 'personal'} />
           ))}
         </motion.div>
       )}

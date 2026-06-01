@@ -939,6 +939,25 @@ function HowItWorksSection() {
 // ──────────────────────────────────────────────
 const plans = [
   {
+    id: 'personal',
+    name: 'Personal',
+    price: 97,
+    period: '/mês',
+    description: 'Para personal trainers independentes',
+    features: [
+      'Até 20 alunos',
+      'Fichas ilimitadas',
+      'Biblioteca de exercícios',
+      'Histórico de treinos',
+      'Convites por link',
+      '14 dias grátis',
+    ],
+    cta: 'Começar grátis',
+    href: '/cadastro?plan=personal',
+    popular: false,
+    color: '#8B5CF6',
+  },
+  {
     id: 'starter',
     name: 'Starter',
     price: 197,
@@ -1270,25 +1289,40 @@ function Footer() {
           {[
             {
               title: 'Produto',
-              links: ['Funcionalidades', 'Preços', 'Segurança', 'Roadmap'],
+              links: [
+                { label: 'Funcionalidades', href: '#funcionalidades' },
+                { label: 'Preços', href: '#preços' },
+                { label: 'Segurança', href: '#' },
+                { label: 'Roadmap', href: '#' },
+              ],
             },
             {
               title: 'Empresa',
-              links: ['Sobre', 'Blog', 'Parceiros', 'Contato'],
+              links: [
+                { label: 'Sobre', href: '#sobre' },
+                { label: 'Blog', href: '#' },
+                { label: 'Parceiros', href: '#' },
+                { label: 'Contato', href: '#' },
+              ],
             },
             {
               title: 'Legal',
-              links: ['Privacidade', 'Termos', 'Cookies', 'LGPD'],
+              links: [
+                { label: 'Privacidade', href: '/privacidade' },
+                { label: 'Termos', href: '#' },
+                { label: 'Cookies', href: '/privacidade#cookies' },
+                { label: 'LGPD', href: '/privacidade#lgpd' },
+              ],
             },
           ].map((col) => (
             <div key={col.title}>
               <h4 className="font-semibold text-sm mb-4">{col.title}</h4>
               <ul className="space-y-2.5">
                 {col.links.map((link) => (
-                  <li key={link}>
-                    <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                      {link}
-                    </a>
+                  <li key={link.label}>
+                    <Link href={link.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                      {link.label}
+                    </Link>
                   </li>
                 ))}
               </ul>
