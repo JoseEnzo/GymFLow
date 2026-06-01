@@ -1,0 +1,3 @@
+setup:
+  project: gymflow-s-org
+  config: dev
