@@ -1,3 +1,0 @@
-Push funcionando com sucesso!
-Data: 26/05/2026
-Repositório sincronizado com o GitHub.
