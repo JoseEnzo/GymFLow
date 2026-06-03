@@ -42,6 +42,7 @@ export async function POST(request: Request) {
     })
     return NextResponse.json({ url: session.url })
   } catch (err: unknown) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 })
+    console.error('[billing/checkout]', err)
+    return NextResponse.json({ error: 'Erro ao criar sessão de pagamento' }, { status: 500 })
   }
 }

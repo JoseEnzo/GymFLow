@@ -1,2 +1,32 @@
 # MCP config (contains secrets)
 .mcp.json
+
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Turbo cache
+.turbo/
+
+# Build artifacts
+dist/
+
+# Vercel
+.vercel/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db

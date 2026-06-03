@@ -67,6 +67,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ invoices, periodEnd, trialEnd })
   } catch (err: unknown) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 })
+    console.error('[billing/invoices]', err)
+    return NextResponse.json({ error: 'Erro ao buscar faturas' }, { status: 500 })
   }
 }

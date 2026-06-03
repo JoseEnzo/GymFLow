@@ -25,8 +25,9 @@ export async function GET(request: Request) {
     const data = await fetchCNPJ(cnpj)
     return NextResponse.json(data)
   } catch (err: unknown) {
+    console.error('[cnpj]', err)
     return NextResponse.json(
-      { error: (err as Error).message },
+      { error: 'CNPJ inválido ou não encontrado' },
       { status: 422 }
     )
   }

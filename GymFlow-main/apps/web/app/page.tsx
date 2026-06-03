@@ -411,7 +411,7 @@ function Hero() {
                     ))}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    <span className="text-foreground font-semibold">+500 academias</span> confiam no GymFlow
+                    Junte-se às primeiras academias no <span className="text-foreground font-semibold">GymFlow</span>
                   </p>
                 </div>
               </motion.div>
@@ -1310,7 +1310,7 @@ function Footer() {
               title: 'Legal',
               links: [
                 { label: 'Privacidade', href: '/privacidade' },
-                { label: 'Termos', href: '#' },
+                { label: 'Termos', href: '/termos' },
                 { label: 'Cookies', href: '/privacidade#cookies' },
                 { label: 'LGPD', href: '/privacidade#lgpd' },
               ],
@@ -1348,10 +1348,10 @@ function Footer() {
 // Stats Bar
 // ──────────────────────────────────────────────
 const STATS = [
-  { label: 'Academias ativas',      end: 500,    suffix: '+',  color: '#6366F1' },
-  { label: 'Treinos registrados',   end: 50000,  suffix: '+',  color: '#06B6D4' },
-  { label: 'Satisfação dos clientes', end: 98,   suffix: '%',  color: '#10B981' },
-  { label: 'Uptime garantido',      end: 99.9,   suffix: '%',  color: '#F59E0B' },
+  { label: 'Multi-tenant com RLS',        end: 100,  suffix: '%', color: '#6366F1' },
+  { label: 'Exercícios no catálogo',      end: 200,  suffix: '+', color: '#06B6D4' },
+  { label: 'Uptime de infraestrutura',    end: 99.9, suffix: '%', color: '#10B981' },
+  { label: 'Suporte por e-mail',          end: 24,   suffix: 'h', color: '#F59E0B' },
 ]
 
 function StatsBar() {

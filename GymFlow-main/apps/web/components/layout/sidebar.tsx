@@ -163,6 +163,7 @@ export function Sidebar() {
           {!sidebarCollapsed && (
             <button
               onClick={() => setSidebarCollapsed(true)}
+              aria-label="Recolher menu"
               className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-200 transition-all"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -223,6 +224,7 @@ export function Sidebar() {
           <div className="px-2 pb-3">
             <button
               onClick={() => setSidebarCollapsed(false)}
+              aria-label="Expandir menu"
               className="w-full flex items-center justify-center p-2.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-surface-200 transition-all"
             >
               <ChevronRight className="w-4 h-4" />
@@ -261,8 +263,8 @@ export function Sidebar() {
               </div>
               <button
                 onClick={signOut}
-className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-all"
-                title="Sair"
+                aria-label="Sair da conta"
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-all"
               >
                 <LogOut className="w-3.5 h-3.5" />
               </button>

@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 import { FrequencyHeatmap } from '@/components/charts/frequency-heatmap'
 import { createClient } from '@/lib/supabase/client'
 import { StudentBioView } from '@/components/bioimpedance/student-bio-view'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.07 } } }
 const fadeUp  = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } } }
@@ -317,6 +318,7 @@ export default function DashboardPage() {
   const [freeLogging,     setFreeLogging]     = useState(false)
   const [freeLoggedToday, setFreeLoggedToday] = useState(false)
   const [weekActivity,    setWeekActivity]    = useState<boolean[]>(Array(7).fill(false))
+  const [dataLoaded,      setDataLoaded]      = useState(false)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -334,9 +336,10 @@ export default function DashboardPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = supabase as any
     const aid = currentAcademy.id
-    if (isOwner)    loadOwnerData(sb, aid)
-    if (isPersonal) loadPersonalData(sb, aid)
-    if (isStudent)  loadStudentData(sb, aid)
+    setDataLoaded(false)
+    if (isOwner)    loadOwnerData(sb, aid).finally(() => setDataLoaded(true))
+    if (isPersonal) loadPersonalData(sb, aid).finally(() => setDataLoaded(true))
+    if (isStudent)  loadStudentData(sb, aid).finally(() => setDataLoaded(true))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentAcademy, currentRole])
 
@@ -628,6 +631,31 @@ export default function DashboardPage() {
       {/* ════════════════════════════════════════
           OWNER
       ════════════════════════════════════════ */}
+      {/* Loading skeletons */}
+      {!dataLoaded && hasAcademy && (
+        <motion.div variants={fadeUp} className="space-y-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="glass rounded-2xl p-4 border border-border/40 space-y-3">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-8 w-16" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div className="xl:col-span-2 space-y-4">
+              <Skeleton className="h-40 w-full rounded-2xl" />
+              <Skeleton className="h-56 w-full rounded-2xl" />
+            </div>
+            <div className="space-y-4">
+              <Skeleton className="h-40 w-full rounded-2xl" />
+              <Skeleton className="h-40 w-full rounded-2xl" />
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {isOwner && !hasAcademy && (
         <motion.div variants={fadeUp} className="glass rounded-2xl p-6 border border-brand-500/20 bg-brand-500/5">
           <div className="flex items-start gap-4">
@@ -645,7 +673,7 @@ export default function DashboardPage() {
         </motion.div>
       )}
 
-      {isOwner && hasAcademy && (
+      {isOwner && hasAcademy && dataLoaded && (
         <>
           {/* KPIs — 4 cards */}
           <motion.div variants={stagger} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -824,7 +852,7 @@ export default function DashboardPage() {
       {/* ════════════════════════════════════════
           PERSONAL
       ════════════════════════════════════════ */}
-      {isPersonal && (
+      {isPersonal && dataLoaded && (
         <>
           {/* KPIs */}
           <motion.div variants={stagger} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -933,7 +961,7 @@ export default function DashboardPage() {
       {/* ════════════════════════════════════════
           STUDENT
       ════════════════════════════════════════ */}
-      {isStudent && (
+      {isStudent && dataLoaded && (
         <>
           {/* Banner de boas-vindas após pagamento */}
           {showSuccessBanner && subscriptionPlan && PLAN_INFO[subscriptionPlan] && (

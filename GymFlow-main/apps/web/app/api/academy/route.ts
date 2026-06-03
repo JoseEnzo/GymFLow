@@ -87,7 +87,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ academy, checkoutUrl: session.url })
     } catch (err) {
       console.error('[academy] stripe error:', err)
-      return NextResponse.json({ academy, stripeError: (err as Error).message })
+      return NextResponse.json({ academy, stripeError: 'Erro ao criar sessão de pagamento' })
     }
   }
 

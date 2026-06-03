@@ -9,7 +9,6 @@
   ],
   "scripts": {
     "build": "turbo run build",
-    "predev": "bash scripts/ensure-doppler.sh",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",

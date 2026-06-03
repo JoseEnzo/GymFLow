@@ -1,6 +1,11 @@
+import type { Metadata } from 'next'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
 import { BottomNav } from '@/components/layout/bottom-nav'
+
+export const metadata: Metadata = {
+  title: 'Dashboard',
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (

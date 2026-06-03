@@ -618,7 +618,7 @@ export default function PersonaisPage() {
           <p className="section-subtitle mt-1">
             {loading
               ? 'Carregando...'
-              : `${activePersonais.length} personal${activePersonais.length !== 1 ? 'is' : ''} ativo${activePersonais.length !== 1 ? 's' : ''}`
+              : `${activePersonais.length} ${activePersonais.length !== 1 ? 'personais' : 'personal'} ativo${activePersonais.length !== 1 ? 's' : ''}`
             }
           </p>
         </div>

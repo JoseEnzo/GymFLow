@@ -51,6 +51,7 @@ export async function POST(request: Request) {
     })
     return NextResponse.json({ url: session.url })
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 })
+    console.error('[academy/upgrade]', err)
+    return NextResponse.json({ error: 'Erro ao processar upgrade' }, { status: 500 })
   }
 }

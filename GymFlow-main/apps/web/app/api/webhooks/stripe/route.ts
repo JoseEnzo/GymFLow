@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     )
   } catch (err: unknown) {
     return NextResponse.json(
-      { error: `Webhook error: ${(err as Error).message}` },
+      { error: 'Assinatura do webhook inválida' },
       { status: 400 }
     )
   }
