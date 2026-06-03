@@ -783,6 +783,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_invite: {
+        Args: { p_token: string; p_user_id: string }
+        Returns: {
+          academy_id: string
+          academy_name: string
+          academy_slug: string
+          role: Database["public"]["Enums"]["member_role"]
+        }[]
+      }
       can_manage_personals: { Args: { p_academy_id: string }; Returns: boolean }
       complete_workout: {
         Args: {

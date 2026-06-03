@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -sf http://localhost:3333)",
+      "Bash(break)",
+      "Bash(curl -s -X POST http://localhost:3333/api/invites/accept -w \"\\\\nHTTP %{http_code}\\\\n\")",
+      "Bash(curl -s -X POST http://localhost:3333/api/invites/accept -H 'Content-Type: application/json' -d '{\"token\":\"x\"}' -w \"\\\\nHTTP %{http_code}\\\\n\")",
+      "Read(//tmp/**)"
+    ]
+  }
+}

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 
 import { requireAuth } from '@/lib/api-guard'
+import { limiters } from '@/lib/rate-limit'
+import { clientIp } from '@/lib/turnstile'
 
 const admin = createAdminClient(
   process.env['NEXT_PUBLIC_SUPABASE_URL']!,
@@ -9,10 +11,29 @@ const admin = createAdminClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
+// Mapeia exceções nomeadas da RPC pra HTTP + mensagem amigável.
+function mapRpcError(message: string): { status: number; error: string } | null {
+  if (message.includes('INVITE_EXPIRED'))     return { status: 410, error: 'Este convite expirou' }
+  if (message.includes('INVITE_EXHAUSTED'))   return { status: 409, error: 'Este convite já foi utilizado' }
+  if (message.includes('INVITE_UNAVAILABLE')) return { status: 404, error: 'Convite não encontrado ou inválido' }
+  if (message.includes('INVALID_ROLE'))       return { status: 400, error: 'Convite com configuração inválida' }
+  return null
+}
+
 export async function POST(request: Request) {
   const authResult = await requireAuth()
   if (authResult instanceof NextResponse) return authResult
   const user = authResult
+
+  // Rate limit por IP (10 tentativas / 5 min) — preset existente em rate-limit.ts.
+  const ip = clientIp(request)
+  const { success: rlOk } = await limiters.invite.limit(`accept:${ip}`)
+  if (!rlOk) {
+    return NextResponse.json(
+      { error: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' },
+      { status: 429 },
+    )
+  }
 
   let token: string
   try {
@@ -24,56 +45,32 @@ export async function POST(request: Request) {
 
   if (!token) return NextResponse.json({ error: 'Token obrigatório' }, { status: 400 })
 
-  // Busca convite com dados da academia
-  const { data: invite, error: inviteError } = await admin
-    .from('invites')
-    .select('*, academy:academies(id, name, slug)')
-    .eq('token', token)
-    .eq('is_active', true)
-    .single()
+  // RPC atômica: lock no invite, idempotência por (academy, user), incremento
+  // condicional do uses_count. Resolve race condition + TOCTOU do código antigo.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (admin as any).rpc('accept_invite', {
+    p_token: token,
+    p_user_id: user.id,
+  })
 
-  if (inviteError || !invite) {
-    return NextResponse.json({ error: 'Convite não encontrado ou expirado' }, { status: 404 })
+  if (error) {
+    const mapped = mapRpcError(error.message ?? '')
+    if (mapped) return NextResponse.json({ error: mapped.error }, { status: mapped.status })
+    console.error('[invites/accept]', error)
+    return NextResponse.json({ error: 'Erro ao aceitar convite' }, { status: 500 })
   }
 
-  if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
-    return NextResponse.json({ error: 'Este convite expirou' }, { status: 410 })
-  }
+  const row = (data ?? [])[0] as
+    | { academy_id: string; academy_name: string; academy_slug: string; role: string }
+    | undefined
 
-  if (invite.uses_limit && invite.uses_count >= invite.uses_limit) {
-    return NextResponse.json({ error: 'Este convite já foi utilizado' }, { status: 409 })
-  }
-
-  const academy = invite.academy as { id: string; name: string; slug: string } | null
-  if (!academy) {
+  if (!row) {
     return NextResponse.json({ error: 'Academia não encontrada' }, { status: 404 })
   }
 
-  // Insere ou atualiza membro
-  const { error: memberError } = await admin
-    .from('academy_members')
-    .upsert({
-      academy_id: academy.id,
-      user_id: user.id,
-      role: invite.role as string,
-      is_active: true,
-      joined_at: new Date().toISOString(),
-      invited_by: invite.created_by ?? null,
-    }, { onConflict: 'academy_id,user_id' })
-
-  if (memberError) {
-    return NextResponse.json({ error: memberError.message }, { status: 500 })
-  }
-
-  // Incrementa contador de usos
-  await admin
-    .from('invites')
-    .update({ uses_count: (invite.uses_count ?? 0) + 1 })
-    .eq('token', token)
-
   return NextResponse.json({
-    academyName: academy.name,
-    academySlug: academy.slug,
-    role: invite.role,
+    academyName: row.academy_name,
+    academySlug: row.academy_slug,
+    role: row.role,
   })
 }
