@@ -227,13 +227,17 @@ function Nav() {
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-8">
-            {['Funcionalidades', 'Preços', 'Sobre'].map((item) => (
+            {[
+              { label: 'Funcionalidades', href: '#funcionalidades' },
+              { label: 'Preços', href: '#preco' },
+              { label: 'Sobre', href: '#sobre' },
+            ].map((item) => (
               <a
-                key={item}
-                href={`#${item.toLowerCase()}`}
+                key={item.href}
+                href={item.href}
                 className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
               >
-                {item}
+                {item.label}
               </a>
             ))}
           </nav>
@@ -268,14 +272,18 @@ function Nav() {
             className="md:hidden border-t border-border/60 bg-background/95 backdrop-blur-xl"
           >
             <div className="px-4 py-4 flex flex-col gap-2">
-              {['Funcionalidades', 'Preços', 'Sobre'].map((item) => (
+              {[
+                { label: 'Funcionalidades', href: '#funcionalidades' },
+                { label: 'Preços', href: '#preco' },
+                { label: 'Sobre', href: '#sobre' },
+              ].map((item) => (
                 <a
-                  key={item}
-                  href={`#${item.toLowerCase()}`}
+                  key={item.href}
+                  href={item.href}
                   onClick={() => setMenuOpen(false)}
                   className="px-4 py-3 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all"
                 >
-                  {item}
+                  {item.label}
                 </a>
               ))}
               <div className="pt-2 border-t border-border/60 flex flex-col gap-2">
@@ -1000,7 +1008,7 @@ const plans = [
 
 function PricingSection() {
   return (
-    <section id="preços" className="relative py-24 lg:py-32 overflow-hidden">
+    <section id="preco" className="relative py-24 lg:py-32 overflow-hidden">
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true"
         style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 50%, rgba(99,102,241,0.07) 0%, transparent 70%)' }} />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -1292,18 +1300,15 @@ function Footer() {
               title: 'Produto',
               links: [
                 { label: 'Funcionalidades', href: '#funcionalidades' },
-                { label: 'Preços', href: '#preços' },
-                { label: 'Segurança', href: '#' },
-                { label: 'Roadmap', href: '#' },
+                { label: 'Preços', href: '#preco' },
+                { label: 'Segurança', href: '/privacidade' },
               ],
             },
             {
               title: 'Empresa',
               links: [
                 { label: 'Sobre', href: '#sobre' },
-                { label: 'Blog', href: '#' },
-                { label: 'Parceiros', href: '#' },
-                { label: 'Contato', href: '#' },
+                { label: 'Contato', href: 'mailto:contato@gymflow.app' },
               ],
             },
             {

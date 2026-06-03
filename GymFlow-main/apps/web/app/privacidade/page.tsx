@@ -116,14 +116,16 @@ function Section({
   color,
   title,
   children,
+  id,
 }: {
   icon: React.ElementType
   color: string
   title: string
   children: React.ReactNode
+  id?: string
 }) {
   return (
-    <motion.div variants={fadeUp} className="glass rounded-2xl p-7 border border-border/40">
+    <motion.div id={id} variants={fadeUp} className="glass rounded-2xl p-7 border border-border/40">
       <div className="flex items-center gap-4 mb-5">
         <div
           className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -279,7 +281,7 @@ export default function PrivacidadePage() {
             </Section>
 
             {/* Cookies */}
-            <Section icon={Cookie} color="#F59E0B" title="4. Cookies">
+            <Section id="cookies" icon={Cookie} color="#F59E0B" title="4. Cookies">
               <p>Usamos os seguintes tipos de cookies:</p>
 
               <div className="mt-3 space-y-3">
@@ -355,7 +357,7 @@ export default function PrivacidadePage() {
             </Section>
 
             {/* Direitos do usuário */}
-            <Section icon={Shield} color="#10B981" title="7. Seus Direitos (LGPD)">
+            <Section id="lgpd" icon={Shield} color="#10B981" title="7. Seus Direitos (LGPD)">
               <p>Como titular de dados, você tem direito a:</p>
               <ul className="space-y-2 mt-3">
                 <Li><strong className="text-foreground">Acesso:</strong> solicitar uma cópia de todos os dados que temos sobre você.</Li>

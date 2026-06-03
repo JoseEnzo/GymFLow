@@ -14,8 +14,9 @@ pnpm --version   # install: npm i -g pnpm@9
 
 ## Build
 
+Rodar a partir da raiz do monorepo (`GymFlow-main/`):
+
 ```bash
-cd /home/jose-correia/Documentos/GymFlow
 pnpm install
 ```
 
@@ -25,7 +26,7 @@ pnpm install
 PORT=3333 bash .claude/skills/run-gymflow/smoke.sh
 ```
 
-Expected: `5 passed, 0 failed`. Server stops automatically after checks.
+Expected: `5 passed, 0 failed`. Server stops automatically after checks. O script localiza a raiz do monorepo a partir de seu próprio caminho — funciona tanto no Windows (Git Bash) quanto no Linux nativo.
 
 To keep the server running for manual inspection:
 
@@ -43,17 +44,22 @@ Key routes verified:
 | `/login` | 200 |
 | `/cadastro` | 200 |
 | `/dashboard` | 307 (→ /login, no session) |
-| `/api/cnpj` | 307 (auth-guarded) |
+| `/api/cnpj` | 401 (guardRoute sem sessão) |
 
 ## Run (human path)
 
 ```bash
-cd apps/web && pnpm dev   # opens http://localhost:3000
+# com Doppler (recomendado — pega envs reais)
+doppler run -- pnpm --filter @gymflow/web dev
+
+# ou direto (precisa de .env.local manual)
+cd apps/web && pnpm dev
 ```
 
 ## Gotchas
 
-- **Workspace packages required:** run `pnpm install` from repo root, not `apps/web/`.
-- **Missing `.env.local`:** `smoke.sh` auto-creates it with placeholder Supabase values so Next.js starts. Real Supabase + Stripe credentials needed for auth/payments to work.
-- **Playwright unavailable** on Ubuntu 26.04 — use `curl` smoke checks above. Browser screenshots not supported in this environment.
+- **Envs reais ficam no Doppler.** O smoke.sh gera um `.env.local` stub só para o Next subir; auth/Stripe/Supabase de verdade exigem `doppler run`.
+- **Workspace packages required:** rodar `pnpm install` da raiz `GymFlow-main/`, não de `apps/web/`.
+- **Placeholders Upstash crashavam o servidor** — `.env.example` traz `https://...upstash.io` que passa em truthy check e quebra `Redis.fromEnv()`. Hoje `lib/rate-limit.ts` valida formato e o smoke.sh blanqueia esses campos.
+- **Playwright indisponível:** use os curl smoke checks acima. Sem screenshots de browser nesse ambiente.
 - **Port 3000 occupied:** set `PORT=3333` (or any free port) — `smoke.sh` defaults to 3333.

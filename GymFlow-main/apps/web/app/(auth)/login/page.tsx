@@ -184,8 +184,31 @@ function LoginInner() {
     setIsLoading(true)
     setServerError(null)
     try {
-      const token = await turnstileRef.current?.getToken()
-      if (token !== '') {
+      const token = (await turnstileRef.current?.getToken()) ?? ''
+
+      let email = data.identifier
+
+      if (role === 'owner' || role === 'personal') {
+        // Lookup verifica o token Turnstile internamente (token é single-use).
+        const res = await fetch('/api/auth/lookup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            identifier: data.identifier,
+            type: role === 'owner' ? 'cnpj' : 'cpf',
+            token,
+          }),
+        })
+        const json = await res.json() as { email?: string; error?: string }
+        if (!res.ok || !json.email) {
+          setServerError(json.error ?? 'Credenciais inválidas')
+          turnstileRef.current?.reset()
+          return
+        }
+        email = json.email
+      } else {
+        // Student loga direto com email — verificação Turnstile sempre,
+        // server decide se aceita (em dev sem TURNSTILE_SECRET_KEY libera).
         const res = await fetch('/api/turnstile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -197,23 +220,6 @@ function LoginInner() {
           turnstileRef.current?.reset()
           return
         }
-      }
-
-      let email = data.identifier
-
-      if (role === 'owner' || role === 'personal') {
-        const res = await fetch('/api/auth/lookup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier: data.identifier, type: role === 'owner' ? 'cnpj' : 'cpf' }),
-        })
-        const json = await res.json() as { email?: string; error?: string }
-        if (!res.ok || !json.email) {
-          setServerError(json.error ?? 'Credenciais inválidas')
-          turnstileRef.current?.reset()
-          return
-        }
-        email = json.email
       }
 
       await signIn(email, data.password, redirect ?? undefined, role ?? undefined)

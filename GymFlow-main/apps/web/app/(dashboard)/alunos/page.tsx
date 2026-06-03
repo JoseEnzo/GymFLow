@@ -14,6 +14,9 @@ import { toast } from 'sonner'
 import { cn, formatRelativeDate } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
+import { useDebounce } from '@/hooks/use-debounce'
+
+const PAGE_SIZE = 50
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } }
 const fadeUp = {
@@ -469,63 +472,49 @@ export default function AlunosPage() {
   const [showRevoked, setShowRevoked] = useState(false)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all')
+  const [page, setPage] = useState(0)
+  const [totalStudents, setTotalStudents] = useState(0)
+
+  const debouncedSearch = useDebounce(search, 300)
+
+  // Reseta paginação quando search ou filter mudam.
+  useEffect(() => { setPage(0) }, [debouncedSearch, filter])
 
   const load = useCallback(async () => {
     if (!currentAcademy) { setLoading(false); return }
     setLoading(true)
 
-    // Load students
+    // RPC consolidada: members + profiles + metrics + filtro + paginação numa query.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: members } = await (supabase as any)
-      .from('academy_members')
-      .select('user_id, is_active')
-      .eq('academy_id', currentAcademy.id)
-      .eq('role', 'student')
-
-    const studentIds: string[] = (members ?? []).map((m: { user_id: string }) => m.user_id)
-
-    // Load profiles separately (no direct FK academy_members→profiles)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: profilesData } = studentIds.length > 0
-      ? await (supabase as any)
-          .from('profiles')
-          .select('id, full_name, goal')
-          .in('id', studentIds)
-      : { data: [] }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const profileMap: Record<string, { full_name: string | null; goal: string | null }> = {}
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(profilesData ?? []).forEach((p: any) => {
-      profileMap[p.id] = { full_name: p.full_name ?? null, goal: p.goal ?? null }
+    const { data: studentRows, error: rpcError } = await (supabase as any).rpc('list_academy_students', {
+      p_academy_id: currentAcademy.id,
+      p_search: debouncedSearch,
+      p_status: filter,
+      p_limit: PAGE_SIZE,
+      p_offset: page * PAGE_SIZE,
     })
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: sheetsData } = await (supabase as any)
-      .from('workout_sheets')
-      .select('student_id')
-      .eq('academy_id', currentAcademy.id)
-      .eq('is_active', true)
-      .in('student_id', studentIds.length > 0 ? studentIds : ['00000000-0000-0000-0000-000000000000'])
+    if (rpcError) {
+      toast.error('Erro ao carregar alunos.')
+      setStudents([])
+      setTotalStudents(0)
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows = (studentRows ?? []) as any[]
+      setStudents(rows.map((r) => ({
+        id: r.user_id,
+        full_name: r.full_name,
+        goal: r.goal,
+        lastWorkout: r.last_workout,
+        totalWorkouts: Number(r.total_workouts) || 0,
+        activeSheets: Number(r.active_sheets) || 0,
+        streak: 0,
+        status: r.is_active ? 'active' : 'inactive',
+      })))
+      setTotalStudents(Number(rows[0]?.total_count ?? 0))
+    }
 
-    const sheetCounts: Record<string, number> = {}
-    ;(sheetsData ?? []).forEach((s: { student_id: string }) => {
-      sheetCounts[s.student_id] = (sheetCounts[s.student_id] ?? 0) + 1
-    })
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    setStudents((members ?? []).map((m: any) => ({
-      id: m.user_id,
-      full_name: profileMap[m.user_id]?.full_name ?? null,
-      goal: profileMap[m.user_id]?.goal ?? null,
-      lastWorkout: null,
-      totalWorkouts: 0,
-      activeSheets: sheetCounts[m.user_id] ?? 0,
-      streak: 0,
-      status: m.is_active ? 'active' : 'inactive',
-    })))
-
-    // Load student invites
+    // Invites: query separada com limit defensivo.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: inviteData } = await (supabase as any)
       .from('invites')
@@ -533,6 +522,7 @@ export default function AlunosPage() {
       .eq('academy_id', currentAcademy.id)
       .eq('role', 'student')
       .order('created_at', { ascending: false })
+      .limit(100)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setInvites((inviteData ?? []).map((i: any) => ({
@@ -547,7 +537,7 @@ export default function AlunosPage() {
     })))
 
     setLoading(false)
-  }, [currentAcademy])
+  }, [currentAcademy, debouncedSearch, filter, page])
 
   useEffect(() => { load() }, [load])
 
@@ -559,11 +549,8 @@ export default function AlunosPage() {
     setInvites((prev) => [invite, ...prev])
   }
 
-  const filtered = students.filter((s) => {
-    const matchesSearch = (s.full_name ?? '').toLowerCase().includes(search.toLowerCase())
-    const matchesFilter = filter === 'all' || s.status === filter
-    return matchesSearch && matchesFilter
-  })
+  // students já vem filtrado/paginado do server (search + status server-side via RPC).
+  const filtered = students
 
   const activeInvites = invites.filter(
     (i) => i.isActive && !isExpired(i.expiresAt) && !isExhausted(i.usesCount, i.usesLimit)
@@ -572,7 +559,9 @@ export default function AlunosPage() {
     (i) => !i.isActive || isExpired(i.expiresAt) || isExhausted(i.usesCount, i.usesLimit)
   )
 
-  const activeStudents = students.filter((s) => s.status === 'active')
+  const totalPages = Math.max(1, Math.ceil(totalStudents / PAGE_SIZE))
+  const showingFrom = totalStudents === 0 ? 0 : page * PAGE_SIZE + 1
+  const showingTo   = Math.min(totalStudents, (page + 1) * PAGE_SIZE)
 
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6">
@@ -584,7 +573,9 @@ export default function AlunosPage() {
             {currentRole === 'personal' ? 'Meus alunos' : 'Alunos'}
           </h2>
           <p className="section-subtitle mt-1">
-            {loading ? 'Carregando...' : `${activeStudents.length} ${activeStudents.length === 1 ? 'aluno ativo' : 'alunos ativos'}`}
+            {loading
+              ? 'Carregando...'
+              : `${totalStudents} ${totalStudents === 1 ? 'aluno' : 'alunos'}${filter !== 'all' ? ` (${filter === 'active' ? 'ativos' : 'inativos'})` : ''}`}
           </p>
         </div>
 
@@ -686,8 +677,8 @@ export default function AlunosPage() {
               <div className="flex items-center gap-2">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
                   <Users className="w-3.5 h-3.5" />
-                  Alunos ativos
-                  <span className="badge text-[10px] py-0.5 px-1.5 bg-surface-200 border-0 font-bold">{activeStudents.length}</span>
+                  Alunos
+                  <span className="badge text-[10px] py-0.5 px-1.5 bg-surface-200 border-0 font-bold">{totalStudents}</span>
                 </p>
               </div>
 
@@ -718,11 +709,40 @@ export default function AlunosPage() {
                   </button>
                 </div>
               ) : (
-                <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {filtered.map((student) => (
-                    <StudentCard key={student.id} student={student} isPersonal={currentRole === 'personal'} />
-                  ))}
-                </motion.div>
+                <>
+                  <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {filtered.map((student) => (
+                      <StudentCard key={student.id} student={student} isPersonal={currentRole === 'personal'} />
+                    ))}
+                  </motion.div>
+
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between gap-3 pt-2">
+                      <p className="text-xs text-muted-foreground">
+                        Mostrando {showingFrom}–{showingTo} de {totalStudents}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setPage((p) => Math.max(0, p - 1))}
+                          disabled={page === 0 || loading}
+                          className="px-3 py-1.5 rounded-lg border border-border/60 text-xs text-muted-foreground hover:text-foreground hover:bg-surface-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        >
+                          Anterior
+                        </button>
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          {page + 1} / {totalPages}
+                        </span>
+                        <button
+                          onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                          disabled={page >= totalPages - 1 || loading}
+                          className="px-3 py-1.5 rounded-lg border border-border/60 text-xs text-muted-foreground hover:text-foreground hover:bg-surface-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        >
+                          Próxima
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </motion.div>
           </div>

@@ -1,15 +1,14 @@
 /**
  * POST /api/turnstile
  * Verifica token do Cloudflare Turnstile server-side.
- * Nunca confiar no resultado do cliente — sempre verificar aqui.
+ * Decisão de aceitar ou não vive em lib/turnstile.ts (gate por NODE_ENV).
  */
 import { NextResponse } from 'next/server'
-import { turnstileVerifySchema } from '@/lib/validations'
 
-const VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
+import { turnstileVerifySchema } from '@/lib/validations'
+import { verifyTurnstileToken, clientIp } from '@/lib/turnstile'
 
 export async function POST(request: Request) {
-  // Parse body
   let rawBody: unknown
   try {
     rawBody = await request.json()
@@ -19,39 +18,14 @@ export async function POST(request: Request) {
 
   const parsed = turnstileVerifySchema.safeParse(rawBody)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Token obrigatório' }, { status: 422 })
+    return NextResponse.json({ error: 'Payload inválido' }, { status: 422 })
   }
 
-  const secretKey = process.env['TURNSTILE_SECRET_KEY']
-  if (!secretKey) {
-    // Se não configurado, deixa passar (para dev sem Turnstile)
-    return NextResponse.json({ success: true })
-  }
-
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined
-
-  const form = new URLSearchParams()
-  form.set('secret', secretKey)
-  form.set('response', parsed.data.token)
-  if (ip) form.set('remoteip', ip)
-
-  const res = await fetch(VERIFY_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: form.toString(),
-  })
-
-  interface TurnstileResponse {
-    success: boolean
-    'error-codes'?: string[]
-  }
-
-  const data = await res.json() as TurnstileResponse
-
-  if (!data.success) {
+  const ok = await verifyTurnstileToken(parsed.data.token, clientIp(request))
+  if (!ok) {
     return NextResponse.json(
-      { error: 'Verificação de segurança falhou. Tente novamente.', codes: data['error-codes'] },
-      { status: 403 }
+      { error: 'Verificação de segurança falhou. Tente novamente.' },
+      { status: 403 },
     )
   }
 

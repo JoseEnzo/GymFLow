@@ -26,8 +26,18 @@ export const MAX_AVATAR_BYTES = 2 * 1024 * 1024 // 2 MB
 
 // ── Turnstile ────────────────────────────────────────────────────────────────
 
+// Token sem min: a verificação real é server-side via verifyTurnstileToken,
+// que rejeita vazio quando TURNSTILE_SECRET_KEY está set (prod) e libera em dev.
 export const turnstileVerifySchema = z.object({
-  token: z.string().min(1, 'Token obrigatório').max(2048),
+  token: z.string().max(2048),
+})
+
+// ── Auth lookup ──────────────────────────────────────────────────────────────
+
+export const lookupSchema = z.object({
+  identifier: z.string().min(1).max(20),
+  type: z.enum(['cnpj', 'cpf']),
+  token: z.string().max(2048),
 })
 
 // ── Invite ───────────────────────────────────────────────────────────────────

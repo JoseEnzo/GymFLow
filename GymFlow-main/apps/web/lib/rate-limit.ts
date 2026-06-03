@@ -34,8 +34,18 @@ class InMemoryLimiter {
 }
 
 // ── Upstash (produção) ────────────────────────────────────────────────────────
+// Considera só envs com valor real — placeholders do .env.example (ex: "https://...upstash.io")
+// passam num truthy check mas crasham em Redis.fromEnv(). Em prod, Doppler injeta o valor verdadeiro.
+function hasValidUpstashEnv(): boolean {
+  const url = process.env['UPSTASH_REDIS_REST_URL']
+  const token = process.env['UPSTASH_REDIS_REST_TOKEN']
+  if (!url || !token) return false
+  if (url.includes('...') || token.includes('...')) return false
+  return url.startsWith('https://')
+}
+
 function createUpstashLimiters() {
-  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+  if (!hasValidUpstashEnv()) {
     return null
   }
 

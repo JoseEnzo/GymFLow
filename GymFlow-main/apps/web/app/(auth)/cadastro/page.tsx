@@ -111,6 +111,7 @@ function CadastroInner() {
   const [serverError, setServerError] = useState<string | null>(null)
   const [document, setDocument] = useState('')
   const [documentError, setDocumentError] = useState<string | null>(null)
+  const [termsAccepted, setTermsAccepted] = useState(false)
 
   useEffect(() => {
     if (!inviteToken) return
@@ -566,20 +567,43 @@ function CadastroInner() {
 
               {/* Terms */}
               <motion.div variants={fadeUp}>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Ao criar a conta você aceita nossos{' '}
-                  <a href="#" className="text-brand-400 hover:underline">Termos de Uso</a>
-                  {' '}e{' '}
-                  <a href="#" className="text-brand-400 hover:underline">Política de Privacidade</a>.
-                </p>
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <div className="relative mt-0.5 flex-shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                      className="sr-only"
+                    />
+                    <div className={cn(
+                      'w-4 h-4 rounded border-2 flex items-center justify-center transition-all duration-200',
+                      termsAccepted
+                        ? 'bg-brand-500 border-brand-500'
+                        : 'border-border/60 bg-surface-100 group-hover:border-brand-500/50'
+                    )}>
+                      {termsAccepted && <Check className="w-2.5 h-2.5 text-white" />}
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground leading-relaxed">
+                    Li e concordo com os{' '}
+                    <Link href="/termos" target="_blank" className="text-brand-400 hover:underline font-medium">
+                      Termos de Uso
+                    </Link>
+                    {' '}e com a{' '}
+                    <Link href="/privacidade" target="_blank" className="text-brand-400 hover:underline font-medium">
+                      Política de Privacidade
+                    </Link>
+                    {' '}do GymFlow.
+                  </span>
+                </label>
               </motion.div>
 
               {/* Submit */}
               <motion.div variants={fadeUp}>
                 <button
                   type="submit"
-                  disabled={isLoading}
-                  className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm"
+                  disabled={isLoading || !termsAccepted}
+                  className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Criar conta gratuita'}
                 </button>

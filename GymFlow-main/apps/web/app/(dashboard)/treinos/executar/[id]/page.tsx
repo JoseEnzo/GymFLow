@@ -285,34 +285,33 @@ export default function ExecutarTreinoPage() {
     (setData[ex.sheetExerciseId] ?? []).every((s) => s.done)
   )
 
+  // Garante um client_id estável por sessão de treino, persistido no draft.
+  // Usado como chave de idempotência na RPC — retries não duplicam workout_log.
+  function ensureClientId(): string {
+    if (!draftKey) return crypto.randomUUID()
+    try {
+      const raw = localStorage.getItem(draftKey)
+      const draft = raw ? (JSON.parse(raw) as { clientId?: string }) : {}
+      if (draft.clientId) return draft.clientId
+      const newId = crypto.randomUUID()
+      localStorage.setItem(draftKey, JSON.stringify({ ...draft, clientId: newId }))
+      return newId
+    } catch {
+      return crypto.randomUUID()
+    }
+  }
+
   async function finishWorkout() {
     setSaving(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || !currentAcademy) throw new Error('Não autenticado')
+      if (!currentAcademy) throw new Error('Sem academia ativa')
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: log, error: logError } = await (supabase as any)
-        .from('workout_logs')
-        .insert({
-          student_id: user.id,
-          sheet_id: id,
-          academy_id: currentAcademy.id,
-          duration_seconds: timer,
-          completed_at: new Date().toISOString(),
-        })
-        .select('id')
-        .single()
-
-      if (logError) throw logError
-
-      const setLogsToInsert: object[] = []
+      const setLogsPayload: object[] = []
       for (const ex of exercises) {
         const exSets = setData[ex.sheetExerciseId] ?? []
         exSets.forEach((set, idx) => {
           if (set.done) {
-            setLogsToInsert.push({
-              workout_log_id: log.id,
+            setLogsPayload.push({
               sheet_exercise_id: ex.sheetExerciseId,
               exercise_id: ex.exerciseId,
               set_number: idx + 1,
@@ -324,11 +323,18 @@ export default function ExecutarTreinoPage() {
         })
       }
 
-      if (setLogsToInsert.length > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error: setsError } = await (supabase as any).from('set_logs').insert(setLogsToInsert)
-        if (setsError) throw setsError
-      }
+      const clientId = ensureClientId()
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).rpc('complete_workout', {
+        p_sheet_id: id,
+        p_academy_id: currentAcademy.id,
+        p_duration_seconds: timer,
+        p_set_logs: setLogsPayload,
+        p_client_id: clientId,
+      })
+
+      if (error) throw error
 
       if (draftKey) localStorage.removeItem(draftKey)
       setIsCompleted(true)
