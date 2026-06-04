@@ -110,7 +110,7 @@ function OnboardingContent() {
   const [step, setStep] = useState<'role' | 'plan' | 'academy' | 'invite' | 'payment'>('role')
   const [selectedStudentPlan, setSelectedStudentPlan] = useState(() => {
     const p = searchParams.get('plan')
-    return STUDENT_PLANS.find(x => x.id === p) ?? STUDENT_PLANS[0]
+    return STUDENT_PLANS.find(x => x.id === p) ?? STUDENT_PLANS[0]!
   })
 
   // Usuário já configurado → direto ao dashboard
@@ -121,7 +121,7 @@ function OnboardingContent() {
   // Pula seleção de perfil se account_type já está no metadata (login com credenciais)
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      const accountType = data.user?.user_metadata?.account_type as string | undefined
+      const accountType = data.user?.user_metadata?.['account_type'] as string | undefined
       const planFromUrl       = searchParams.get('plan')
       const isAcademyPlan     = PLANS.some(x => x.id === planFromUrl)
       const isStudentPlan     = STUDENT_PLANS.some(x => x.id === planFromUrl)
@@ -203,7 +203,7 @@ function OnboardingContent() {
         toast.error('Código inválido ou expirado. Verifique e tente novamente.')
         return
       }
-      router.push(`/convite/${(data[0] as { token: string }).token}`)
+      router.push(`/convite/${(data[0] as { token: string } | undefined)!.token}`)
     } catch {
       toast.error('Erro ao verificar código. Tente novamente.')
     } finally {

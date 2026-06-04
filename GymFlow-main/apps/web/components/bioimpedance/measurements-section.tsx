@@ -149,9 +149,10 @@ function MeasureInput({ label, id, value, onChange }: {
 }
 
 // ── Main component ───────────────────────────────────────────
-export function MeasurementsSection({ studentId, academyId }: {
+export function MeasurementsSection({ studentId, academyId, readOnly = false }: {
   studentId: string
   academyId: string
+  readOnly?: boolean
 }) {
   const supabase = createClient()
   const [measurements, setMeasurements] = useState<BodyMeasurement[]>([])
@@ -240,12 +241,14 @@ export function MeasurementsSection({ studentId, academyId }: {
             <Ruler className="w-4 h-4 text-indigo-400" />
             Medidas Corporais
           </h3>
-          <button
-            onClick={() => { setForm(emptyForm()); setShowModal(true) }}
-            className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1 transition-colors"
-          >
-            <Plus className="w-3 h-3" /> Nova medição
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => { setForm(emptyForm()); setShowModal(true) }}
+              className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1 transition-colors"
+            >
+              <Plus className="w-3 h-3" /> Nova medição
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -261,12 +264,14 @@ export function MeasurementsSection({ studentId, academyId }: {
             <p className="text-xs text-muted-foreground/60 mt-1">
               Registre as circunferências corporais para acompanhar a evolução.
             </p>
-            <button
-              onClick={() => { setForm(emptyForm()); setShowModal(true) }}
-              className="btn-primary text-xs py-2 px-4 rounded-xl mt-3 inline-flex items-center gap-1.5"
-            >
-              <Plus className="w-3 h-3" /> Registrar medidas
-            </button>
+            {!readOnly && (
+              <button
+                onClick={() => { setForm(emptyForm()); setShowModal(true) }}
+                className="btn-primary text-xs py-2 px-4 rounded-xl mt-3 inline-flex items-center gap-1.5"
+              >
+                <Plus className="w-3 h-3" /> Registrar medidas
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-4">

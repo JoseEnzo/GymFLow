@@ -26,8 +26,14 @@ interface Sheet {
   goal: string | null
   is_active: boolean
   created_at: string
+  schedule_type?: string | null
   student_name?: string | null
   exercise_count?: number
+}
+
+const SCHEDULE_BADGE: Record<string, string> = {
+  weekly: 'Semanal',
+  monthly: 'Mensal',
 }
 
 function MoreVertical({ className }: { className?: string }) {
@@ -49,9 +55,11 @@ const GOAL_COLORS: Record<string, string> = {
   'Flexibilidade': '#EC4899',
 }
 
-function SheetCard({ sheet, isPersonal, onDelete }: {
+function SheetCard({ sheet, isPersonal, isStudent, readOnly, onDelete }: {
   sheet: Sheet
   isPersonal: boolean
+  isStudent?: boolean
+  readOnly?: boolean
   onDelete: (id: string) => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -72,6 +80,9 @@ function SheetCard({ sheet, isPersonal, onDelete }: {
                 </span>
               )}
               {sheet.is_active && <span className="badge-success text-[10px]">Ativa</span>}
+              {sheet.schedule_type && SCHEDULE_BADGE[sheet.schedule_type] && (
+                <span className="badge text-[10px]">{SCHEDULE_BADGE[sheet.schedule_type]}</span>
+              )}
             </div>
             <h3 className="font-display font-bold text-sm leading-snug">{sheet.name}</h3>
             {isPersonal && sheet.student_name && (
@@ -82,60 +93,62 @@ function SheetCard({ sheet, isPersonal, onDelete }: {
             )}
           </div>
 
-          <div className="relative">
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-200 transition-all opacity-0 group-hover:opacity-100"
-            >
-              <MoreVertical className="w-3.5 h-3.5" />
-            </button>
+          {isPersonal && !readOnly && (
+            <div className="relative">
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-200 transition-all opacity-0 group-hover:opacity-100"
+              >
+                <MoreVertical className="w-3.5 h-3.5" />
+              </button>
 
-            <AnimatePresence>
-              {menuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: -4 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                  className="absolute right-0 top-8 w-40 glass rounded-xl border border-border/60 shadow-xl z-10 overflow-hidden"
-                >
-                  {[
-                    { icon: Eye, label: 'Ver detalhes', href: `/treinos/${sheet.id}` },
-                    {
-                      icon: Trash2,
-                      label: confirmDelete ? 'Confirmar exclusão?' : 'Excluir',
-                      href: '#',
-                      danger: true,
-                      onClick: () => {
-                        if (!confirmDelete) {
-                          setConfirmDelete(true)
-                          setTimeout(() => setConfirmDelete(false), 3000)
-                        } else {
-                          setMenuOpen(false)
-                          setConfirmDelete(false)
-                          onDelete(sheet.id)
-                        }
+              <AnimatePresence>
+                {menuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                    className="absolute right-0 top-8 w-40 glass rounded-xl border border-border/60 shadow-xl z-10 overflow-hidden"
+                  >
+                    {[
+                      { icon: Eye, label: 'Ver detalhes', href: `/treinos/${sheet.id}` },
+                      {
+                        icon: Trash2,
+                        label: confirmDelete ? 'Confirmar exclusão?' : 'Excluir',
+                        href: '#',
+                        danger: true,
+                        onClick: () => {
+                          if (!confirmDelete) {
+                            setConfirmDelete(true)
+                            setTimeout(() => setConfirmDelete(false), 3000)
+                          } else {
+                            setMenuOpen(false)
+                            setConfirmDelete(false)
+                            onDelete(sheet.id)
+                          }
+                        },
                       },
-                    },
-                  ].map(({ icon: Icon, label, href, danger, onClick }) => (
-                    <Link
-                      key={label}
-                      href={href}
-                      onClick={(e) => { if (onClick) { e.preventDefault(); onClick() } else setMenuOpen(false) }}
-                      className={cn(
-                        'flex items-center gap-2.5 px-3.5 py-2.5 text-sm transition-all',
-                        danger
-                          ? 'text-red-400 hover:bg-red-500/10'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-surface-200'
-                      )}
-                    >
-                      <Icon className="w-3.5 h-3.5" />
-                      {label}
-                    </Link>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+                    ].map(({ icon: Icon, label, href, danger, onClick }) => (
+                      <Link
+                        key={label}
+                        href={href}
+                        onClick={(e) => { if (onClick) { e.preventDefault(); onClick() } else setMenuOpen(false) }}
+                        className={cn(
+                          'flex items-center gap-2.5 px-3.5 py-2.5 text-sm transition-all',
+                          danger
+                            ? 'text-red-400 hover:bg-red-500/10'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-surface-200'
+                        )}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        {label}
+                      </Link>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-2 mb-4">
@@ -163,14 +176,16 @@ function SheetCard({ sheet, isPersonal, onDelete }: {
             <Eye className="w-3.5 h-3.5" />
             Ver ficha
           </Link>
-          <Link
-            href={`/treinos/executar/${sheet.id}`}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all"
-            style={{ background: `${color}15`, color, border: `1px solid ${color}30` }}
-          >
-            <Play className="w-3 h-3" />
-            Executar
-          </Link>
+          {isStudent && !readOnly && (
+            <Link
+              href={`/treinos/executar/${sheet.id}`}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all"
+              style={{ background: `${color}15`, color, border: `1px solid ${color}30` }}
+            >
+              <Play className="w-3 h-3" />
+              Executar
+            </Link>
+          )}
         </div>
       </div>
     </motion.div>
@@ -183,33 +198,67 @@ export default function TreinosPage() {
   const [loading, setLoading] = useState(true)
   const { currentRole, currentAcademy } = useAuthStore()
   const supabase = createClient()
-  const isPersonal = currentRole === 'owner' || currentRole === 'personal'
+  const isOwner    = currentRole === 'owner'
+  const isPersonal = currentRole === 'personal'
+  const isStudent  = currentRole === 'student'
 
   useEffect(() => {
     async function load() {
       if (!currentAcademy) { setLoading(false); return }
 
+      const { data: { user } } = await supabase.auth.getUser()
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const query = (supabase as any)
+      let query = (supabase as any)
         .from('workout_sheets')
         .select(`
-          id, name, goal, is_active, created_at,
+          id, name, goal, is_active, created_at, student_id, schedule_type,
           sheet_exercises ( id )
         `)
         .eq('academy_id', currentAcademy.id)
         .order('created_at', { ascending: false })
 
+      // Student sees only their own sheets
+      if (isStudent && user) {
+        query = query.eq('student_id', user.id)
+      }
+
       const { data, error } = await query
       if (error) { toast.error('Erro ao carregar fichas.'); setLoading(false); return }
 
-      setSheets((data ?? []).map((s: any) => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mapped = (data ?? []).map((s: any) => ({
         ...s,
         exercise_count: s.sheet_exercises?.length ?? 0,
-      })))
+      }))
+
+      // For personal: resolve student names
+      if (isPersonal && mapped.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const studentIds = [...new Set<string>(mapped.map((s: any) => s.student_id).filter(Boolean))]
+        if (studentIds.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: profilesData } = await (supabase as any)
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', studentIds)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const profileMap: Record<string, string | null> = {}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ;(profilesData ?? []).forEach((p: any) => { profileMap[p.id] = p.full_name ?? null })
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setSheets(mapped.map((s: any) => ({ ...s, student_name: profileMap[s.student_id] ?? null })))
+        } else {
+          setSheets(mapped)
+        }
+      } else {
+        setSheets(mapped)
+      }
+
       setLoading(false)
     }
     load()
-  }, [currentAcademy])
+  }, [currentAcademy, currentRole])
 
   async function handleDelete(id: string) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -284,7 +333,7 @@ export default function TreinosPage() {
       {!loading && filtered.length > 0 && (
         <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtered.map((sheet) => (
-            <SheetCard key={sheet.id} sheet={sheet} isPersonal={isPersonal} onDelete={handleDelete} />
+            <SheetCard key={sheet.id} sheet={sheet} isPersonal={isPersonal} isStudent={isStudent} readOnly={isOwner} onDelete={handleDelete} />
           ))}
         </motion.div>
       )}
@@ -296,10 +345,12 @@ export default function TreinosPage() {
             <ClipboardList className="w-7 h-7 text-muted-foreground/40" />
           </div>
           <p className="font-semibold text-muted-foreground">
-            {isPersonal ? 'Nenhuma ficha criada ainda' : 'Nenhuma ficha atribuída a você'}
+            {isOwner ? 'Nenhuma ficha cadastrada' : isPersonal ? 'Nenhuma ficha criada ainda' : 'Nenhuma ficha atribuída a você'}
           </p>
           <p className="text-sm text-muted-foreground/60 mt-1">
-            {isPersonal
+            {isOwner
+              ? 'Os personais ainda não criaram fichas para os alunos.'
+              : isPersonal
               ? 'Crie fichas de treino e atribua aos seus alunos.'
               : 'Aguarde seu personal trainer criar uma ficha para você.'}
           </p>

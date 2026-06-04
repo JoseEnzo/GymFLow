@@ -9,6 +9,7 @@ import { z } from 'zod'
 import { motion } from 'framer-motion'
 import { Eye, EyeOff, Loader2, AlertCircle, Building2, Dumbbell, ArrowLeft, UserCheck, ChevronRight, Ticket, Check, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { maskCREF } from '@/lib/cnpj'
 
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -57,7 +58,7 @@ const ROLES: {
     label: 'Personal',
     sublabel: 'Treinador pessoal',
     description: 'Monte fichas, acompanhe alunos e resultados',
-    credential: 'Acesso com CPF',
+    credential: 'Acesso com CREF',
     icon: UserCheck,
     bg: 'bg-violet-500/8',
     border: 'border-violet-500/30',
@@ -175,7 +176,7 @@ function LoginInner() {
   function handleIdentifierChange(e: React.ChangeEvent<HTMLInputElement>) {
     let v = e.target.value
     if (role === 'owner')    v = maskCNPJ(v)
-    if (role === 'personal') v = maskCPF(v)
+    if (role === 'personal') v = maskCREF(v)
     setIdentifier(v)
     setValue('identifier', v)
   }
@@ -195,7 +196,7 @@ function LoginInner() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             identifier: data.identifier,
-            type: role === 'owner' ? 'cnpj' : 'cpf',
+            type: role === 'owner' ? 'cnpj' : 'cref',
             token,
           }),
         })
@@ -391,8 +392,8 @@ function LoginInner() {
 
   /* ── Step 3: login form ─────────────────────────────────────────── */
   const roleInfo = ROLES.find(r => r.key === role)!
-  const idLabel       = role === 'owner' ? 'CNPJ' : role === 'personal' ? 'CPF' : 'E-mail'
-  const idPlaceholder = role === 'owner' ? '00.000.000/0001-00' : role === 'personal' ? '000.000.000-00' : 'seu@email.com'
+  const idLabel       = role === 'owner' ? 'CNPJ' : role === 'personal' ? 'CREF' : 'E-mail'
+  const idPlaceholder = role === 'owner' ? '00.000.000/0001-00' : role === 'personal' ? '123456-G/SP' : 'seu@email.com'
   const idType        = role === 'student' ? 'email' : 'text'
 
   return (

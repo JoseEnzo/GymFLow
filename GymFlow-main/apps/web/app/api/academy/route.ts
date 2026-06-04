@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
   // Busca CNPJ armazenado no metadata do Supabase Auth durante o cadastro
   const { data: { user: fullUser } } = await admin.auth.admin.getUserById(user.id)
-  const cnpj = (fullUser?.user_metadata?.document ?? '').replace(/\D/g, '') || null
+  const cnpj = (fullUser?.user_metadata?.['document'] ?? '').replace(/\D/g, '') || null
 
   const slug =
     name

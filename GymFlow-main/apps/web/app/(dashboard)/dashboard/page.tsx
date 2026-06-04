@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, Activity, TrendingUp, Calendar, ArrowUpRight,
   Dumbbell, ChevronRight, Plus, UserPlus, Building2,
@@ -324,8 +324,8 @@ export default function DashboardPage() {
     const params = new URLSearchParams(window.location.search)
     if (params.get('subscription') === 'success') setShowSuccessBanner(true)
     supabase.auth.getUser().then(({ data: { user } }) => {
-      setAccountType(user?.user_metadata?.account_type ?? 'owner')
-      const plan = user?.user_metadata?.subscription_plan ?? params.get('plan') ?? null
+      setAccountType(user?.user_metadata?.['account_type'] ?? 'owner')
+      const plan = user?.user_metadata?.['subscription_plan'] ?? params.get('plan') ?? null
       setSubscriptionPlan(plan)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -582,7 +582,7 @@ export default function DashboardPage() {
         const nextDay = (todayIndex + i) % 7
         if (sheetByDay.has(nextDay)) {
           const s = sheetByDay.get(nextDay)!
-          setNextWorkout({ id: s.id, name: s.name, goal: s.goal, exerciseCount: s.sheet_exercises?.length ?? 0, dayLabel: DAY_LABELS[nextDay] })
+          setNextWorkout({ id: s.id, name: s.name, goal: s.goal, exerciseCount: s.sheet_exercises?.length ?? 0, dayLabel: DAY_LABELS[nextDay] ?? '' })
           break
         }
       }
@@ -598,6 +598,9 @@ export default function DashboardPage() {
 
   const hasAcademy      = !!currentAcademy
   const engagementPct   = ownerMetrics.totalStudents > 0 ? Math.round((ownerMetrics.activeThisWeek / ownerMetrics.totalStudents) * 100) : 0
+  const workoutsDelta   = ownerMetrics.workoutsLastWeek > 0
+    ? `${ownerMetrics.workoutsThisWeek >= ownerMetrics.workoutsLastWeek ? '+' : ''}${Math.round(((ownerMetrics.workoutsThisWeek - ownerMetrics.workoutsLastWeek) / ownerMetrics.workoutsLastWeek) * 100)}%`
+    : undefined
   const trainedToday    = weekActivity[6] === true || freeLoggedToday || (todayWorkout?.alreadyDone ?? false)
   const streakAtRisk    = studentStats.streak > 0 && !trainedToday
 
@@ -618,8 +621,8 @@ export default function DashboardPage() {
           )}
           {isOwner && currentAcademy?.plan && OWNER_PLAN_INFO[currentAcademy.plan] && (
             <span className="text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1"
-              style={{ background: `${OWNER_PLAN_INFO[currentAcademy.plan].color}18`, color: OWNER_PLAN_INFO[currentAcademy.plan].color, border: `1px solid ${OWNER_PLAN_INFO[currentAcademy.plan].color}30` }}>
-              {OWNER_PLAN_INFO[currentAcademy.plan].emoji} Plano {OWNER_PLAN_INFO[currentAcademy.plan].name}
+              style={{ background: `${OWNER_PLAN_INFO[currentAcademy.plan]!.color}18`, color: OWNER_PLAN_INFO[currentAcademy.plan]!.color, border: `1px solid ${OWNER_PLAN_INFO[currentAcademy.plan]!.color}30` }}>
+              {OWNER_PLAN_INFO[currentAcademy.plan]!.emoji} Plano {OWNER_PLAN_INFO[currentAcademy.plan]!.name}
             </span>
           )}
         </div>
@@ -676,12 +679,34 @@ export default function DashboardPage() {
       {isOwner && hasAcademy && dataLoaded && (
         <>
           {/* KPIs — 4 cards */}
-          <motion.div variants={stagger} className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatCard label="Total de alunos"  value={ownerMetrics.totalStudents}   delta={ownerMetrics.newThisMonth > 0 ? `+${ownerMetrics.newThisMonth}` : undefined} icon={Users}       color="#6366F1" empty={ownerMetrics.totalStudents === 0} />
-            <StatCard label="Novos este mês"   value={ownerMetrics.newThisMonth}                                                                                          icon={UserPlus}    color="#10B981" empty={ownerMetrics.newThisMonth === 0} />
-            <StatCard label="Personais ativos" value={ownerMetrics.activePersonals}                                                                                       icon={ShieldCheck} color="#8B5CF6" empty={ownerMetrics.activePersonals === 0} />
-            <StatCard label="Engajamento"      value={engagementPct} suffix="%"                                                                                           icon={Activity}    color="#06B6D4" empty={ownerMetrics.totalStudents === 0} />
+          <motion.div variants={stagger} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <StatCard label="Total de alunos"     value={ownerMetrics.totalStudents}    delta={ownerMetrics.newThisMonth > 0 ? `+${ownerMetrics.newThisMonth}` : undefined} icon={Users}       color="#6366F1" empty={ownerMetrics.totalStudents === 0} />
+            <StatCard label="Novos este mês"      value={ownerMetrics.newThisMonth}                                                                                         icon={UserPlus}    color="#10B981" empty={ownerMetrics.newThisMonth === 0} />
+            <StatCard label="Personais ativos"    value={ownerMetrics.activePersonals}                                                                                      icon={ShieldCheck} color="#8B5CF6" empty={ownerMetrics.activePersonals === 0} />
+            <StatCard label="Engajamento"         value={engagementPct} suffix="%"                                                                                          icon={Activity}    color="#06B6D4" empty={ownerMetrics.totalStudents === 0} />
+            <StatCard label="Treinos esta semana" value={ownerMetrics.workoutsThisWeek} delta={workoutsDelta}                                                               icon={Dumbbell}    color="#F59E0B" empty={ownerMetrics.totalStudents === 0} />
+            <StatCard label="Ativos esta semana"  value={ownerMetrics.activeThisWeek}                                                                                       icon={Flame}       color="#F97316" empty={ownerMetrics.totalStudents === 0} />
           </motion.div>
+
+          {/* Alertas */}
+          {(ownerMetrics.inactiveCount > 0 || ownerMetrics.studentsWithoutSheets > 0) && (
+            <motion.div variants={fadeUp} className="space-y-2">
+              {ownerMetrics.inactiveCount > 0 && (
+                <AlertBanner icon={AlertTriangle} color="#F59E0B">
+                  <span className="font-bold text-amber-300">{ownerMetrics.inactiveCount} aluno{ownerMetrics.inactiveCount > 1 ? 's' : ''}</span>{' '}
+                  não treinaram esta semana.{' '}
+                  <Link href="/alunos" className="underline text-amber-400">Ver detalhes →</Link>
+                </AlertBanner>
+              )}
+              {ownerMetrics.studentsWithoutSheets > 0 && (
+                <AlertBanner icon={ClipboardList} color="#06B6D4">
+                  <span className="font-bold text-cyan-300">{ownerMetrics.studentsWithoutSheets} aluno{ownerMetrics.studentsWithoutSheets > 1 ? 's' : ''}</span>{' '}
+                  ainda {ownerMetrics.studentsWithoutSheets > 1 ? 'não têm' : 'não tem'} ficha de treino.{' '}
+                  <Link href="/alunos" className="underline text-cyan-400">Atribuir fichas →</Link>
+                </AlertBanner>
+              )}
+            </motion.div>
+          )}
 
           {/* Main 2/3 + 1/3 */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -691,7 +716,7 @@ export default function DashboardPage() {
 
               {/* Plano / financeiro */}
               {currentAcademy?.plan && OWNER_PLAN_INFO[currentAcademy.plan] && (() => {
-                const p = OWNER_PLAN_INFO[currentAcademy.plan!]
+                const p = OWNER_PLAN_INFO[currentAcademy.plan!]!
                 const isStarter = currentAcademy.plan === 'starter'
                 const studentUsagePct = isStarter ? Math.min((ownerMetrics.totalStudents / 50) * 100, 100) : 0
                 const personalUsagePct = isStarter ? Math.min((ownerMetrics.activePersonals / 3) * 100, 100) : 0
@@ -735,19 +760,19 @@ export default function DashboardPage() {
 
                     {isStarter && (
                       <>
-                        <div className="rounded-xl p-3 mb-3" style={{ background: `${OWNER_PLAN_INFO.pro.color}0A`, border: `1px solid ${OWNER_PLAN_INFO.pro.color}20` }}>
-                          <p className="text-[11px] font-bold mb-1.5" style={{ color: OWNER_PLAN_INFO.pro.color }}>👑 Pro desbloqueia:</p>
+                        <div className="rounded-xl p-3 mb-3" style={{ background: `${OWNER_PLAN_INFO['pro']!.color}0A`, border: `1px solid ${OWNER_PLAN_INFO['pro']!.color}20` }}>
+                          <p className="text-[11px] font-bold mb-1.5" style={{ color: OWNER_PLAN_INFO['pro']!.color }}>👑 Pro desbloqueia:</p>
                           <ul className="grid grid-cols-2 gap-1">
                             {PRO_UPGRADE_FEATURES.slice(0, 4).map(f => (
                               <li key={f} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                                <Check className="w-2.5 h-2.5 flex-shrink-0" style={{ color: OWNER_PLAN_INFO.pro.color }} />{f}
+                                <Check className="w-2.5 h-2.5 flex-shrink-0" style={{ color: OWNER_PLAN_INFO['pro']!.color }} />{f}
                               </li>
                             ))}
                           </ul>
                         </div>
                         <button onClick={() => handleOwnerPlanChange('pro')} disabled={!!upgrading}
                           className="w-full text-xs font-semibold py-2.5 rounded-xl flex items-center justify-center gap-1.5 disabled:opacity-50 transition-all"
-                          style={{ background: `${OWNER_PLAN_INFO.pro.color}15`, color: OWNER_PLAN_INFO.pro.color, border: `1px solid ${OWNER_PLAN_INFO.pro.color}25` }}>
+                          style={{ background: `${OWNER_PLAN_INFO['pro']!.color}15`, color: OWNER_PLAN_INFO['pro']!.color, border: `1px solid ${OWNER_PLAN_INFO['pro']!.color}25` }}>
                           {upgrading === 'pro' ? <Loader2 className="w-3 h-3 animate-spin" /> : <>👑 Fazer upgrade para Pro — R$ 397/mês</>}
                         </button>
                       </>
@@ -803,6 +828,41 @@ export default function DashboardPage() {
                   </div>
                 )}
               </div>
+
+              {/* Treinos recentes */}
+              <div className="glass rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="font-display font-bold">Treinos recentes</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">Atividade da academia</p>
+                  </div>
+                </div>
+                {recentWorkouts.length === 0 ? (
+                  <EmptyState icon={Dumbbell} title="Nenhum treino registrado" description="Os treinos dos alunos aparecerão aqui quando forem executados." cta="Ver alunos" ctaHref="/alunos" />
+                ) : (
+                  <div className="space-y-2">
+                    {recentWorkouts.map(w => (
+                      <div key={w.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-surface-100">
+                        <div className="w-8 h-8 rounded-lg bg-brand-500/15 flex items-center justify-center flex-shrink-0">
+                          <Dumbbell className="w-3.5 h-3.5 text-brand-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{w.studentName}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{w.sheetName}</p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-[10px] text-muted-foreground">{formatTimeAgo(w.createdAt)}</p>
+                          {w.durationSeconds != null && (
+                            <p className="text-[10px] text-brand-400 flex items-center gap-0.5 justify-end">
+                              <Clock className="w-2.5 h-2.5" />{formatDuration(w.durationSeconds)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </motion.div>
 
             {/* Right col */}
@@ -812,7 +872,8 @@ export default function DashboardPage() {
                 <h3 className="font-display font-bold text-sm mb-3">Ações rápidas</h3>
                 <QuickAction icon={UserPlus}    label="Convidar aluno"          href="/alunos"        color="#06B6D4" />
                 <QuickAction icon={ShieldCheck} label="Convidar personal"      href="/personais"    color="#8B5CF6" />
-                <QuickAction icon={Activity}    label="Frequência da academia" href="/frequencia"   color="#F59E0B" />
+                <QuickAction icon={Dumbbell}    label="Fichas de treino"       sublabel="Ver e gerenciar fichas" href="/treinos"      color="#10B981" />
+                <QuickAction icon={BarChart3}   label="Relatórios"             sublabel="Engajamento geral"      href="/relatorios"   color="#F97316" />
                 <QuickAction icon={Settings}    label="Configurações"          href="/configuracoes" color="#6366F1" />
               </div>
 
@@ -840,6 +901,34 @@ export default function DashboardPage() {
                           {p.studentCount > 0 ? 'Ativo' : 'Sem alunos'}
                         </span>
                       </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Alunos inativos */}
+              <div className="glass rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-display font-bold text-sm">Alunos inativos</h3>
+                  <Link href="/alunos" className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">Ver todos <ChevronRight className="w-3 h-3" /></Link>
+                </div>
+                {inactiveStudents.length === 0 ? (
+                  <div className="py-3 text-center">
+                    <p className="text-[11px] text-emerald-400 font-semibold">✓ Todos treinaram esta semana!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {inactiveStudents.slice(0, 5).map(s => (
+                      <Link key={s.userId} href={`/alunos/${s.userId}`} className="flex items-center gap-3 p-2.5 rounded-xl bg-surface-100 hover:bg-surface-200 transition-colors">
+                        <div className="w-7 h-7 rounded-full bg-amber-500/15 flex items-center justify-center flex-shrink-0">
+                          <span className="text-[11px] font-bold text-amber-400">{s.fullName.charAt(0).toUpperCase()}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{s.fullName}</p>
+                          <p className="text-[10px] text-muted-foreground">{s.lastWorkoutAt ? `Último: ${formatTimeAgo(s.lastWorkoutAt)}` : 'Nunca treinou'}</p>
+                        </div>
+                        <ChevronRight className="w-3 h-3 text-muted-foreground/40" />
+                      </Link>
                     ))}
                   </div>
                 )}

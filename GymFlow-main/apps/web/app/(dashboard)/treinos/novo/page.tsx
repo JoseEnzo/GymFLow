@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 import { useForm } from 'react-hook-form'
 import {
   ArrowLeft, Loader2, Target, FileText,
-  ChevronRight, Check, User,
+  ChevronRight, Check, User, CalendarDays, Sparkles, X,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -22,6 +22,12 @@ const fadeUp = {
     transition: { delay: i * 0.06, duration: 0.4, ease: [0.16, 1, 0.3, 1] },
   }),
 }
+
+const SCHEDULE_TYPES = [
+  { id: 'daily',   emoji: '📅', label: 'Diária',   desc: 'Um único treino repetido nos dias escolhidos' },
+  { id: 'weekly',  emoji: '📆', label: 'Semanal',  desc: 'Treinos diferentes para cada dia da semana' },
+  { id: 'monthly', emoji: '🗓️', label: 'Mensal',   desc: 'Programação dividida em 4 semanas' },
+]
 
 const GOALS = [
   { id: 'Hipertrofia', emoji: '💪' },
@@ -43,6 +49,27 @@ interface StudentOption {
   full_name: string | null
 }
 
+interface SheetTemplate {
+  id: string
+  name: string
+  muscle_group: string
+  level: string
+  goal: string | null
+  exercise_count?: number
+}
+
+const MUSCLE_GROUPS_ORDER = [
+  'Peito','Costas','Ombros','Bíceps','Tríceps','Antebraços',
+  'Abdômen','Oblíquos','Glúteos','Quadríceps','Isquiotibiais',
+  'Panturrilhas','Trapézio','Lombar','Cardio',
+]
+const LEVEL_ORDER = ['Iniciante','Intermediário','Avançado']
+const LEVEL_COLORS: Record<string, string> = {
+  'Iniciante':     '#10B981',
+  'Intermediário': '#6366F1',
+  'Avançado':      '#F97316',
+}
+
 function NovaFichaContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -52,13 +79,38 @@ function NovaFichaContent() {
 
   const [saving, setSaving] = useState(false)
   const [selectedGoal, setSelectedGoal] = useState('')
+  const [scheduleType, setScheduleType] = useState<'daily' | 'weekly' | 'monthly'>('daily')
+  const [templates, setTemplates] = useState<SheetTemplate[]>([])
+  const [selectedMuscleGroup, setSelectedMuscleGroup] = useState<string | null>(null)
+  const [selectedTemplate, setSelectedTemplate] = useState<SheetTemplate | null>(null)
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false)
   const [students, setStudents] = useState<StudentOption[]>([])
   const [selectedStudentId, setSelectedStudentId] = useState(studentIdFromUrl ?? '')
   const [loadingStudents, setLoadingStudents] = useState(!studentIdFromUrl)
 
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>({
     defaultValues: { name: '', goal: '', description: '' },
   })
+
+  // Load templates once
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(supabase as any)
+      .from('workout_sheet_templates')
+      .select('id, name, muscle_group, level, goal')
+      .then(({ data }: { data: SheetTemplate[] | null }) => {
+        if (data) setTemplates(data)
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function applyTemplate(t: SheetTemplate) {
+    setSelectedTemplate(t)
+    setValue('name', t.name)
+    if (t.goal) setSelectedGoal(t.goal)
+    setShowTemplatePicker(false)
+    setSelectedMuscleGroup(null)
+  }
 
   useEffect(() => {
     if (studentIdFromUrl || !currentAcademy) {
@@ -99,6 +151,10 @@ function NovaFichaContent() {
       toast.error('Você precisa estar em uma academia para criar fichas.')
       return
     }
+    if (!studentIdFromUrl && students.length > 0 && !selectedStudentId) {
+      toast.error('Selecione um aluno para atribuir a ficha.')
+      return
+    }
     if (!selectedGoal) {
       toast.error('Selecione um objetivo para a ficha.')
       return
@@ -107,7 +163,7 @@ function NovaFichaContent() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { toast.error('Não autenticado.'); return }
 
-    const finalStudentId = selectedStudentId || user.id
+    const finalStudentId = selectedStudentId || studentIdFromUrl || ''
 
     if (!finalStudentId) {
       toast.error('Selecione um aluno para atribuir a ficha.')
@@ -127,11 +183,30 @@ function NovaFichaContent() {
           goal: selectedGoal,
           description: data.description || null,
           is_active: true,
+          schedule_type: scheduleType,
         })
         .select('id')
         .single()
 
       if (error) throw error
+
+      // Copy template exercises if a template was selected
+      if (selectedTemplate) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: tmplExs } = await (supabase as any)
+          .from('template_exercises')
+          .select('exercise_id, order_index, sets, reps, rest_seconds, notes')
+          .eq('template_id', selectedTemplate.id)
+          .order('order_index')
+
+        if (tmplExs && tmplExs.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (supabase as any)
+            .from('sheet_exercises')
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .insert(tmplExs.map((e: any) => ({ ...e, sheet_id: sheet.id })))
+        }
+      }
 
       toast.success('Ficha criada com sucesso!')
       router.push(`/treinos/${sheet.id}`)
@@ -155,8 +230,87 @@ function NovaFichaContent() {
       </motion.div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+
+        {/* Template picker */}
+        <motion.div custom={1} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-brand-400" />
+              <h3 className="font-display font-bold text-sm">Começar de um modelo</h3>
+            </div>
+            {selectedTemplate && (
+              <button type="button" onClick={() => setSelectedTemplate(null)} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+                <X className="w-3 h-3" /> Remover
+              </button>
+            )}
+          </div>
+
+          {selectedTemplate ? (
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-brand-500/8 border border-brand-500/20">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold">{selectedTemplate.name}</p>
+                <p className="text-xs text-muted-foreground">{selectedTemplate.muscle_group} · {selectedTemplate.level}</p>
+              </div>
+              <span className="text-xs font-bold" style={{ color: LEVEL_COLORS[selectedTemplate.level] }}>{selectedTemplate.level}</span>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowTemplatePicker((v) => !v)}
+              className="w-full flex items-center justify-between p-3 rounded-xl border border-border/60 hover:border-brand-500/30 hover:bg-surface-100 transition-all text-sm text-muted-foreground"
+            >
+              <span>Selecionar modelo pronto...</span>
+              <ChevronRight className={cn('w-4 h-4 transition-transform', showTemplatePicker && 'rotate-90')} />
+            </button>
+          )}
+
+          {showTemplatePicker && !selectedTemplate && (
+            <div className="space-y-3 pt-1">
+              {/* Muscle group grid */}
+              <div className="flex flex-wrap gap-1.5">
+                {MUSCLE_GROUPS_ORDER.map((mg) => (
+                  <button
+                    key={mg}
+                    type="button"
+                    onClick={() => setSelectedMuscleGroup(selectedMuscleGroup === mg ? null : mg)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all',
+                      selectedMuscleGroup === mg
+                        ? 'bg-brand-500 text-white border-brand-500'
+                        : 'border-border/60 text-muted-foreground hover:border-brand-500/40 hover:text-foreground'
+                    )}
+                  >
+                    {mg}
+                  </button>
+                ))}
+              </div>
+
+              {/* Level cards */}
+              {selectedMuscleGroup && (
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  {LEVEL_ORDER.map((level) => {
+                    const tmpl = templates.find((t) => t.muscle_group === selectedMuscleGroup && t.level === level)
+                    if (!tmpl) return null
+                    return (
+                      <button
+                        key={level}
+                        type="button"
+                        onClick={() => applyTemplate(tmpl)}
+                        className="flex flex-col gap-1 p-3 rounded-xl border border-border/60 hover:border-brand-500/30 hover:bg-surface-100 transition-all text-left"
+                      >
+                        <span className="text-xs font-bold" style={{ color: LEVEL_COLORS[level] }}>{level}</span>
+                        <span className="text-[10px] text-muted-foreground">{selectedMuscleGroup}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </motion.div>
+
         {/* Informações básicas */}
-        <motion.div custom={1} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5 space-y-4">
+        <motion.div custom={2} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5 space-y-4">
           <div className="flex items-center gap-2 mb-1">
             <FileText className="w-4 h-4 text-brand-400" />
             <h3 className="font-display font-bold text-sm">Informações básicas</h3>
@@ -184,7 +338,7 @@ function NovaFichaContent() {
         </motion.div>
 
         {/* Objetivo */}
-        <motion.div custom={2} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5 space-y-3">
+        <motion.div custom={3} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5 space-y-3">
           <div className="flex items-center gap-2">
             <Target className="w-4 h-4 text-brand-400" />
             <h3 className="font-display font-bold text-sm">Objetivo <span className="text-red-400">*</span></h3>
@@ -211,9 +365,39 @@ function NovaFichaContent() {
           </div>
         </motion.div>
 
+        {/* Tipo de programação */}
+        <motion.div custom={3} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-brand-400" />
+            <h3 className="font-display font-bold text-sm">Tipo de programação <span className="text-red-400">*</span></h3>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {SCHEDULE_TYPES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setScheduleType(t.id as typeof scheduleType)}
+                className={cn(
+                  'flex flex-col gap-1 p-3 rounded-xl border text-left transition-all',
+                  scheduleType === t.id
+                    ? 'border-brand-500/50 bg-brand-500/8'
+                    : 'border-border/60 hover:border-border hover:bg-surface-100'
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-base">{t.emoji}</span>
+                  {scheduleType === t.id && <Check className="w-3 h-3 text-brand-400" />}
+                </div>
+                <span className={cn('text-xs font-bold', scheduleType === t.id ? '' : 'text-muted-foreground')}>{t.label}</span>
+                <span className="text-[10px] text-muted-foreground/70 leading-tight">{t.desc}</span>
+              </button>
+            ))}
+          </div>
+        </motion.div>
+
         {/* Aluno — só mostra se não veio da URL */}
         {!studentIdFromUrl && (
-          <motion.div custom={3} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5 space-y-3">
+          <motion.div custom={4} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5 space-y-3">
             <div className="flex items-center gap-2">
               <User className="w-4 h-4 text-brand-400" />
               <h3 className="font-display font-bold text-sm">Atribuir a um aluno</h3>
@@ -225,7 +409,7 @@ function NovaFichaContent() {
               </div>
             ) : students.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                Nenhum aluno cadastrado. A ficha será atribuída a você mesmo.
+                Nenhum aluno cadastrado. Convide alunos antes de criar fichas.
               </p>
             ) : (
               <div className="space-y-1.5">
@@ -235,7 +419,7 @@ function NovaFichaContent() {
                   onChange={(e) => setSelectedStudentId(e.target.value)}
                   className="field"
                 >
-                  <option value="">— Para mim mesmo —</option>
+                  <option value="">— Selecione um aluno —</option>
                   {students.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.full_name ?? 'Aluno sem nome'}
@@ -248,7 +432,7 @@ function NovaFichaContent() {
         )}
 
         {/* Info */}
-        <motion.div custom={4} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-4 border border-brand-500/15 bg-brand-500/5">
+        <motion.div custom={5} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-4 border border-brand-500/15 bg-brand-500/5">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-brand-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
               <ChevronRight className="w-3.5 h-3.5 text-brand-400" />
@@ -263,13 +447,13 @@ function NovaFichaContent() {
         </motion.div>
 
         {/* Actions */}
-        <motion.div custom={5} variants={fadeUp} initial="hidden" animate="show" className="flex gap-3">
+        <motion.div custom={6} variants={fadeUp} initial="hidden" animate="show" className="flex gap-3">
           <Link href="/treinos" className="flex-1 btn-secondary py-3 rounded-xl text-sm font-semibold text-center">
             Cancelar
           </Link>
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || (students.length === 0 && !studentIdFromUrl)}
             className="flex-1 btn-primary py-3 rounded-xl text-sm font-semibold"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Criar ficha'}

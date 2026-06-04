@@ -36,7 +36,7 @@ export const turnstileVerifySchema = z.object({
 
 export const lookupSchema = z.object({
   identifier: z.string().min(1).max(20),
-  type: z.enum(['cnpj', 'cpf']),
+  type: z.enum(['cnpj', 'cpf', 'cref']),
   token: z.string().max(2048),
 })
 

@@ -6,7 +6,8 @@ import {
   Search, UserPlus, Filter, Dumbbell, Flame,
   Clock, ChevronRight, Copy, Loader2, Users,
   Link2, CheckCircle2, ClipboardList, ShieldOff,
-  AlertCircle, RefreshCw, Trash2,
+  AlertCircle, RefreshCw, Trash2, MoreVertical,
+  UserX, CheckCheck, XCircle,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -34,6 +35,16 @@ interface Student {
   activeSheets: number
   streak: number
   status: 'active' | 'inactive'
+}
+
+interface ExpulsionRequest {
+  id: string
+  studentId: string
+  studentMemberId: string
+  studentName: string | null
+  requestedByName: string | null
+  reason: string
+  createdAt: string
 }
 
 interface PendingInvite {
@@ -64,13 +75,60 @@ function isExhausted(usesCount: number, usesLimit: number | null) {
 }
 
 // ── StudentCard ──────────────────────────────────────────────
-function StudentCard({ student, isPersonal }: { student: Student; isPersonal?: boolean }) {
+function StudentCard({
+  student,
+  isPersonal,
+  onExpel,
+}: {
+  student: Student
+  isPersonal?: boolean
+  onExpel?: (student: Student) => void
+}) {
   const colors = ['#6366F1', '#06B6D4', '#10B981', '#F59E0B', '#F97316', '#EC4899']
-  const color = colors[(student.full_name?.charCodeAt(0) ?? 0) % colors.length]!
+  const color = colors[(student.full_name?.charCodeAt(0) ?? 0) % colors.length]!;
+  const [menuOpen, setMenuOpen] = useState(false)
 
   return (
     <motion.div variants={fadeUp}>
       <div className="glass rounded-2xl p-4 hover:border-brand-500/20 hover:-translate-y-0.5 transition-all duration-300 hover:shadow-card-hover">
+        <div className="relative">
+          {/* menu de ação */}
+          {onExpel && student.status === 'active' && (
+            <div className="absolute top-0 right-0 z-10">
+              <button
+                onClick={(e) => { e.preventDefault(); setMenuOpen((v) => !v) }}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-200 transition-all"
+              >
+                <MoreVertical className="w-3.5 h-3.5" />
+              </button>
+              <AnimatePresence>
+                {menuOpen && (
+                  <>
+                    <motion.div
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      onClick={() => setMenuOpen(false)}
+                      className="fixed inset-0 z-10"
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 top-full mt-1 z-20 glass rounded-xl border border-border/60 shadow-lg overflow-hidden min-w-[170px]"
+                    >
+                      <button
+                        onClick={() => { setMenuOpen(false); onExpel(student) }}
+                        className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-all"
+                      >
+                        <UserX className="w-4 h-4" />
+                        {isPersonal ? 'Solicitar remoção' : 'Remover aluno'}
+                      </button>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         <Link href={`/alunos/${student.id}`} className="block">
           <div className="flex items-start gap-3">
             <div className="relative flex-shrink-0">
@@ -124,6 +182,7 @@ function StudentCard({ student, isPersonal }: { student: Student; isPersonal?: b
             </div>
           )}
         </Link>
+        </div>
 
         {isPersonal && (
           <div className="mt-3 pt-3 border-t border-border/40">
@@ -475,6 +534,12 @@ export default function AlunosPage() {
   const [page, setPage] = useState(0)
   const [totalStudents, setTotalStudents] = useState(0)
 
+  // Expulsion flow
+  const [expulsionTarget, setExpulsionTarget] = useState<Student | null>(null)
+  const [expulsionReason, setExpulsionReason] = useState('')
+  const [expulsionLoading, setExpulsionLoading] = useState(false)
+  const [expulsionRequests, setExpulsionRequests] = useState<ExpulsionRequest[]>([])
+
   const debouncedSearch = useDebounce(search, 300)
 
   // Reseta paginação quando search ou filter mudam.
@@ -495,9 +560,81 @@ export default function AlunosPage() {
     })
 
     if (rpcError) {
-      toast.error('Erro ao carregar alunos.')
-      setStudents([])
-      setTotalStudents(0)
+      console.warn('[alunos] list_academy_students indisponível — usando fallback. Aplique a migration 029 no Supabase.', rpcError?.message ?? rpcError)
+      // Fallback: queries diretas quando o RPC falha (ex: função ainda não aplicada no banco).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let memberQuery = (supabase as any)
+        .from('academy_members')
+        .select('user_id, is_active', { count: 'exact' })
+        .eq('academy_id', currentAcademy.id)
+        .eq('role', 'student')
+      if (filter === 'active')   memberQuery = memberQuery.eq('is_active', true)
+      if (filter === 'inactive') memberQuery = memberQuery.eq('is_active', false)
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: memberData, count: totalCount, error: memberError } = await memberQuery
+        .order('is_active', { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+
+      if (memberError) {
+        console.warn('[alunos] fallback error:', memberError?.message ?? memberError)
+        toast.error('Erro ao carregar alunos.')
+        setStudents([])
+        setTotalStudents(0)
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const userIds = (memberData ?? []).map((m: any) => m.user_id) as string[]
+        setTotalStudents(totalCount ?? 0)
+
+        if (userIds.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: profileData } = await (supabase as any)
+            .from('profiles')
+            .select('id, full_name, goal')
+            .in('id', userIds)
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const profileMap = new Map<string, any>((profileData ?? []).map((p: any) => [p.id, p]))
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: sheetData } = await (supabase as any)
+            .from('workout_sheets')
+            .select('student_id')
+            .eq('academy_id', currentAcademy.id)
+            .in('student_id', userIds)
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const sheetCountMap = new Map<string, number>()
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ;(sheetData ?? []).forEach((s: any) => {
+            sheetCountMap.set(s.student_id, (sheetCountMap.get(s.student_id) ?? 0) + 1)
+          })
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let mapped: Student[] = (memberData ?? []).map((m: any) => {
+            const p = profileMap.get(m.user_id)
+            return {
+              id: m.user_id,
+              full_name: p?.full_name ?? null,
+              goal: p?.goal ?? null,
+              lastWorkout: null,
+              totalWorkouts: 0,
+              activeSheets: sheetCountMap.get(m.user_id) ?? 0,
+              streak: 0,
+              status: (m.is_active ? 'active' : 'inactive') as 'active' | 'inactive',
+            }
+          })
+
+          if (debouncedSearch) {
+            const s = debouncedSearch.toLowerCase()
+            mapped = mapped.filter(st => st.full_name?.toLowerCase().includes(s))
+          }
+
+          setStudents(mapped)
+        } else {
+          setStudents([])
+        }
+      }
     } else {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rows = (studentRows ?? []) as any[]
@@ -547,6 +684,161 @@ export default function AlunosPage() {
 
   function handleInviteCreated(invite: PendingInvite) {
     setInvites((prev) => [invite, ...prev])
+  }
+
+  // ── Expulsion requests (owner only) ─────────────────────────
+  const loadExpulsionRequests = useCallback(async () => {
+    if (!currentAcademy || currentRole !== 'owner') return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase as any)
+      .from('expulsion_requests')
+      .select('id, student_id, student_member_id, reason, created_at, requested_by')
+      .eq('academy_id', currentAcademy.id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+
+    if (!data?.length) { setExpulsionRequests([]); return }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ids = data.map((r: any) => r.student_id)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const reqByIds = data.map((r: any) => r.requested_by)
+    const allIds = [...new Set([...ids, ...reqByIds])]
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: profiles } = await (supabase as any)
+      .from('profiles').select('id, full_name').in('id', allIds)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nameMap: Record<string, string | null> = {}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(profiles ?? []).forEach((p: any) => { nameMap[p.id] = p.full_name })
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setExpulsionRequests(data.map((r: any) => ({
+      id: r.id,
+      studentId: r.student_id,
+      studentMemberId: r.student_member_id,
+      studentName: nameMap[r.student_id] ?? null,
+      requestedByName: nameMap[r.requested_by] ?? null,
+      reason: r.reason,
+      createdAt: r.created_at,
+    })))
+  }, [currentAcademy, currentRole, supabase])
+
+  useEffect(() => { loadExpulsionRequests() }, [loadExpulsionRequests])
+
+  // Owner: aprova a expulsão → inativa o aluno
+  async function handleApproveExpulsion(req: ExpulsionRequest) {
+    if (!currentAcademy) return
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = supabase as any
+      // Apaga o vínculo; expulsion_requests.student_member_id é ON DELETE CASCADE,
+      // então o próprio pedido some junto (o update abaixo vira no-op inofensivo).
+      const { data: deleted, error } = await sb.from('academy_members')
+        .delete()
+        .eq('id', req.studentMemberId)
+        .select('id')
+      if (error) throw error
+      if (!deleted || deleted.length === 0) throw new Error('Sem permissão para remover este aluno.')
+      await sb.from('expulsion_requests')
+        .update({ status: 'approved', resolved_at: new Date().toISOString(), resolved_by: user?.id })
+        .eq('id', req.id)
+      toast.success(`${req.studentName ?? 'Aluno'} foi removido da academia.`)
+      setExpulsionRequests((prev) => prev.filter((r) => r.id !== req.id))
+      load()
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? 'Erro ao remover aluno.')
+    }
+  }
+
+  // Owner: rejeita o pedido
+  async function handleRejectExpulsion(req: ExpulsionRequest) {
+    if (!currentAcademy) return
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from('expulsion_requests')
+        .update({ status: 'rejected', resolved_at: new Date().toISOString(), resolved_by: user?.id })
+        .eq('id', req.id)
+      toast.success('Pedido de remoção rejeitado.')
+      setExpulsionRequests((prev) => prev.filter((r) => r.id !== req.id))
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? 'Erro ao rejeitar pedido.')
+    }
+  }
+
+  // Owner: remove diretamente (sem pedido)
+  async function handleDirectExpel(student: Student) {
+    if (!currentAcademy) return
+    setExpulsionLoading(true)
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: memberList } = await (supabase as any)
+        .from('academy_members')
+        .select('id')
+        .eq('academy_id', currentAcademy.id)
+        .eq('user_id', student.id)
+        .eq('role', 'student')
+        .limit(1)
+      const memberData = memberList?.[0]
+      if (!memberData) throw new Error('Membro não encontrado.')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: deleted, error } = await (supabase as any)
+        .from('academy_members')
+        .delete()
+        .eq('id', memberData.id)
+        .select('id')
+      if (error) throw error
+      if (!deleted || deleted.length === 0) throw new Error('Sem permissão para remover este aluno.')
+      toast.success(`${student.full_name ?? 'Aluno'} foi removido da academia.`)
+      setExpulsionTarget(null)
+      setExpulsionReason('')
+      load()
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? 'Erro ao remover aluno.')
+    } finally {
+      setExpulsionLoading(false)
+    }
+  }
+
+  // Personal: submete pedido ao owner
+  async function handleRequestExpulsion(student: Student) {
+    if (!currentAcademy || !expulsionReason.trim()) return
+    setExpulsionLoading(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: memberList2 } = await (supabase as any)
+        .from('academy_members')
+        .select('id, role')
+        .eq('academy_id', currentAcademy.id)
+        .eq('user_id', student.id)
+        .limit(1)
+      const memberData = memberList2?.[0]
+      if (!memberData) throw new Error('Membro não encontrado.')
+      if (memberData.role === 'owner') {
+        toast.error('Não é possível solicitar a remoção do dono da academia.')
+        return
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).from('expulsion_requests').insert({
+        academy_id: currentAcademy.id,
+        student_id: student.id,
+        student_member_id: memberData.id,
+        requested_by: user?.id,
+        reason: expulsionReason.trim(),
+      })
+      if (error) throw error
+      toast.success('Pedido de remoção enviado ao dono da academia.')
+      setExpulsionTarget(null)
+      setExpulsionReason('')
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? 'Erro ao enviar pedido.')
+    } finally {
+      setExpulsionLoading(false)
+    }
   }
 
   // students já vem filtrado/paginado do server (search + status server-side via RPC).
@@ -641,7 +933,7 @@ export default function AlunosPage() {
           <div className="space-y-4">
 
             {/* Filtros */}
-            {students.length > 0 && (
+            {(students.length > 0 || filter !== 'all') && (
               <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -682,7 +974,7 @@ export default function AlunosPage() {
                 </p>
               </div>
 
-              {students.length === 0 ? (
+              {students.length === 0 && filter === 'all' ? (
                 <div className="glass rounded-2xl p-8 text-center border border-dashed border-border/40">
                   <div className="w-12 h-12 rounded-2xl bg-surface-200 flex items-center justify-center mx-auto mb-3">
                     <Users className="w-6 h-6 text-muted-foreground/30" />
@@ -701,18 +993,27 @@ export default function AlunosPage() {
                     </button>
                   )}
                 </div>
-              ) : filtered.length === 0 ? (
+              ) : students.length === 0 || filtered.length === 0 ? (
                 <div className="text-center py-10">
-                  <p className="font-semibold text-muted-foreground">Nenhum aluno encontrado</p>
+                  <p className="font-semibold text-muted-foreground">
+                    {students.length === 0
+                      ? `Nenhum aluno ${filter === 'active' ? 'ativo' : 'inativo'}`
+                      : 'Nenhum aluno encontrado'}
+                  </p>
                   <button onClick={() => { setSearch(''); setFilter('all') }} className="text-sm text-brand-400 mt-2 hover:underline">
-                    Limpar filtros
+                    Ver todos os alunos
                   </button>
                 </div>
               ) : (
                 <>
                   <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {filtered.map((student) => (
-                      <StudentCard key={student.id} student={student} isPersonal={currentRole === 'personal'} />
+                      <StudentCard
+                        key={student.id}
+                        student={student}
+                        isPersonal={currentRole === 'personal'}
+                        onExpel={(s) => { setExpulsionTarget(s); setExpulsionReason('') }}
+                      />
                     ))}
                   </motion.div>
 
@@ -822,6 +1123,135 @@ export default function AlunosPage() {
 
         </div>
       )}
+
+      {/* ── Pedidos de expulsão pendentes (owner) ── */}
+      {currentRole === 'owner' && expulsionRequests.length > 0 && (
+        <motion.div variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5 border border-red-500/20">
+          <div className="flex items-center gap-2 mb-4">
+            <UserX className="w-4 h-4 text-red-400" />
+            <h3 className="font-display font-bold text-sm text-red-300">
+              Pedidos de remoção pendentes
+              <span className="ml-2 badge text-[10px] py-0.5 px-1.5 bg-red-500/15 text-red-300 border-red-500/20">{expulsionRequests.length}</span>
+            </h3>
+          </div>
+          <div className="space-y-3">
+            {expulsionRequests.map((req) => (
+              <div key={req.id} className="bg-surface-100 rounded-xl p-4 border border-border/40 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold">{req.studentName ?? 'Aluno'}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Solicitado por <span className="font-medium text-foreground/70">{req.requestedByName ?? 'Personal'}</span>
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground bg-surface-200 rounded-lg px-3 py-2">
+                  <span className="font-semibold text-foreground/60">Motivo: </span>{req.reason}
+                </p>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => handleApproveExpulsion(req)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/15 text-red-300 hover:bg-red-500/25 border border-red-500/20 transition-all"
+                  >
+                    <CheckCheck className="w-3.5 h-3.5" /> Aprovar remoção
+                  </button>
+                  <button
+                    onClick={() => handleRejectExpulsion(req)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-200 border border-border/40 transition-all"
+                  >
+                    <XCircle className="w-3.5 h-3.5" /> Rejeitar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Modal de expulsão ── */}
+      <AnimatePresence>
+        {expulsionTarget && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => { if (!expulsionLoading) { setExpulsionTarget(null); setExpulsionReason('') } }}
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="fixed inset-x-4 bottom-4 sm:inset-auto sm:left-1/2 sm:-translate-x-1/2 sm:top-1/2 sm:-translate-y-1/2 z-50 w-full sm:max-w-md glass rounded-2xl p-6 border border-border/60 shadow-2xl"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-red-500/15 border border-red-500/20 flex items-center justify-center">
+                  <UserX className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <p className="font-display font-bold text-sm">
+                    {currentRole === 'personal' ? 'Solicitar remoção' : 'Remover aluno'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{expulsionTarget.full_name ?? 'Aluno'}</p>
+                </div>
+              </div>
+
+              {currentRole === 'personal' ? (
+                <>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Informe o motivo. O dono da academia precisará aprovar antes da remoção ser efetivada.
+                  </p>
+                  <textarea
+                    value={expulsionReason}
+                    onChange={(e) => setExpulsionReason(e.target.value)}
+                    placeholder="Ex: Comportamento inadequado, inadimplência..."
+                    rows={3}
+                    className="field w-full resize-none text-sm mb-4"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleRequestExpulsion(expulsionTarget)}
+                      disabled={!expulsionReason.trim() || expulsionLoading}
+                      className="flex-1 btn-primary py-2.5 rounded-xl text-sm flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {expulsionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><UserX className="w-4 h-4" /> Enviar pedido</>}
+                    </button>
+                    <button
+                      onClick={() => { setExpulsionTarget(null); setExpulsionReason('') }}
+                      disabled={expulsionLoading}
+                      className="px-4 py-2.5 rounded-xl text-sm border border-border/60 text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    O aluno perderá o acesso à academia. Esta ação pode ser revertida reativando o aluno.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleDirectExpel(expulsionTarget)}
+                      disabled={expulsionLoading}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-red-500/15 text-red-300 hover:bg-red-500/25 border border-red-500/20 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      {expulsionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><UserX className="w-4 h-4" /> Confirmar remoção</>}
+                    </button>
+                    <button
+                      onClick={() => { setExpulsionTarget(null); setExpulsionReason('') }}
+                      disabled={expulsionLoading}
+                      className="px-4 py-2.5 rounded-xl text-sm border border-border/60 text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }
