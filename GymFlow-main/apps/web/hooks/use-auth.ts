@@ -108,12 +108,19 @@ export function useAuth() {
     const normalizedDoc = document
       ? (accountType === 'personal' ? document.trim().toUpperCase() : document.replace(/\D/g, ''))
       : null
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: fullName, account_type: accountType, document: normalizedDoc } },
     })
     if (error) throw error
+    // Com confirmação de e-mail ligada, o Supabase devolve "sucesso" com um user
+    // SEM identities quando o e-mail já existe (proteção anti-enumeração). Sem
+    // tratar isso, o usuário cairia no onboarding de uma conta que nunca loga.
+    const identities = data?.user?.identities
+    if (Array.isArray(identities) && identities.length === 0) {
+      throw new Error('Este e-mail já está cadastrado. Faça login.')
+    }
     toast.success('Conta criada com sucesso!')
     router.push(redirectTo ?? '/onboarding')
   }

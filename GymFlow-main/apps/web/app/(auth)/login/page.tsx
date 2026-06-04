@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Suspense, useRef, type ElementType } from 'react'
+import { useState, useEffect, Suspense, useRef, type ElementType } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -128,6 +128,14 @@ function LoginInner() {
 
   const { register, handleSubmit, setValue, reset, formState: { errors } } =
     useForm<FormData>({ resolver: zodResolver(schema) })
+
+  // O callback de OAuth redireciona pra /login?error=auth_callback_failed quando
+  // o login social falha. Avisa o usuário (toast funciona em qualquer etapa).
+  useEffect(() => {
+    if (searchParams.get('error') === 'auth_callback_failed') {
+      toast.error('Não foi possível entrar com o provedor. Tente novamente.')
+    }
+  }, [searchParams])
 
   function handleRoleSelect(r: Role) {
     setRole(r)
