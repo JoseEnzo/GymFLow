@@ -27,6 +27,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/perfil': 'Perfil',
   '/agenda': 'Agenda',
   '/personais': 'Personais',
+  '/relatorios': 'Relatórios',
 }
 
 function getPageInfo(pathname: string): { title: string; isSubPage: boolean } {

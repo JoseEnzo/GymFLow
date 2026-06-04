@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Dumbbell, UserPlus, Copy, Loader2, Users, Link2,
   MoreVertical, Trash2, ShieldOff, Clock, CheckCircle2,
-  RefreshCw, AlertCircle, CalendarDays,
+  RefreshCw, AlertCircle, Search, Filter,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -26,6 +26,8 @@ interface Personal {
   fullName: string | null
   joinedAt: string | null
   isActive: boolean
+  sheetsCount: number
+  studentsCount: number
 }
 
 interface PendingInvite {
@@ -130,7 +132,6 @@ function InvitePanel({
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xs">Fechar</button>
         </div>
 
-        {/* Código */}
         <div>
           <p className="text-xs text-muted-foreground mb-1.5">Código de acesso</p>
           <div className="flex items-center gap-2">
@@ -151,7 +152,6 @@ function InvitePanel({
 
         <div className="divider" />
 
-        {/* Link */}
         <div>
           <p className="text-xs text-muted-foreground mb-1.5">Link de convite</p>
           <div className="flex items-center gap-2">
@@ -203,7 +203,6 @@ function InvitePanel({
         </div>
       </div>
 
-      {/* Validade */}
       <div className="space-y-2">
         <p className="text-xs font-medium text-muted-foreground">Validade do convite</p>
         <div className="flex gap-2">
@@ -228,7 +227,6 @@ function InvitePanel({
         </div>
       </div>
 
-      {/* Tipo de uso */}
       <div className="flex items-center justify-between glass rounded-xl p-3">
         <div>
           <p className="text-sm font-medium">Usos ilimitados</p>
@@ -282,12 +280,14 @@ function PersonalCard({
     setMenuOpen(false)
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any)
+      const { data: deleted, error } = await (supabase as any)
         .from('academy_members')
-        .update({ is_active: false })
+        .delete()
         .eq('id', personal.memberId)
+        .select('id')
 
       if (error) throw error
+      if (!deleted || deleted.length === 0) throw new Error('Sem permissão para remover este personal.')
       toast.success(`${personal.fullName ?? 'Personal'} foi removido.`)
       onDeactivate(personal.memberId)
     } catch (err: unknown) {
@@ -299,10 +299,10 @@ function PersonalCard({
   return (
     <motion.div variants={fadeUp}>
       <div className={cn(
-        'glass rounded-2xl p-4 border transition-all duration-300',
-        personal.isActive ? 'border-border/40' : 'border-border/20 opacity-60'
+        'glass rounded-2xl p-4 hover:border-brand-500/20 hover:-translate-y-0.5 transition-all duration-300 hover:shadow-card-hover border',
+        !personal.isActive && 'opacity-60'
       )}>
-        <div className="flex items-center gap-3">
+        <div className="flex items-start gap-3">
           {/* Avatar */}
           <div className="relative flex-shrink-0">
             <div
@@ -318,20 +318,15 @@ function PersonalCard({
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm truncate">{personal.fullName ?? 'Personal'}</p>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              {personal.isActive ? (
-                <span className="badge text-[10px] py-0.5 px-1.5 bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Ativo</span>
-              ) : (
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-sm truncate">{personal.fullName ?? 'Personal'}</p>
+              {!personal.isActive && (
                 <span className="badge text-[10px] py-0.5 px-1.5 bg-surface-200 text-muted-foreground border-0">Inativo</span>
               )}
-              {personal.joinedAt && (
-                <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                  <CalendarDays className="w-3 h-3" />
-                  Entrou {formatRelativeDate(personal.joinedAt)}
-                </span>
-              )}
             </div>
+            <p className="text-[11px] text-muted-foreground truncate">
+              {personal.joinedAt ? `Entrou ${formatRelativeDate(personal.joinedAt)}` : 'Personal Trainer'}
+            </p>
           </div>
 
           {/* Menu */}
@@ -377,6 +372,24 @@ function PersonalCard({
               </AnimatePresence>
             </div>
           )}
+        </div>
+
+        {/* Stats grid */}
+        <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-border/40">
+          <div className="text-center">
+            <p className="font-bold text-sm">{personal.studentsCount}</p>
+            <p className="text-[10px] text-muted-foreground">Alunos</p>
+          </div>
+          <div className="text-center">
+            <p className="font-bold text-sm">{personal.sheetsCount}</p>
+            <p className="text-[10px] text-muted-foreground">Fichas</p>
+          </div>
+          <div className="text-center">
+            <p className="font-bold text-sm text-emerald-400">
+              {personal.isActive ? 'Ativo' : 'Inativo'}
+            </p>
+            <p className="text-[10px] text-muted-foreground">Status</p>
+          </div>
         </div>
       </div>
     </motion.div>
@@ -470,6 +483,18 @@ function InviteCard({
                 <Copy className="w-3.5 h-3.5" />
               </button>
             )}
+            {!invalid && (
+              <button
+                onClick={async () => {
+                  try { await navigator.clipboard.writeText(link); toast.success('Link copiado!') }
+                  catch { toast.error('Não foi possível copiar.') }
+                }}
+                className="p-2 rounded-lg border border-border/60 hover:bg-surface-200 transition-all text-muted-foreground hover:text-foreground"
+                title="Copiar link"
+              >
+                <Link2 className="w-3.5 h-3.5" />
+              </button>
+            )}
             {invite.isActive && !expired && !exhausted && (
               <button
                 onClick={revoke}
@@ -500,6 +525,8 @@ export default function PersonaisPage() {
   const [loading, setLoading] = useState(true)
   const [showInvitePanel, setShowInvitePanel] = useState(false)
   const [showRevoked, setShowRevoked] = useState(false)
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all')
 
   const isOwner = currentRole === 'owner'
 
@@ -507,17 +534,19 @@ export default function PersonaisPage() {
     if (!currentAcademy) { setLoading(false); return }
     setLoading(true)
 
-    // Load personais
+    // Load personais members
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: members } = await (supabase as any)
       .from('academy_members')
       .select('id, user_id, joined_at, is_active')
       .eq('academy_id', currentAcademy.id)
       .eq('role', 'personal')
+      .eq('is_active', true)
       .order('joined_at', { ascending: false })
 
-    // Load profiles separately (no direct FK academy_members→profiles)
     const userIds: string[] = (members ?? []).map((m: { user_id: string }) => m.user_id)
+
+    // Load profiles
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: profilesData } = userIds.length > 0
       ? await (supabase as any)
@@ -531,6 +560,25 @@ export default function PersonaisPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(profilesData ?? []).forEach((p: any) => { profileMap[p.id] = p.full_name ?? null })
 
+    // Load sheet stats per personal
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: sheetsData } = userIds.length > 0
+      ? await (supabase as any)
+          .from('workout_sheets')
+          .select('personal_id, student_id')
+          .eq('academy_id', currentAcademy.id)
+          .in('personal_id', userIds)
+      : { data: [] }
+
+    const sheetsCountMap: Record<string, number> = {}
+    const studentsSetMap: Record<string, Set<string>> = {}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(sheetsData ?? []).forEach((s: any) => {
+      sheetsCountMap[s.personal_id] = (sheetsCountMap[s.personal_id] ?? 0) + 1
+      if (!studentsSetMap[s.personal_id]) studentsSetMap[s.personal_id] = new Set()
+      studentsSetMap[s.personal_id]!.add(s.student_id)
+    })
+
     setPersonais(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (members ?? []).map((m: any) => ({
@@ -539,6 +587,8 @@ export default function PersonaisPage() {
         fullName: profileMap[m.user_id] ?? null,
         joinedAt: m.joined_at ?? null,
         isActive: m.is_active,
+        sheetsCount: sheetsCountMap[m.user_id] ?? 0,
+        studentsCount: studentsSetMap[m.user_id]?.size ?? 0,
       }))
     )
 
@@ -586,8 +636,14 @@ export default function PersonaisPage() {
     setInvites((prev) => [invite, ...prev])
   }
 
-  const activePersonais = personais.filter((p) => p.isActive)
-  const inactivePersonais = personais.filter((p) => !p.isActive)
+  const filtered = personais.filter((p) => {
+    const matchesSearch = !search || (p.fullName?.toLowerCase().includes(search.toLowerCase()) ?? false)
+    const matchesFilter =
+      filter === 'all' ||
+      (filter === 'active' && p.isActive) ||
+      (filter === 'inactive' && !p.isActive)
+    return matchesSearch && matchesFilter
+  })
 
   const activeInvites = invites.filter(
     (i) => i.isActive && !isExpired(i.expiresAt) && !isExhausted(i.usesCount, i.usesLimit)
@@ -618,7 +674,7 @@ export default function PersonaisPage() {
           <p className="section-subtitle mt-1">
             {loading
               ? 'Carregando...'
-              : `${activePersonais.length} ${activePersonais.length !== 1 ? 'personais' : 'personal'} ativo${activePersonais.length !== 1 ? 's' : ''}`
+              : `${personais.filter((p) => p.isActive).length} ${personais.filter((p) => p.isActive).length !== 1 ? 'personais' : 'personal'} ativo${personais.filter((p) => p.isActive).length !== 1 ? 's' : ''}`
             }
           </p>
         </div>
@@ -679,17 +735,49 @@ export default function PersonaisPage() {
           {/* ── Coluna esquerda: personais ── */}
           <div className="space-y-4">
 
-            {/* Personais ativos */}
+            {/* Filtros */}
+            {(personais.length > 0 || filter !== 'all') && (
+              <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Buscar personais..."
+                    className="field pl-10"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  {(['all', 'active', 'inactive'] as const).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setFilter(f)}
+                      className={cn(
+                        'px-3.5 py-2 rounded-xl text-sm font-medium transition-all',
+                        filter === f
+                          ? 'bg-brand-500/15 text-brand-300 border border-brand-500/20'
+                          : 'text-muted-foreground hover:bg-surface-100 border border-transparent'
+                      )}
+                    >
+                      {f === 'all' ? 'Todos' : f === 'active' ? 'Ativos' : 'Inativos'}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {/* Lista */}
             <motion.div variants={fadeUp} className="space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
                   <Users className="w-3.5 h-3.5" />
-                  Personais ativos
-                  <span className="badge text-[10px] py-0.5 px-1.5 bg-surface-200 border-0 font-bold">{activePersonais.length}</span>
+                  Personais
+                  <span className="badge text-[10px] py-0.5 px-1.5 bg-surface-200 border-0 font-bold">{personais.length}</span>
                 </p>
               </div>
 
-              {activePersonais.length === 0 ? (
+              {personais.length === 0 ? (
                 <div className="glass rounded-2xl p-8 text-center border border-dashed border-border/40">
                   <div className="w-12 h-12 rounded-2xl bg-surface-200 flex items-center justify-center mx-auto mb-3">
                     <Dumbbell className="w-6 h-6 text-muted-foreground/30" />
@@ -706,30 +794,26 @@ export default function PersonaisPage() {
                     Convidar agora
                   </button>
                 </div>
+              ) : filtered.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="font-semibold text-muted-foreground">
+                    {search ? 'Nenhum personal encontrado' : `Nenhum personal ${filter === 'active' ? 'ativo' : 'inativo'}`}
+                  </p>
+                  <button
+                    onClick={() => { setSearch(''); setFilter('all') }}
+                    className="text-sm text-brand-400 mt-2 hover:underline"
+                  >
+                    Ver todos os personais
+                  </button>
+                </div>
               ) : (
-                <motion.div variants={stagger} className="space-y-2">
-                  {activePersonais.map((p) => (
+                <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {filtered.map((p) => (
                     <PersonalCard key={p.memberId} personal={p} onDeactivate={handleDeactivate} />
                   ))}
                 </motion.div>
               )}
             </motion.div>
-
-            {/* Personais inativos */}
-            {inactivePersonais.length > 0 && (
-              <motion.div variants={fadeUp} className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-                  <ShieldOff className="w-3.5 h-3.5" />
-                  Inativos
-                  <span className="badge text-[10px] py-0.5 px-1.5 bg-surface-200 border-0 font-bold">{inactivePersonais.length}</span>
-                </p>
-                <div className="space-y-2">
-                  {inactivePersonais.map((p) => (
-                    <PersonalCard key={p.memberId} personal={p} onDeactivate={handleDeactivate} />
-                  ))}
-                </div>
-              </motion.div>
-            )}
           </div>
 
           {/* ── Coluna direita: convites ── */}
@@ -786,19 +870,16 @@ export default function PersonaisPage() {
               </div>
             )}
 
-            {/* Hierarquia explicada */}
+            {/* Info */}
             <div className="glass rounded-xl p-4 border border-border/30 space-y-3">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Hierarquia</p>
               {[
-                { label: 'Proprietário', desc: 'Gerencia academia, personais e plano', color: '#10B981', badge: 'owner' },
-                { label: 'Personal Trainer', desc: 'Cria fichas e convida alunos', color: '#06B6D4', badge: 'personal' },
-                { label: 'Aluno', desc: 'Executa treinos e acompanha evolução', color: '#6366F1', badge: 'student' },
-              ].map(({ label, desc, color, badge }) => (
-                <div key={badge} className="flex items-start gap-2.5">
-                  <div
-                    className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
-                    style={{ background: color }}
-                  />
+                { label: 'Proprietário', desc: 'Gerencia academia, personais e plano', color: '#10B981' },
+                { label: 'Personal Trainer', desc: 'Cria fichas e convida alunos', color: '#06B6D4' },
+                { label: 'Aluno', desc: 'Executa treinos e acompanha evolução', color: '#6366F1' },
+              ].map(({ label, desc, color }) => (
+                <div key={label} className="flex items-start gap-2.5">
+                  <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: color }} />
                   <div>
                     <p className="text-xs font-semibold">{label}</p>
                     <p className="text-[11px] text-muted-foreground">{desc}</p>

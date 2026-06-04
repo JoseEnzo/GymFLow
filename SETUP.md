@@ -103,10 +103,10 @@ git status
 git add .                     # todos os arquivos
 
 # 4. Criar o commit com mensagem
-git commit -m "Doppler adicionado"
+git commit -m "Correção dos fluxos"
 
 # 5. Enviar pro GitHub
-git push origin main
+git push origin main:JoseEnzo
 ```
 ```
 

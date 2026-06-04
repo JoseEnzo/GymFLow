@@ -52,7 +52,9 @@ function getInitials(name: string | null) {
 export default function StudentDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const { currentAcademy } = useAuthStore()
+  const { currentAcademy, currentRole } = useAuthStore()
+  const isOwner    = currentRole === 'owner'
+  const isPersonal = currentRole === 'personal'
   const supabase = createClient()
 
   const [student, setStudent] = useState<StudentProfile | null>(null)
@@ -67,25 +69,29 @@ export default function StudentDetailPage() {
 
       // Verify member belongs to this academy
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: member } = await (supabase as any)
+      const { data: memberList, error: memberError } = await (supabase as any)
         .from('academy_members')
         .select('user_id, role')
         .eq('academy_id', currentAcademy.id)
         .eq('user_id', id)
         .eq('is_active', true)
-        .single()
+        .limit(1)
 
+      if (memberError) console.warn('[aluno] erro ao buscar membro:', memberError?.message ?? memberError)
+      const member = memberList?.[0]
       if (!member) { setNotFound(true); setLoading(false); return }
 
       // Load profile
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: profile } = await (supabase as any)
+      const { data: profileList, error: profileError } = await (supabase as any)
         .from('profiles')
         .select('id, full_name, phone, goal, bio, weight_kg, height_cm, birth_date, avatar_url')
         .eq('id', id)
-        .single()
+        .limit(1)
 
-      if (profile) setStudent(profile)
+      if (profileError) console.warn('[aluno] erro ao buscar perfil:', profileError?.message ?? profileError)
+      // O membro pertence à academia: renderiza mesmo se o profile ainda não existir.
+      setStudent(profileList?.[0] ?? { id, full_name: null, phone: null, goal: null, bio: null, weight_kg: null, height_cm: null, birth_date: null, avatar_url: null })
 
       // Load sheets assigned to this student
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -239,6 +245,7 @@ export default function StudentDetailPage() {
             studentId={id}
             academyId={currentAcademy.id}
             studentHeight={student.height_cm ?? undefined}
+            readOnly={isOwner}
           />
         </motion.div>
       )}
@@ -249,6 +256,7 @@ export default function StudentDetailPage() {
           <MeasurementsSection
             studentId={id}
             academyId={currentAcademy.id}
+            readOnly={isOwner}
           />
         </motion.div>
       )}
@@ -257,12 +265,14 @@ export default function StudentDetailPage() {
       <motion.div custom={5} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-display font-bold text-sm">Fichas de treino ({sheets.length})</h3>
-          <Link
-            href={`/treinos/novo?studentId=${id}`}
-            className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1"
-          >
-            <Plus className="w-3 h-3" /> Nova ficha
-          </Link>
+          {isPersonal && (
+            <Link
+              href={`/treinos/novo?studentId=${id}`}
+              className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1"
+            >
+              <Plus className="w-3 h-3" /> Nova ficha
+            </Link>
+          )}
         </div>
 
         {sheets.length === 0 ? (
@@ -271,12 +281,14 @@ export default function StudentDetailPage() {
               <ClipboardList className="w-4.5 h-4.5 text-muted-foreground/40" />
             </div>
             <p className="text-sm text-muted-foreground">Nenhuma ficha atribuída</p>
-            <Link
-              href={`/treinos/novo?studentId=${id}`}
-              className="btn-primary text-xs py-2 px-4 rounded-xl mt-3 inline-flex items-center gap-1.5"
-            >
-              <Plus className="w-3 h-3" /> Criar ficha
-            </Link>
+            {isPersonal && (
+              <Link
+                href={`/treinos/novo?studentId=${id}`}
+                className="btn-primary text-xs py-2 px-4 rounded-xl mt-3 inline-flex items-center gap-1.5"
+              >
+                <Plus className="w-3 h-3" /> Criar ficha
+              </Link>
+            )}
           </div>
         ) : (
           <div className="space-y-2">

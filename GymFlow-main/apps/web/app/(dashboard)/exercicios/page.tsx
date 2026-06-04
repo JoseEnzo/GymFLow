@@ -262,10 +262,17 @@ function ExerciciosContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const addTo = searchParams.get('addTo')
+  const dayParam = searchParams.get('day')
+  const typeParam = searchParams.get('type')
+  const dayIndex = dayParam !== null ? parseInt(dayParam, 10) : null
+  const DAY_LABELS_EX = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+  const dayLabel = dayIndex !== null
+    ? (typeParam === 'monthly' ? `Semana ${dayIndex}` : (DAY_LABELS_EX[dayIndex] ?? `Dia ${dayIndex}`))
+    : null
   const { currentAcademy, currentRole } = useAuthStore()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = createClient() as any
-  const isPersonal = currentRole === 'owner' || currentRole === 'personal'
+  const isPersonal = currentRole === 'personal'
 
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [loading, setLoading] = useState(true)
@@ -304,16 +311,18 @@ function ExerciciosContent() {
         .then(({ data }: { data: { name: string } | null }) => { if (data) setSheetName(data.name) })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentAcademy, addTo])
+  }, [currentAcademy, addTo, dayParam])
 
   async function handleAddToSheet(exerciseId: string, cfg: AddToSheetConfig) {
     if (!addTo || addedIds.has(exerciseId)) return
     setAdding(exerciseId)
     try {
-      const { count } = await supabase
+      let countQuery = supabase
         .from('sheet_exercises')
         .select('id', { count: 'exact', head: true })
         .eq('sheet_id', addTo)
+      if (dayIndex !== null) countQuery = countQuery.eq('day_index', dayIndex)
+      const { count } = await countQuery
 
       const { error } = await supabase
         .from('sheet_exercises')
@@ -325,6 +334,7 @@ function ExerciciosContent() {
           reps: cfg.reps,
           rest_seconds: 60,
           notes: cfg.notes || null,
+          ...(dayIndex !== null ? { day_index: dayIndex } : {}),
         })
 
       if (error) throw error
@@ -358,7 +368,10 @@ function ExerciciosContent() {
           </button>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-brand-300">Modo: adicionar à ficha</p>
-            <p className="text-xs text-muted-foreground truncate">{sheetName || 'Carregando...'}</p>
+            <p className="text-xs text-muted-foreground truncate">
+              {sheetName || 'Carregando...'}
+              {dayLabel && <span className="ml-1 text-brand-400">· {dayLabel}</span>}
+            </p>
           </div>
           {addedIds.size > 0 && (
             <span className="badge-success text-[10px]">{addedIds.size} adicionado{addedIds.size > 1 ? 's' : ''}</span>

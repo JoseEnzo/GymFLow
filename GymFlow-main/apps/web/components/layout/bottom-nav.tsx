@@ -23,7 +23,8 @@ const STUDENT_ITEMS = [
 const OWNER_ITEMS = [
   { label: 'Início',     href: '/dashboard',  icon: LayoutDashboard },
   { label: 'Alunos',     href: '/alunos',     icon: Users           },
-  { label: 'Personais',  href: '/personais',  icon: UserCog         },
+  { label: 'Fichas',     href: '/treinos',    icon: ClipboardList   },
+  { label: 'Exercícios', href: '/exercicios', icon: BookOpen        },
   { label: 'Frequência', href: '/frequencia', icon: BarChart2       },
 ]
 

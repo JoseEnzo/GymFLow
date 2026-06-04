@@ -35,8 +35,14 @@ interface SetData {
 export default function ExecutarTreinoPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const { currentAcademy, profile } = useAuthStore()
+  const { currentAcademy, profile, currentRole } = useAuthStore()
   const supabase = createClient()
+
+  useEffect(() => {
+    if (currentRole && currentRole !== 'student') {
+      router.replace(`/treinos/${id}`)
+    }
+  }, [currentRole, id, router])
 
   const [exercises, setExercises] = useState<ExerciseSlot[]>([])
   const [sheetName, setSheetName] = useState('')
@@ -280,6 +286,21 @@ export default function ExecutarTreinoPage() {
       toast.success(`Série ${setIdx + 1} concluída! 💪`)
     }
   }
+
+  // Marca/desmarca todas as séries do exercício atual de uma vez.
+  // Para quem quer registrar o exercício como feito sem preencher série por série.
+  function toggleExerciseDone() {
+    if (!exercise) return
+    const sets = setData[exercise.sheetExerciseId] ?? []
+    const allDone = sets.length > 0 && sets.every((s) => s.done)
+    setRestTimer(null)
+    setSetData((prev) => ({
+      ...prev,
+      [exercise.sheetExerciseId]: prev[exercise.sheetExerciseId]!.map((s) => ({ ...s, done: !allDone })),
+    }))
+  }
+
+  const currentExerciseDone = !!exercise && exerciseSets.length > 0 && exerciseSets.every((s) => s.done)
 
   const allExercisesDone = exercises.length > 0 && exercises.every((ex) =>
     (setData[ex.sheetExerciseId] ?? []).every((s) => s.done)
@@ -560,6 +581,20 @@ export default function ExecutarTreinoPage() {
               </motion.div>
             )})}
           </div>
+
+          {/* Marcar exercício inteiro como concluído (sem preencher série a série) */}
+          <button
+            onClick={toggleExerciseDone}
+            className={cn(
+              'w-full py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 border',
+              currentExerciseDone
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/15'
+                : 'bg-surface-100 text-muted-foreground border-border/60 hover:text-foreground hover:bg-surface-200'
+            )}
+          >
+            <Check className="w-4 h-4" />
+            {currentExerciseDone ? 'Concluído — desmarcar' : 'Marcar como concluído'}
+          </button>
         </motion.div>
       </AnimatePresence>
 

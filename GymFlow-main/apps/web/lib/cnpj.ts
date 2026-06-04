@@ -96,7 +96,7 @@ export function validateCNPJ(cnpj: string): boolean {
     let sum = 0
     let weight = n - 7
     for (let i = 0; i < n; i++) {
-      sum += slice[i] * weight--
+      sum += slice[i]! * weight--
       if (weight < 2) weight = 9
     }
     const rest = sum % 11
@@ -105,4 +105,28 @@ export function validateCNPJ(cnpj: string): boolean {
 
   return checkDigit(nums.slice(0, 12)) === nums[12]
       && checkDigit(nums.slice(0, 13)) === nums[13]
+}
+
+// ── CREF (registro do personal trainer) ──────────────────────────────────────
+// Formato: NNNNNN-C/UF  (ex: 123456-G/SP). Não há dígito verificador público,
+// então validamos apenas o formato.
+
+export function maskCREF(value: string): string {
+  const s = value.toUpperCase().replace(/[^0-9A-Z]/g, '')
+  const num = s.match(/^\d{0,6}/)?.[0] ?? ''
+  const letters = s.slice(num.length).replace(/[^A-Z]/g, '')
+  const cat = letters.slice(0, 1)
+  const uf = letters.slice(1, 3)
+  let out = num
+  if (cat) out += `-${cat}`
+  if (uf) out += `/${uf}`
+  return out
+}
+
+export function validateCREF(value: string): boolean {
+  return /^\d{4,6}-[A-Z]\/[A-Z]{2}$/.test(value.trim().toUpperCase())
+}
+
+export function normalizeCREF(value: string): string {
+  return value.toUpperCase().replace(/[^0-9A-Z]/g, '')
 }

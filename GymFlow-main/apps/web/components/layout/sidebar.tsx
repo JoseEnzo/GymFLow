@@ -7,7 +7,7 @@ import {
   Dumbbell, LayoutDashboard, Users, ClipboardList, BookOpen,
   Settings, ChevronLeft, ChevronRight, LogOut, ChevronsUpDown,
   Activity, CalendarDays, History, TrendingUp, ShieldCheck, UserCircle, Video,
-  UserCog, BarChart2,
+  UserCog, BarChart2, BarChart3,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -24,7 +24,9 @@ const NAV_ITEMS: NavItem[] = [
   // ── Owner: foco em administração ──────────────────────────────
   { label: 'Alunos',           href: '/alunos',       icon: Users,           roles: ['owner'] },
   { label: 'Personais',        href: '/personais',    icon: UserCog,         roles: ['owner'] },
-  { label: 'Frequência',       href: '/frequencia',   icon: BarChart2,       roles: ['owner'] },
+  { label: 'Fichas de treino', href: '/treinos',      icon: ClipboardList,   roles: ['owner'] },
+  { label: 'Exercícios',       href: '/exercicios',   icon: BookOpen,        roles: ['owner'] },
+  { label: 'Relatórios',       href: '/relatorios',   icon: BarChart3,       roles: ['owner'] },
 
   // ── Personal: foco em treino ──────────────────────────────────
   { label: 'Meus alunos',      href: '/alunos',       icon: Users,           roles: ['personal'] },

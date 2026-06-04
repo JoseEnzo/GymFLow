@@ -14,7 +14,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import { validateCPF, validateCNPJ, maskCPF, maskCNPJ } from '@/lib/cnpj'
+import { validateCPF, validateCNPJ, maskCPF, maskCNPJ, validateCREF, maskCREF } from '@/lib/cnpj'
 import { SocialButtons } from '@/components/auth/social-buttons'
 
 const schema = z.object({
@@ -142,7 +142,7 @@ function CadastroInner() {
         toast.error('Código inválido ou expirado.')
         return
       }
-      router.push(`/convite/${(data[0] as { token: string }).token}`)
+      router.push(`/convite/${(data[0] as { token: string } | undefined)!.token}`)
     } catch {
       toast.error('Erro ao verificar código. Tente novamente.')
     } finally {
@@ -165,7 +165,7 @@ function CadastroInner() {
     if (accountType === 'owner') {
       if (!validateCNPJ(document)) { setDocumentError('CNPJ inválido'); return }
     } else if (accountType === 'personal') {
-      if (!validateCPF(document)) { setDocumentError('CPF inválido'); return }
+      if (!validateCREF(document)) { setDocumentError('CREF inválido (ex: 123456-G/SP)'); return }
     }
 
     setIsLoading(true)
@@ -467,20 +467,20 @@ function CadastroInner() {
               {/* CPF / CNPJ */}
               <motion.div variants={fadeUp} className="space-y-1.5">
                 <label className="text-sm font-medium flex items-center gap-1.5">
-                  {accountType === 'owner' ? 'CNPJ da academia' : 'CPF'}
+                  {accountType === 'owner' ? 'CNPJ da academia' : accountType === 'personal' ? 'CREF' : 'CPF'}
                   {accountType === 'student' && (
                     <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
                   )}
                 </label>
                 <input
                   type="text"
-                  inputMode="numeric"
+                  inputMode={accountType === 'personal' ? 'text' : 'numeric'}
                   value={document}
-                  placeholder={accountType === 'owner' ? '00.000.000/0000-00' : '000.000.000-00'}
+                  placeholder={accountType === 'owner' ? '00.000.000/0000-00' : accountType === 'personal' ? '123456-G/SP' : '000.000.000-00'}
                   autoComplete="off"
                   onChange={(e) => {
                     setDocumentError(null)
-                    setDocument(accountType === 'owner' ? maskCNPJ(e.target.value) : maskCPF(e.target.value))
+                    setDocument(accountType === 'owner' ? maskCNPJ(e.target.value) : accountType === 'personal' ? maskCREF(e.target.value) : maskCPF(e.target.value))
                   }}
                   className={cn('field', documentError && 'border-destructive/60 focus:ring-destructive/40')}
                 />

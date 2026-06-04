@@ -138,10 +138,12 @@ export function BioimpedanceSection({
   studentId,
   academyId,
   studentHeight,
+  readOnly = false,
 }: {
   studentId: string
   academyId: string
   studentHeight?: number | null
+  readOnly?: boolean
 }) {
   const supabase = createClient()
   const [assessments, setAssessments] = useState<BioAssessment[]>([])
@@ -239,12 +241,14 @@ export function BioimpedanceSection({
             <Activity className="w-4 h-4 text-cyan-400" />
             Bioimpedância
           </h3>
-          <button
-            onClick={() => { setForm({ ...EMPTY_FORM, assessed_at: new Date().toISOString().slice(0, 10) }); setShowModal(true) }}
-            className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1 transition-colors"
-          >
-            <Plus className="w-3 h-3" /> Nova avaliação
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => { setForm({ ...EMPTY_FORM, assessed_at: new Date().toISOString().slice(0, 10) }); setShowModal(true) }}
+              className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1 transition-colors"
+            >
+              <Plus className="w-3 h-3" /> Nova avaliação
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -260,12 +264,14 @@ export function BioimpedanceSection({
             <p className="text-xs text-muted-foreground/60 mt-1">
               Registre a composição corporal do aluno usando uma balança de bioimpedância.
             </p>
-            <button
-              onClick={() => { setForm({ ...EMPTY_FORM, assessed_at: new Date().toISOString().slice(0, 10) }); setShowModal(true) }}
-              className="btn-primary text-xs py-2 px-4 rounded-xl mt-3 inline-flex items-center gap-1.5"
-            >
-              <Plus className="w-3 h-3" /> Registrar avaliação
-            </button>
+            {!readOnly && (
+              <button
+                onClick={() => { setForm({ ...EMPTY_FORM, assessed_at: new Date().toISOString().slice(0, 10) }); setShowModal(true) }}
+                className="btn-primary text-xs py-2 px-4 rounded-xl mt-3 inline-flex items-center gap-1.5"
+              >
+                <Plus className="w-3 h-3" /> Registrar avaliação
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-4">

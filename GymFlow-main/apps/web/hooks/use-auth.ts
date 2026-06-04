@@ -33,9 +33,14 @@ export function useAuth() {
       // is always displayed immediately after login.
       const metaName = user.user_metadata?.full_name ?? null
       if (metaName) {
+        const accountType = user.user_metadata?.account_type as string | undefined
+        const doc = user.user_metadata?.document ?? null
         setProfile({
           id: user.id,
           full_name: metaName,
+          email: user.email ?? null,
+          cpf: accountType === 'student' ? doc : null,
+          cref: accountType === 'personal' ? doc : null,
           avatar_url: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -87,10 +92,14 @@ export function useAuth() {
   }
 
   async function signUp(email: string, password: string, fullName: string, accountType: 'owner' | 'personal' | 'student' = 'owner', redirectTo?: string, document?: string) {
+    // Personal usa CREF (alfanumérico); demais usam documento numérico (CPF/CNPJ).
+    const normalizedDoc = document
+      ? (accountType === 'personal' ? document.trim().toUpperCase() : document.replace(/\D/g, ''))
+      : null
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName, account_type: accountType, document: document ? document.replace(/\D/g, '') : null } },
+      options: { data: { full_name: fullName, account_type: accountType, document: normalizedDoc } },
     })
     if (error) throw error
     toast.success('Conta criada com sucesso!')

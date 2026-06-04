@@ -24,7 +24,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Convite não encontrado ou expirado' }, { status: 404 })
   }
 
-  const academy = data.academy as { name: string; slug: string } | null
+  // academy:academies(...) é relação to-one — PostgREST retorna objeto em runtime.
+  const academy = data.academy as unknown as { name: string; slug: string } | null
   if (!academy) return NextResponse.json({ error: 'Academia não encontrada' }, { status: 404 })
 
   if (data.expires_at && new Date(data.expires_at) < new Date()) {

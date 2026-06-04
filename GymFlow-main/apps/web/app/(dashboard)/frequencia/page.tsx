@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Activity, Calendar, Dumbbell, TrendingUp, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
@@ -69,8 +70,13 @@ function computeBestStreak(timestamps: string[]): number {
 
 export default function FrequenciaPage() {
   const { currentRole, currentAcademy } = useAuthStore()
+  const router = useRouter()
   const supabase = createClient()
   const isOwnerOrPersonal = currentRole === 'owner' || currentRole === 'personal'
+
+  useEffect(() => {
+    if (currentRole === 'owner') router.replace('/relatorios')
+  }, [currentRole, router])
 
   const [stats, setStats] = useState<FreqStats>({ thisWeek: 0, thisMonth: 0, total: 0, bestStreak: 0, weekDays: Array(7).fill(false) })
 
