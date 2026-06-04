@@ -106,7 +106,7 @@ git add .                     # todos os arquivos
 git commit -m "Correção dos fluxos"
 
 # 5. Enviar pro GitHub
-git push origin JoseEnzo
+git push origin main:JoseEnzo
 ```
 ```
 
