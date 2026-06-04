@@ -265,29 +265,31 @@ function InvitePanel({
 // ── Card de personal ─────────────────────────────────────────
 function PersonalCard({
   personal,
+  academyId,
   onDeactivate,
 }: {
   personal: Personal
+  academyId: string
   onDeactivate: (memberId: string) => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [deactivating, setDeactivating] = useState(false)
-  const supabase = createClient()
   const color = avatarColor(personal.fullName)
 
   async function handleDeactivate() {
     setDeactivating(true)
     setMenuOpen(false)
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: deleted, error } = await (supabase as any)
-        .from('academy_members')
-        .delete()
-        .eq('id', personal.memberId)
-        .select('id')
-
-      if (error) throw error
-      if (!deleted || deleted.length === 0) throw new Error('Sem permissão para remover este personal.')
+      // Remove só o vínculo via service-role (funciona sem depender da policy 037).
+      const res = await fetch('/api/members/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId: personal.memberId, academyId }),
+      })
+      if (!res.ok) {
+        const err = await res.json() as { error?: string }
+        throw new Error(err.error ?? 'Erro ao remover personal.')
+      }
       toast.success(`${personal.fullName ?? 'Personal'} foi removido.`)
       onDeactivate(personal.memberId)
     } catch (err: unknown) {
@@ -809,7 +811,7 @@ export default function PersonaisPage() {
               ) : (
                 <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {filtered.map((p) => (
-                    <PersonalCard key={p.memberId} personal={p} onDeactivate={handleDeactivate} />
+                    <PersonalCard key={p.memberId} personal={p} academyId={currentAcademy?.id ?? ''} onDeactivate={handleDeactivate} />
                   ))}
                 </motion.div>
               )}

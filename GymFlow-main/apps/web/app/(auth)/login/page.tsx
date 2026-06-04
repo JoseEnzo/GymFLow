@@ -109,7 +109,10 @@ function LoginInner() {
   const { signIn, signInWithProvider } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirect = searchParams.get('redirect')
+  // `redirect` é usado pelos links internos (ex: página de convite); `next` é o
+  // que o middleware injeta ao barrar rota protegida. Aceitar os dois evita que
+  // o destino pretendido se perca e o usuário caia sempre em /dashboard.
+  const redirect = searchParams.get('redirect') ?? searchParams.get('next')
   const roleParam = searchParams.get('role') as Role | null
 
   const [role, setRole] = useState<Role | null>(roleParam)

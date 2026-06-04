@@ -456,13 +456,14 @@ export default function DashboardPage() {
     const weekAgo    = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
 
-    // "Meus alunos" do personal = alunos ativos da academia (mesma base da
-    // página Alunos). Antes filtrava por workout_sheets.personal_id, então um
-    // personal sem fichas via "Nenhum aluno" no dashboard mesmo havendo alunos.
+    // "Meus alunos" do personal = alunos que ELE convidou (academy_members.invited_by,
+    // gravado pelo accept_invite). Não depende de fichas criadas — um personal novo
+    // que convida um aluno já o vê aqui, e não vê alunos de outros personais.
     const { data: studentMembers } = await sb
       .from('academy_members')
       .select('user_id')
       .eq('academy_id', aid).eq('role', 'student').eq('is_active', true)
+      .eq('invited_by', user.id)
     const myStudentIds = [...new Set((studentMembers ?? []).map((m: { user_id: string }) => m.user_id))] as string[]
 
     if (myStudentIds.length === 0) {

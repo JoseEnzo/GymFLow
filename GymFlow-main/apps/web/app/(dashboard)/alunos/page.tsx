@@ -549,25 +549,43 @@ export default function AlunosPage() {
     if (!currentAcademy) { setLoading(false); return }
     setLoading(true)
 
-    // RPC consolidada: members + profiles + metrics + filtro + paginação numa query.
+    // Escopo: o personal vê só os alunos que ELE convidou (academy_members.invited_by).
+    // O owner vê todos via RPC consolidada (members + profiles + metrics + paginação).
+    const { data: { user } } = await supabase.auth.getUser()
+    const personalUserId = currentRole === 'personal' ? (user?.id ?? '__none__') : null
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: studentRows, error: rpcError } = await (supabase as any).rpc('list_academy_students', {
-      p_academy_id: currentAcademy.id,
-      p_search: debouncedSearch,
-      p_status: filter,
-      p_limit: PAGE_SIZE,
-      p_offset: page * PAGE_SIZE,
-    })
+    let studentRows: any = null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let rpcError: any = null
+    if (personalUserId) {
+      // Marca sintética: pula a RPC e cai na query escopada abaixo (não é erro real).
+      rpcError = { scoped: true }
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const r = await (supabase as any).rpc('list_academy_students', {
+        p_academy_id: currentAcademy.id,
+        p_search: debouncedSearch,
+        p_status: filter,
+        p_limit: PAGE_SIZE,
+        p_offset: page * PAGE_SIZE,
+      })
+      studentRows = r.data
+      rpcError = r.error
+    }
 
     if (rpcError) {
-      console.warn('[alunos] list_academy_students indisponível — usando fallback. Aplique a migration 029 no Supabase.', rpcError?.message ?? rpcError)
-      // Fallback: queries diretas quando o RPC falha (ex: função ainda não aplicada no banco).
+      if (!rpcError.scoped) {
+        console.warn('[alunos] list_academy_students indisponível — usando fallback. Aplique a migration 029 no Supabase.', rpcError?.message ?? rpcError)
+      }
+      // Fallback (owner) / query escopada (personal): queries diretas.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let memberQuery = (supabase as any)
         .from('academy_members')
         .select('user_id, is_active', { count: 'exact' })
         .eq('academy_id', currentAcademy.id)
         .eq('role', 'student')
+      if (personalUserId) memberQuery = memberQuery.eq('invited_by', personalUserId)
       if (filter === 'active')   memberQuery = memberQuery.eq('is_active', true)
       if (filter === 'inactive') memberQuery = memberQuery.eq('is_active', false)
 
@@ -674,7 +692,7 @@ export default function AlunosPage() {
     })))
 
     setLoading(false)
-  }, [currentAcademy, debouncedSearch, filter, page])
+  }, [currentAcademy, currentRole, debouncedSearch, filter, page])
 
   useEffect(() => { load() }, [load])
 
@@ -732,17 +750,20 @@ export default function AlunosPage() {
     if (!currentAcademy) return
     try {
       const { data: { user } } = await supabase.auth.getUser()
+      // Remove só o vínculo via service-role (funciona sem depender da policy 037).
+      const res = await fetch('/api/members/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId: req.studentMemberId, academyId: currentAcademy.id }),
+      })
+      if (!res.ok) {
+        const err = await res.json() as { error?: string }
+        throw new Error(err.error ?? 'Erro ao remover aluno.')
+      }
+      // O vínculo já foi removido; o pedido some via cascade. O update é um
+      // no-op defensivo caso o cascade não exista neste ambiente.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const sb = supabase as any
-      // Apaga o vínculo; expulsion_requests.student_member_id é ON DELETE CASCADE,
-      // então o próprio pedido some junto (o update abaixo vira no-op inofensivo).
-      const { data: deleted, error } = await sb.from('academy_members')
-        .delete()
-        .eq('id', req.studentMemberId)
-        .select('id')
-      if (error) throw error
-      if (!deleted || deleted.length === 0) throw new Error('Sem permissão para remover este aluno.')
-      await sb.from('expulsion_requests')
+      await (supabase as any).from('expulsion_requests')
         .update({ status: 'approved', resolved_at: new Date().toISOString(), resolved_by: user?.id })
         .eq('id', req.id)
       toast.success(`${req.studentName ?? 'Aluno'} foi removido da academia.`)
@@ -784,14 +805,16 @@ export default function AlunosPage() {
         .limit(1)
       const memberData = memberList?.[0]
       if (!memberData) throw new Error('Membro não encontrado.')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: deleted, error } = await (supabase as any)
-        .from('academy_members')
-        .delete()
-        .eq('id', memberData.id)
-        .select('id')
-      if (error) throw error
-      if (!deleted || deleted.length === 0) throw new Error('Sem permissão para remover este aluno.')
+      // Remove só o vínculo via service-role (funciona sem depender da policy 037).
+      const res = await fetch('/api/members/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memberId: memberData.id, academyId: currentAcademy.id }),
+      })
+      if (!res.ok) {
+        const err = await res.json() as { error?: string }
+        throw new Error(err.error ?? 'Erro ao remover aluno.')
+      }
       toast.success(`${student.full_name ?? 'Aluno'} foi removido da academia.`)
       setExpulsionTarget(null)
       setExpulsionReason('')
@@ -1228,7 +1251,7 @@ export default function AlunosPage() {
               ) : (
                 <>
                   <p className="text-xs text-muted-foreground mb-4">
-                    O aluno perderá o acesso à academia. Esta ação pode ser revertida reativando o aluno.
+                    O aluno perderá o acesso a esta academia. A conta, o histórico e o perfil dele são preservados — ele pode voltar depois com um novo convite.
                   </p>
                   <div className="flex gap-2">
                     <button
