@@ -29,19 +29,31 @@ export function useAuth() {
     if (profileResult.data) {
       setProfile(profileResult.data)
     } else {
-      // Fallback: profile row may not exist yet — use auth metadata so the name
-      // is always displayed immediately after login.
-      const metaName = user.user_metadata?.full_name ?? null
+      // O trigger handle_new_user não cria a linha de profile de forma confiável
+      // no Supabase remoto, então alunos/personais ficam sem profile e o dono vê
+      // "Aluno" no lugar do nome. Gravamos o profile no 1º login a partir do
+      // metadata do auth para que o nome fique persistido e visível a todos.
+      const metaName = user.user_metadata?.full_name ?? (user.email ? user.email.split('@')[0] : null)
       if (metaName) {
         const accountType = user.user_metadata?.account_type as string | undefined
         const doc = user.user_metadata?.document ?? null
-        setProfile({
+        const upsertData = {
           id: user.id,
           full_name: metaName,
           email: user.email ?? null,
-          cpf: accountType === 'student' ? doc : null,
-          cref: accountType === 'personal' ? doc : null,
           avatar_url: null,
+          cpf: accountType === 'student' ? doc : null,
+          cref: accountType === 'personal' && typeof doc === 'string' ? doc.toUpperCase() : null,
+        }
+        // Persiste no banco (policy de insert permite id = auth.uid()). Se falhar
+        // (ex: cref duplicado), ainda mostramos o nome em memória nesta sessão.
+        const { data: created } = await supabase
+          .from('profiles')
+          .upsert(upsertData, { onConflict: 'id' })
+          .select()
+          .single()
+        setProfile(created ?? {
+          ...upsertData,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           phone: null,
@@ -96,12 +108,19 @@ export function useAuth() {
     const normalizedDoc = document
       ? (accountType === 'personal' ? document.trim().toUpperCase() : document.replace(/\D/g, ''))
       : null
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: fullName, account_type: accountType, document: normalizedDoc } },
     })
     if (error) throw error
+    // Com confirmação de e-mail ligada, o Supabase devolve "sucesso" com um user
+    // SEM identities quando o e-mail já existe (proteção anti-enumeração). Sem
+    // tratar isso, o usuário cairia no onboarding de uma conta que nunca loga.
+    const identities = data?.user?.identities
+    if (Array.isArray(identities) && identities.length === 0) {
+      throw new Error('Este e-mail já está cadastrado. Faça login.')
+    }
     toast.success('Conta criada com sucesso!')
     router.push(redirectTo ?? '/onboarding')
   }

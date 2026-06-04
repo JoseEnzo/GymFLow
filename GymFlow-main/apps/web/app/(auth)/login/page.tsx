@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Suspense, useRef, type ElementType } from 'react'
+import { useState, useEffect, Suspense, useRef, type ElementType } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -109,7 +109,10 @@ function LoginInner() {
   const { signIn, signInWithProvider } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirect = searchParams.get('redirect')
+  // `redirect` é usado pelos links internos (ex: página de convite); `next` é o
+  // que o middleware injeta ao barrar rota protegida. Aceitar os dois evita que
+  // o destino pretendido se perca e o usuário caia sempre em /dashboard.
+  const redirect = searchParams.get('redirect') ?? searchParams.get('next')
   const roleParam = searchParams.get('role') as Role | null
 
   const [role, setRole] = useState<Role | null>(roleParam)
@@ -125,6 +128,14 @@ function LoginInner() {
 
   const { register, handleSubmit, setValue, reset, formState: { errors } } =
     useForm<FormData>({ resolver: zodResolver(schema) })
+
+  // O callback de OAuth redireciona pra /login?error=auth_callback_failed quando
+  // o login social falha. Avisa o usuário (toast funciona em qualquer etapa).
+  useEffect(() => {
+    if (searchParams.get('error') === 'auth_callback_failed') {
+      toast.error('Não foi possível entrar com o provedor. Tente novamente.')
+    }
+  }, [searchParams])
 
   function handleRoleSelect(r: Role) {
     setRole(r)

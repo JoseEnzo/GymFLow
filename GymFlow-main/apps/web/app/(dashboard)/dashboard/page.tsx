@@ -456,21 +456,34 @@ export default function DashboardPage() {
     const weekAgo    = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
 
-    const { data: mySheets } = await sb.from('workout_sheets').select('student_id, is_active').eq('personal_id', user.id).eq('academy_id', aid)
-    const myStudentIds = [...new Set((mySheets ?? []).map((s: { student_id: string }) => s.student_id))] as string[]
-    const activeSheetStudents = new Set((mySheets ?? []).filter((s: { is_active: boolean }) => s.is_active).map((s: { student_id: string }) => s.student_id))
+    // "Meus alunos" do personal = alunos que ELE convidou (academy_members.invited_by,
+    // gravado pelo accept_invite). Não depende de fichas criadas — um personal novo
+    // que convida um aluno já o vê aqui, e não vê alunos de outros personais.
+    const { data: studentMembers } = await sb
+      .from('academy_members')
+      .select('user_id')
+      .eq('academy_id', aid).eq('role', 'student').eq('is_active', true)
+      .eq('invited_by', user.id)
+    const myStudentIds = [...new Set((studentMembers ?? []).map((m: { user_id: string }) => m.user_id))] as string[]
 
     if (myStudentIds.length === 0) {
       setPersonalMetrics({ myStudentsCount: 0, trainedTodayCount: 0, activeSheetsCount: 0, inactiveCount: 0 })
       return
     }
 
+    // Alunos com alguma ficha ativa (de qualquer personal).
+    const { data: activeSheetRows } = await sb
+      .from('workout_sheets')
+      .select('student_id')
+      .eq('academy_id', aid).eq('is_active', true).in('student_id', myStudentIds)
+    const activeSheetStudents = new Set((activeSheetRows ?? []).map((s: { student_id: string }) => s.student_id))
+
     const [{ data: recentLogs }, { data: todayLogs }, { data: profiles }, { data: myRecentRaw }, { data: mySheetNames }] = await Promise.all([
       sb.from('workout_logs').select('student_id, created_at').eq('academy_id', aid).in('student_id', myStudentIds).gte('created_at', weekAgo.toISOString()),
       sb.from('workout_logs').select('student_id').eq('academy_id', aid).in('student_id', myStudentIds).gte('created_at', todayStart.toISOString()),
       sb.from('profiles').select('id, full_name').in('id', myStudentIds),
       sb.from('workout_logs').select('id, created_at, student_id, duration_seconds, sheet_id').eq('academy_id', aid).in('student_id', myStudentIds).order('created_at', { ascending: false }).limit(8),
-      sb.from('workout_sheets').select('id, name').eq('personal_id', user.id).eq('academy_id', aid),
+      sb.from('workout_sheets').select('id, name').eq('academy_id', aid).in('student_id', myStudentIds),
     ])
 
     type ProfileRow   = { id: string; full_name: string }
