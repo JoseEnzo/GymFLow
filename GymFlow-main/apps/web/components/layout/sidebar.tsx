@@ -10,6 +10,7 @@ import {
   UserCog, BarChart2, BarChart3,
 } from 'lucide-react'
 
+import { BrandLogo } from '@/components/layout/brand-logo'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 import { useUIStore } from '@/stores/ui-store'

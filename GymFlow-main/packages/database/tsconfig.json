@@ -1,0 +1,4 @@
+{
+  "extends": "@gymflow/typescript-config/base.json",
+  "include": ["src/**/*"]
+}

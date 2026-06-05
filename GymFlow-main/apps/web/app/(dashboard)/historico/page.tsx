@@ -221,10 +221,16 @@ export default function HistoricoPage() {
       }
     })
 
-    if (pageNum === 0) setSessions(mapped)
-    else setSessions((prev) => [...prev, ...mapped])
+    // range() do Supabase é inclusivo, então pedimos PAGE_SIZE+1 (sentinel)
+    // pra detectar se há mais — mas só renderizamos os PAGE_SIZE primeiros,
+    // senão o último item duplicaria na próxima página.
+    const hasMorePages = mapped.length > PAGE_SIZE
+    const visible = hasMorePages ? mapped.slice(0, PAGE_SIZE) : mapped
 
-    setHasMore(mapped.length === PAGE_SIZE + 1)
+    if (pageNum === 0) setSessions(visible)
+    else setSessions((prev) => [...prev, ...visible])
+
+    setHasMore(hasMorePages)
     setLoading(false)
   }, [currentAcademy, profile])
 

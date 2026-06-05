@@ -349,7 +349,26 @@ export default function DemoPage() {
   const openGate = (msg: string) => setGate(msg)
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative min-h-screen bg-background bg-mesh bg-fixed">
+      {/* Grid pattern — absolute, rola junto com a página */}
+      <div
+        className="absolute inset-0 pointer-events-none z-0 opacity-[0.04]"
+        aria-hidden="true"
+        style={{
+          backgroundImage: `linear-gradient(rgba(99,102,241,1) 1px, transparent 1px),
+                            linear-gradient(90deg, rgba(99,102,241,1) 1px, transparent 1px)`,
+          backgroundSize: '60px 60px',
+        }}
+      />
+      {/* Vignette — fixed viewport overlay, below nav (z-50) */}
+      <div
+        className="fixed inset-0 pointer-events-none z-[45]"
+        aria-hidden="true"
+        style={{
+          background:
+            'radial-gradient(ellipse 80% 75% at 50% 50%, transparent 45%, rgba(0,0,0,0.55) 100%)',
+        }}
+      />
       {gate && <GateModal message={gate} onClose={() => setGate(null)} />}
 
       {/* Top bar */}
@@ -376,10 +395,9 @@ export default function DemoPage() {
         </div>
       </div>
 
-      <div className="pt-14">
+      <div className="relative pt-14">
         {/* Hero da demo */}
         <div className="relative py-16 overflow-hidden">
-          <div className="absolute inset-0 bg-mesh opacity-60" />
           <motion.div
             animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
             transition={{ duration: 8, repeat: Infinity }}
@@ -470,7 +488,7 @@ export default function DemoPage() {
         </div>
 
         {/* CTA section */}
-        <div className="border-t border-border/40 bg-mesh">
+        <div>
           <div className="mx-auto max-w-5xl px-4 py-16">
             <motion.div
               initial={{ opacity: 0, y: 24 }}

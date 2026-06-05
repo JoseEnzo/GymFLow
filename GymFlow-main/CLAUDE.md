@@ -398,8 +398,28 @@ Rodar da **raiz do monorepo** (`GymFlow-main/`), não de `apps/web/`:
 - `pnpm install` — instalar dependências do workspace
 - `doppler run -- pnpm --filter @gymflow/web dev` — dev server com envs reais (recomendado)
 - `pnpm dev` — dev server sem Doppler (precisa de `.env.local` manual em `apps/web/`)
-- `pnpm build` — build de tudo via Turbo
-- `pnpm type-check` / `pnpm lint` — checks
+- `pnpm build` — build de tudo via Turbo (passa pelo `doppler run` em `apps/web`)
+- `pnpm type-check` — checks de tipo via tsc em todos os pacotes (rodado no CI)
+- `pnpm lint` — **não configurado** ainda (`next lint` cai em prompt interativo)
 - `pnpm db:push` / `pnpm db:reset` / `pnpm db:types` — migrations e tipos
 - Smoke test: `PORT=3333 bash .claude/skills/run-gymflow/smoke.sh`
 - Rotinas integradas: skill `.claude/skills/run-gymflow/SKILL.md`
+
+---
+
+## CI
+
+GitHub Actions roda em `.github/workflows/ci.yml` a cada PR pra `main` e push em `main`.
+
+**Hoje:**
+- ✅ `type-check` — `tsc --noEmit` em todos os pacotes via Turbo. Bloqueia merge se quebrar.
+
+**TODO (estão comentados no YAML, prontos pra ativar):**
+- ⏳ `lint` — depende de configurar `eslint.config.mjs` em `apps/web` + popular `packages/config/eslint/` (hoje vazio). `next lint` em projeto sem config cai em prompt interativo e quebra.
+- ⏳ `build` — depende de remover dependência de Doppler no `next build` ou injetar `DOPPLER_TOKEN` como secret. Hoje o script é `doppler run -- next build` e falha sem token.
+
+**Particularidades resolvidas:**
+- `packages/database` precisa de `tsconfig.json` (estende `@gymflow/typescript-config/base.json`) — sem ele `tsc --noEmit` cai no help.
+- `packages/ui` está vazio (sem `src/`); type-check é `echo skip` até o pacote ter conteúdo.
+
+**Branch protection sugerida:** Settings → Branches → require `CI / Type-check` passing pra mergear em `main`.
