@@ -1,0 +1,19 @@
+{
+  "name": "MeuTrein — Plataforma para Academias",
+  "short_name": "MeuTrein",
+  "description": "Ficha de treino no celular do aluno, evolução nas mãos do personal, dashboard pro dono. Sem TI.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#06060F",
+  "theme_color": "#06060F",
+  "lang": "pt-BR",
+  "categories": ["fitness", "health", "productivity"],
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}

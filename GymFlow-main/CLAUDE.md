@@ -159,6 +159,33 @@ if (error) throw error
 const { data } = await supabase.from('workout_sheets').select('*')
 ```
 
+#### Paginação com `.range()` — pegadinha
+
+`.range(start, end)` no Supabase é **inclusivo nas duas pontas**. Pra páginas de tamanho N:
+
+```ts
+// ❌ ERRADO: range(0, 10) traz 11 items, range(10, 20) duplica o item 10
+.range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE)
+
+// ✅ CORRETO opção A (simples — pede exatamente N items):
+.range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1)
+
+// ✅ CORRETO opção B (sentinel — pede N+1 pra detectar "tem mais"):
+.range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE)
+const hasMore = result.length > PAGE_SIZE
+const visible = hasMore ? result.slice(0, PAGE_SIZE) : result
+```
+
+Bug já corrigido em `app/(dashboard)/historico/page.tsx`. Padrão B é o recomendado quando você precisa do "Carregar mais".
+
+#### Dívida técnica — `(supabase as any).from(...)`
+
+Existem **~90 ocorrências** de `as any` no codebase, das quais ~65 são `(supabase as any).from(...)`. Eram necessárias quando `packages/database/src/types.ts` estava stale; **hoje os types estão atualizados** (regenerados após migrations 040/041). A maioria desses casts **pode ser removida sem efeito funcional**, e fazer isso revela bugs de tipo que estão escondidos.
+
+Para **código novo**: use `supabase.from('tabela')` direto, sem cast. Se `as any` for necessário, comente o motivo.
+
+Para **limpeza retroativa**: ataque por categoria (queries → casts inline → outros), rodando `pnpm type-check` entre lotes.
+
 ### Zustand
 - Store global apenas para: usuário logado, `academy_id` ativo e `role`
 - Estado de UI (loading, modal aberto) fica local com `useState`
@@ -271,15 +298,39 @@ if (role === 'owner') {
 
 ## Padrões de UI
 
-- **Componentes base:** sempre usar shadcn/ui (`Button`, `Input`, `Card`, `Badge`, `Dialog`)
-- **Ícones:** Lucide React, outline, 20-24px
-- **Cor primária:** teal `#1D9E75` — usar `text-teal-600`, `bg-teal-50`, `border-teal-200`
-- **Cor de destaque:** amber `#EF9F27` — usar para recordes pessoais e conquistas
-- **Mobile-first:** toda tela deve funcionar em 375px
-- **Estado vazio:** sempre ter ícone + mensagem + botão de ação
-- **Loading:** usar skeleton (shadcn/ui `Skeleton`), nunca spinner sozinho em tela cheia
+- **Componentes base:** sempre usar shadcn/ui (`Button`, `Input`, `Card`, `Badge`, `Dialog`).
+- **Ícones:** Lucide React, outline, 20-24px.
+- **Logo:** sempre via `<BrandLogo size="..." />` em `apps/web/components/layout/brand-logo.tsx`. Link smart auto-decide destino (`/dashboard` se logado, `/` se não). Nunca recriar logo manual.
+- **Mobile-first:** toda tela deve funcionar em 375px.
+- **Estado vazio:** sempre ter ícone + mensagem + botão de ação.
+- **Loading:** usar skeleton (`components/ui/skeleton.tsx`), nunca spinner sozinho em tela cheia.
 - **Inputs numéricos no mobile:** sempre passar `inputMode` junto com `type="number"`. Use `"decimal"` para pesos/medidas/percentuais e `"numeric"` para inteiros (reps, idade). Sem isso, o aluno suado registrando carga pega teclado QWERTY.
 - **Scroll horizontal mobile:** quando usar `overflow-x-auto` em tabs/filtros, esconder a scrollbar nativa (`[scrollbar-width:none] [&::-webkit-scrollbar]:hidden`) e adicionar gradient fade na borda direita pra indicar conteúdo cortado (ver `app/(dashboard)/configuracoes/page.tsx`).
+
+### Paleta e regra de cor (sistema vigente)
+
+| Papel | Cor | Onde usar |
+|---|---|---|
+| **Brand / estrutura** | `brand-500` `#6366F1` (indigo) | Sidebar active, logo, links de navegação, badges informativos, charts informativos, gradient text decorativo |
+| **Ação primária** | `amber-700` `#B45309` (mostarda queimada) | Botões `btn-primary`, CTAs principais da landing, badges de destaque ("⚡ Mais popular"), botão de upgrade |
+| **Sucesso** | `emerald-500` `#10b981` | Confirmações, estado "concluído", treinos completos |
+| **Aviso/atenção** | `amber-400/500` `#fbbf24/#f59e0b` | Streak ativa, alertas suaves |
+| **Erro/destrutivo** | `rose-500` / destructive | Erros, remoção, cancelamento |
+| **Conquista** | `amber-400` ou `Trophy` icon | PR (recorde pessoal), streak |
+
+**Regra de ouro:** roxo = onde o usuário **olha**, amber = onde o usuário **clica**. Se um botão é a ação principal da tela, é amber-700. Se é navegação ou informação, é roxo.
+
+**`btn-primary` (em `globals.css`)** já está configurado com amber-700 + glow amber — qualquer botão com essa classe herda automaticamente. Mudou a definição centralmente, **62 botões** no app inteiro atualizam de uma vez.
+
+### Pegadinha do Tailwind JIT em hover
+
+Tailwind compila classes só quando vê o nome literal no source. Se um botão usa `bg-amber-700 hover:bg-amber-800` mas o dev server inicializou ANTES da paleta `amber` ter `700/800` no `tailwind.config.ts`, o turbopack cacheia ausência da classe — botão fica **transparente até restart** do dev server.
+
+**Workaround robusto** (usado nos CTAs principais da landing): `style={{ background: '#B45309' }}` + handlers `onMouseEnter/Leave` pra hover. Não depende de Tailwind. Use só em local estratégico onde "transparente até restart" não é aceitável — pra dashboard interno, classe normal está OK.
+
+### PWA / manifest
+
+`apps/web/public/manifest.json` existe com config mínima (nome, theme dark, ícone fallback no `favicon.ico`). **Não há service worker ainda** — instalável como PWA, mas sem suporte offline real. Pra prometer offline na copy, implementar service worker antes (ou ajustar texto).
 
 ---
 
@@ -319,12 +370,15 @@ Webhook Stripe (`apps/web/app/api/webhooks/stripe/route.ts`) usa claim atômico 
 ## O que não fazer
 
 - **Não criar componentes de UI do zero** se existe no shadcn/ui
-- **Não usar `localStorage`** para dados do usuário — usar Supabase Auth session
-- **Não fazer queries sem tratamento de erro**
+- **Não criar logo manual** — use `<BrandLogo />` (link smart já configurado)
+- **Não usar `localStorage` para dados do usuário** — usar Supabase Auth session (keys atuais `gymflow_*` são pra drafts/preferências e estão documentadas em [Marca: MeuTrein vs GymFlow])
+- **Não fazer queries sem tratamento de erro** (`{ data, error }`, sempre desestruturar e checar `error`)
+- **Não usar `.range(start, end)` esperando comportamento half-open** — Supabase é inclusivo (ver seção Supabase)
 - **Não expor chaves de API no cliente**
-- **Não fazer redirect no middleware sem checar o role** — aluno não pode acessar `/dashboard`
+- **Não fazer redirect no middleware sem checar o role** — aluno não pode acessar `/dashboard` de owner
 - **Não remover `academy_id` de nenhuma tabela** — quebra o isolamento multi-tenant
-- **Não usar `useEffect` para buscar dados** — usar React Query ou server components
+- **Não usar `useEffect` para buscar dados** — usar React Query ou server components (29 arquivos hoje violam — débito técnico, refator grande)
+- **Não adicionar novos `as any` sem comentário** justificando — types do Supabase estão atualizados, cast normalmente não é necessário
 
 ---
 

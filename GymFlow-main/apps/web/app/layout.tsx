@@ -49,10 +49,10 @@ export const metadata: Metadata = {
     creator: '@gymflow',
   },
   manifest: '/manifest.json',
+  // TODO: gerar PNGs reais (favicon-16x16, apple-touch-icon) com a marca MeuTrein
+  // — por enquanto só favicon.ico evita 404 em produção.
   icons: {
     icon: '/favicon.ico',
-    shortcut: '/favicon-16x16.png',
-    apple: '/apple-touch-icon.png',
   },
 }
 
