@@ -77,19 +77,9 @@ const config: Config = {
           500: '#10b981',
           600: '#059669',
         },
-        // Cor secundária — usada em CTAs principais, badges de destaque e
-        // conquistas (PR, streaks). Roxo brand fica na estrutura; amber é ação.
         amber: {
-          50:  '#fffbeb',
-          100: '#fef3c7',
-          200: '#fde68a',
-          300: '#fcd34d',
           400: '#fbbf24',
           500: '#f59e0b',
-          600: '#d97706',
-          700: '#b45309',
-          800: '#92400e',
-          900: '#78350f',
         },
         rose: {
           400: '#fb7185',
@@ -204,9 +194,6 @@ const config: Config = {
         'glow-lg': '0 0 40px rgba(99, 102, 241, 0.4)',
         'glow-cyan': '0 0 20px rgba(6, 182, 212, 0.3)',
         'glow-emerald': '0 0 20px rgba(16, 185, 129, 0.3)',
-        'glow-amber-sm': '0 0 10px rgba(245, 158, 11, 0.22)',
-        'glow-amber':    '0 0 20px rgba(245, 158, 11, 0.32)',
-        'glow-amber-lg': '0 0 40px rgba(245, 158, 11, 0.38)',
         'card-hover': '0 20px 40px rgba(0,0,0,0.4), 0 0 20px rgba(99,102,241,0.1)',
         'inner-glow': 'inset 0 0 30px rgba(99, 102, 241, 0.05)',
       },

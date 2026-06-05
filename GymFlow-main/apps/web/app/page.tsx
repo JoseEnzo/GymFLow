@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 
 import { BrandLogo } from '@/components/layout/brand-logo'
+import { InstallButton } from '@/components/pwa/install-button'
 import { cn } from '@/lib/utils'
 
 // ──────────────────────────────────────────────
@@ -360,15 +361,15 @@ function Hero() {
               <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-4">
                 <Link
                   href="/cadastro"
-                  className="group relative inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-white overflow-hidden transition-all duration-300 shadow-glow-amber-sm hover:shadow-glow-amber"
-                  style={{ background: '#B45309' }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = '#92400E')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = '#B45309')}
+                  className="group relative inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-white overflow-hidden transition-all duration-300"
+                  style={{ background: 'linear-gradient(135deg, #6366F1, #4F46E5)' }}
                 >
                   <span className="relative z-10 flex items-center gap-2">
                     Começar grátis
                     <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                   </span>
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ background: 'linear-gradient(135deg, #818CF8, #6366F1)' }} />
                 </Link>
 
                 <a
@@ -382,6 +383,11 @@ function Hero() {
                   </div>
                   Ver demonstração
                 </a>
+              </motion.div>
+
+              {/* PWA install — só renderiza quando navegador aceita instalar. */}
+              <motion.div variants={fadeUp}>
+                <InstallButton variant="ghost" />
               </motion.div>
 
               {/* Social proof — texto honesto, sem avatares/estrelas fake */}
@@ -1008,10 +1014,7 @@ function PricingSection() {
             >
               {plan.popular && (
                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                  <span
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-white text-xs font-bold shadow-glow-amber-sm"
-                    style={{ background: '#B45309' }}
-                  >
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-brand-500 to-cyan-500 text-white text-xs font-bold shadow-glow-sm">
                     ⚡ Mais popular
                   </span>
                 </div>
@@ -1047,14 +1050,11 @@ function PricingSection() {
               <Link
                 href={plan.href}
                 className={cn(
-                  'btn text-sm py-3 rounded-xl text-center font-bold transition-all',
+                  'btn text-sm py-3 rounded-xl text-center font-bold',
                   plan.popular
-                    ? 'text-white shadow-glow-amber-sm hover:shadow-glow-amber'
+                    ? 'bg-gradient-to-r from-brand-500 to-brand-600 text-white hover:from-brand-400 hover:to-brand-500 shadow-glow-sm hover:shadow-glow'
                     : 'bg-surface-200 text-foreground hover:bg-surface-300 border border-border'
                 )}
-                style={plan.popular ? { background: '#B45309' } : undefined}
-                onMouseEnter={plan.popular ? (e) => (e.currentTarget.style.background = '#92400E') : undefined}
-                onMouseLeave={plan.popular ? (e) => (e.currentTarget.style.background = '#B45309') : undefined}
               >
                 {plan.cta}
               </Link>
@@ -1221,10 +1221,8 @@ function CTASection() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
               <Link
                 href="/cadastro"
-                className="group relative inline-flex items-center justify-center gap-2 px-10 py-4 rounded-2xl font-bold text-white text-lg overflow-hidden shadow-glow-amber hover:shadow-glow-amber-lg transition-all"
-                style={{ background: '#B45309' }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = '#92400E')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = '#B45309')}
+                className="group relative inline-flex items-center justify-center gap-2 px-10 py-4 rounded-2xl font-bold text-white text-lg overflow-hidden"
+                style={{ background: 'linear-gradient(135deg, #6366F1, #4F46E5)' }}
               >
                 <span className="relative z-10 flex items-center gap-2">
                   Criar conta gratuita
@@ -1250,7 +1248,7 @@ function Footer() {
           <div className="col-span-2 md:col-span-1 space-y-4">
             <BrandLogo size="md" />
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Feito pra academia pequena, sem TI.
+              Feito pra academia pequena.
             </p>
           </div>
 
@@ -1300,7 +1298,7 @@ function Footer() {
             © {new Date().getFullYear()} MeuTrein. Todos os direitos reservados.
           </p>
           <p className="text-xs text-muted-foreground">
-            Feito com ❤️ no Brasil
+            Feito no Brasil
           </p>
         </div>
       </div>

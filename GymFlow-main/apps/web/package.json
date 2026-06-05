@@ -14,6 +14,7 @@
     "clean": "rm -rf .next"
   },
   "dependencies": {
+    "@ducanh2912/next-pwa": "^10.2.9",
     "@gymflow/database": "workspace:*",
     "@gymflow/ui": "workspace:*",
     "@hookform/resolvers": "^3.9.1",

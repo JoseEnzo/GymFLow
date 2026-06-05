@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { useAuth } from '@/hooks/use-auth'
 import { getInitials } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import { InstallButton } from '@/components/pwa/install-button'
 
 const ROOT_ROUTES = new Set(['/dashboard'])
 
@@ -106,6 +107,9 @@ export function Header() {
           <span>Buscar...</span>
           <kbd className="ml-2 text-[10px] font-mono bg-surface-200 px-1.5 py-0.5 rounded border border-border/60">⌘K</kbd>
         </button>
+
+        {/* Install PWA — auto-hide quando já instalado ou não-instalável. */}
+        <InstallButton variant="ghost" className="hidden sm:inline-flex px-2.5 py-2 rounded-xl hover:bg-surface-100" />
 
         {/* Notifications */}
         <button className="relative p-2.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all">

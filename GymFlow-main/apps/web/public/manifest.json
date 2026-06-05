@@ -1,19 +1,64 @@
 {
+  "id": "/",
   "name": "MeuTrein — Plataforma para Academias",
   "short_name": "MeuTrein",
   "description": "Ficha de treino no celular do aluno, evolução nas mãos do personal, dashboard pro dono. Sem TI.",
-  "start_url": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#06060F",
   "theme_color": "#06060F",
   "lang": "pt-BR",
+  "dir": "ltr",
   "categories": ["fitness", "health", "productivity"],
   "icons": [
     {
-      "src": "/favicon.ico",
-      "sizes": "any",
-      "type": "image/x-icon"
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Treinos",
+      "short_name": "Treinos",
+      "description": "Ver e executar treinos",
+      "url": "/treinos",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Agenda",
+      "short_name": "Agenda",
+      "description": "Próximas sessões",
+      "url": "/agenda",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Histórico",
+      "short_name": "Histórico",
+      "description": "Treinos realizados",
+      "url": "/historico",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

@@ -350,16 +350,6 @@ export default function DemoPage() {
 
   return (
     <div className="relative min-h-screen bg-background bg-mesh bg-fixed">
-      {/* Grid pattern — absolute, rola junto com a página */}
-      <div
-        className="absolute inset-0 pointer-events-none z-0 opacity-[0.04]"
-        aria-hidden="true"
-        style={{
-          backgroundImage: `linear-gradient(rgba(99,102,241,1) 1px, transparent 1px),
-                            linear-gradient(90deg, rgba(99,102,241,1) 1px, transparent 1px)`,
-          backgroundSize: '60px 60px',
-        }}
-      />
       {/* Vignette — fixed viewport overlay, below nav (z-50) */}
       <div
         className="fixed inset-0 pointer-events-none z-[45]"

@@ -186,12 +186,8 @@
     @apply focus-visible:ring-primary/70 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply btn bg-amber-700 text-white hover:bg-amber-800 active:scale-95;
-    @apply shadow-glow-amber-sm hover:shadow-glow-amber px-6 py-3;
-  }
-  .btn-amber {
-    @apply btn bg-amber-500 text-white hover:bg-amber-600 active:scale-95;
-    @apply shadow-glow-amber-sm hover:shadow-glow-amber px-6 py-3;
+    @apply btn bg-brand-500 text-white hover:bg-brand-600 active:scale-95;
+    @apply shadow-glow-sm hover:shadow-glow px-6 py-3;
   }
   .btn-secondary {
     @apply btn bg-surface-200 text-foreground hover:bg-surface-300 px-6 py-3;

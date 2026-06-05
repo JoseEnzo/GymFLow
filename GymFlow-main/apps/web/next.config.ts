@@ -1,7 +1,40 @@
 import type { NextConfig } from 'next'
 import { withSentryConfig } from '@sentry/nextjs'
+import withPWAInit from '@ducanh2912/next-pwa'
 
 const isDev = process.env.NODE_ENV === 'development'
+
+// PWA / service worker.
+// Rotas autenticadas (multi-tenant) JAMAIS podem servir resposta cacheada — usuário B
+// veria dado do usuário A. Por isso APIs e páginas dinâmicas usam NetworkOnly.
+// Cache agressivo só em assets estáticos.
+const withPWA = withPWAInit({
+  dest: 'public',
+  register: true,
+  // Em dev o SW interfere com hot reload e o Sentry; só habilita em prod.
+  disable: isDev,
+  cacheOnFrontEndNav: false,
+  reloadOnOnline: true,
+  workboxOptions: {
+    skipWaiting: true,
+    clientsClaim: true,
+    runtimeCaching: [
+      { urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i, handler: 'NetworkOnly' },
+      { urlPattern: /^https:\/\/api\.stripe\.com\/.*/i, handler: 'NetworkOnly' },
+      { urlPattern: /\/api\/.*/i, handler: 'NetworkOnly' },
+      {
+        urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico|avif)$/i,
+        handler: 'CacheFirst',
+        options: { cacheName: 'images', expiration: { maxEntries: 64, maxAgeSeconds: 30 * 24 * 60 * 60 } },
+      },
+      {
+        urlPattern: /\.(?:js|css|woff2?)$/i,
+        handler: 'StaleWhileRevalidate',
+        options: { cacheName: 'static-assets' },
+      },
+    ],
+  },
+})
 
 const SECURITY_HEADERS = [
   { key: 'X-Frame-Options', value: 'DENY' },
@@ -21,6 +54,8 @@ const SECURITY_HEADERS = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' https: data: blob:",
       "font-src 'self'",
+      "worker-src 'self' blob:",
+      "manifest-src 'self'",
       `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://maps.googleapis.com${isDev ? ' http://localhost:54321 ws://localhost:54321' : ''}`,
       "frame-src https://js.stripe.com https://hooks.stripe.com",
       "object-src 'none'",
@@ -52,7 +87,7 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default withSentryConfig(nextConfig, {
+export default withSentryConfig(withPWA(nextConfig), {
   org: process.env['SENTRY_ORG'],
   project: process.env['SENTRY_PROJECT'],
   silent: !process.env['CI'],

@@ -49,10 +49,20 @@ export const metadata: Metadata = {
     creator: '@gymflow',
   },
   manifest: '/manifest.json',
-  // TODO: gerar PNGs reais (favicon-16x16, apple-touch-icon) com a marca MeuTrein
-  // — por enquanto só favicon.ico evita 404 em produção.
+  // Ícones PNG vivem em /public/icons (192/512 + maskable). Apple Touch Icon
+  // fica em /public/apple-touch-icon.png (180x180). Sem esses PNGs, Chrome
+  // não considera a app instalável.
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
+  appleWebApp: {
+    capable: true,
+    title: 'MeuTrein',
+    statusBarStyle: 'black-translucent',
   },
 }
 
@@ -61,7 +71,7 @@ export const viewport: Viewport = {
   colorScheme: 'dark',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
+  // maximumScale removido: bloqueava zoom de acessibilidade (Apple reclama).
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

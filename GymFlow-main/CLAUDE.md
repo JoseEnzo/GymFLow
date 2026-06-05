@@ -311,26 +311,37 @@ if (role === 'owner') {
 
 | Papel | Cor | Onde usar |
 |---|---|---|
-| **Brand / estrutura** | `brand-500` `#6366F1` (indigo) | Sidebar active, logo, links de navegação, badges informativos, charts informativos, gradient text decorativo |
-| **Ação primária** | `amber-700` `#B45309` (mostarda queimada) | Botões `btn-primary`, CTAs principais da landing, badges de destaque ("⚡ Mais popular"), botão de upgrade |
+| **Brand / ação primária** | `brand-500` `#6366F1` (indigo) | Sidebar active, logo, links de navegação, **botões `btn-primary`**, CTAs principais da landing, badges informativos, charts |
+| **Destaque secundário** | gradient `brand-500 → cyan-500` | Badge "⚡ Mais popular" no pricing, elementos que precisam saltar mais |
 | **Sucesso** | `emerald-500` `#10b981` | Confirmações, estado "concluído", treinos completos |
-| **Aviso/atenção** | `amber-400/500` `#fbbf24/#f59e0b` | Streak ativa, alertas suaves |
+| **Aviso / conquista** | `amber-400/500` `#fbbf24/#f59e0b` | Streak ativa, recordes pessoais (PR), `Trophy` icon, alertas suaves |
 | **Erro/destrutivo** | `rose-500` / destructive | Erros, remoção, cancelamento |
-| **Conquista** | `amber-400` ou `Trophy` icon | PR (recorde pessoal), streak |
 
-**Regra de ouro:** roxo = onde o usuário **olha**, amber = onde o usuário **clica**. Se um botão é a ação principal da tela, é amber-700. Se é navegação ou informação, é roxo.
+**Histórico:** chegamos a testar amber-700 como cor de ação primária (laranja queimado, "fitness BR") em out/2026. Resultado: contraste técnico OK mas perda de nitidez perceptiva nas letras + estética destoava do resto. Revertido. Se quiser reabrir esse experimento, considere reduzir glow e aumentar font-weight do botão antes de descartar.
 
-**`btn-primary` (em `globals.css`)** já está configurado com amber-700 + glow amber — qualquer botão com essa classe herda automaticamente. Mudou a definição centralmente, **62 botões** no app inteiro atualizam de uma vez.
-
-### Pegadinha do Tailwind JIT em hover
-
-Tailwind compila classes só quando vê o nome literal no source. Se um botão usa `bg-amber-700 hover:bg-amber-800` mas o dev server inicializou ANTES da paleta `amber` ter `700/800` no `tailwind.config.ts`, o turbopack cacheia ausência da classe — botão fica **transparente até restart** do dev server.
-
-**Workaround robusto** (usado nos CTAs principais da landing): `style={{ background: '#B45309' }}` + handlers `onMouseEnter/Leave` pra hover. Não depende de Tailwind. Use só em local estratégico onde "transparente até restart" não é aceitável — pra dashboard interno, classe normal está OK.
+**`btn-primary` (em `globals.css`)** está em `bg-brand-500` + glow indigo. Mudar a definição centralmente atualiza ~62 botões no app inteiro de uma vez.
 
 ### PWA / manifest
 
-`apps/web/public/manifest.json` existe com config mínima (nome, theme dark, ícone fallback no `favicon.ico`). **Não há service worker ainda** — instalável como PWA, mas sem suporte offline real. Pra prometer offline na copy, implementar service worker antes (ou ajustar texto).
+Setup PWA completo via `@ducanh2912/next-pwa` (configurado em `apps/web/next.config.ts` wrappeando o `nextConfig` antes do Sentry).
+
+- **Manifest:** `apps/web/public/manifest.json` — id, scope, shortcuts (Treinos/Agenda/Histórico), 4 entradas de ícones (192/512 + maskable).
+- **Service worker:** gerado automaticamente no `next build` (output em `public/sw.js`). Desabilitado em dev pra não conflitar com HMR/Sentry.
+- **Estratégia de cache (crítica multi-tenant):**
+  - Supabase, Stripe, `/api/*` → `NetworkOnly` (NUNCA cachear — dado de outro tenant cacheado é vazamento).
+  - Imagens (png/jpg/svg/webp/ico/avif) → `CacheFirst` com expiração 30d.
+  - Bundles JS/CSS/fonts → `StaleWhileRevalidate`.
+  - HTML autenticado: não está em `runtimeCaching`, então respeita o default do Workbox sem cache de página.
+- **iOS:** `metadata.appleWebApp` + `apple-touch-icon.png` (180x180) em `public/`. iOS ignora `manifest.json` parcialmente.
+- **Install UX:** `components/pwa/install-button.tsx` escuta `beforeinstallprompt` (Android/Chrome/Edge) e exibe bottom sheet com instrução manual no iOS. Detecta `display-mode: standalone` pra esconder quando já instalado.
+- **CSP:** `worker-src 'self' blob:` + `manifest-src 'self'` adicionados em `next.config.ts` pra registrar o SW.
+
+**Pendente pra instalação realmente disparar prompt no Chrome:**
+1. Gerar PNGs reais em `apps/web/public/icons/` — `icon-192.png`, `icon-512.png`, `icon-maskable-192.png`, `icon-maskable-512.png`. Sem esses 4 arquivos, Chrome ignora o critério "installable" e o evento `beforeinstallprompt` não dispara. Ferramenta: realfavicongenerator.net com o SVG do `BrandLogo`.
+2. `apple-touch-icon.png` (180x180) em `apps/web/public/`.
+3. Testar em produção com Lighthouse PWA audit (precisa HTTPS — Vercel já dá).
+
+**O que NÃO está cacheado offline ainda:** execução de treino. Pra prometer "funciona sem internet" na copy, precisaria estratégia adicional (cache do shell + IndexedDB pra set_logs pendentes + sync ao reconectar).
 
 ---
 
@@ -432,6 +443,60 @@ Toda comunicação com o usuário deve refletir o foco em **pequenas academias**
 ### Régua simples
 
 Antes de aprovar qualquer copy nova, pergunte: **"Um dono de uma academia com 40 alunos no bairro lendo isso entende, acredita e vê valor?"** Se a resposta exigir "ele vai precisar de alguém pra explicar", reescreve.
+
+---
+
+## Política de Documentação (CLAUDE.md)
+
+Este arquivo é a **memória persistente do projeto** lida no início de toda sessão. Sua qualidade dita o nível do trabalho a partir do próximo prompt. Regras pra manter.
+
+### Quando ATUALIZAR
+
+Atualize `CLAUDE.md` na **mesma sessão** em que algo abaixo acontecer — não deixe pra depois:
+
+1. **Nova dependência ou padrão de stack** (ex: `next-pwa`, novo limiter, troca de lib de chart). Inclui versão se for relevante.
+2. **Decisão arquitetural** (ex: "drafts em localStorage", "RPCs SECURITY INVOKER em vez de DEFINER"). Sempre com o **porquê** — sem o motivo, a regra vira culto-cargo.
+3. **Pegadinha de API/lib** que pode reincidir (ex: `.range()` inclusivo do Supabase, `.env.example` truthy quebrando `!process.env.X`). Documenta o erro **e** o padrão correto.
+4. **Mudança em fluxo crítico** (cadastro de academia, entrada de aluno, execução de treino, webhook Stripe, instalação PWA).
+5. **Convenção de UI ou cor** (paleta, regra de logo, inputs mobile, scroll horizontal).
+6. **Status de feature/infra** (CI, lint, build, PWA, observability) — o que **já funciona** vs **TODO** vs **bloqueado**.
+7. **Experimento descartado** quando vale registrar pra futuro não repetir cego (ver "Histórico" da paleta amber).
+
+### Quando NÃO atualizar
+
+- **Bugfix isolado** sem padrão novo (commit message basta).
+- **Refactor interno** sem mudar superfície pública.
+- **Coisa já óbvia** lendo o código (estrutura de pastas, nomes shadcn — sem valor).
+- **Estado efêmero da sessão** (arquivos mexidos, progresso atual) — isso vive em checkpoint, não em CLAUDE.md.
+
+### Estrutura de cada entrada
+
+1. **Adicione na seção existente** se houver. Crie nova seção `##` só pra domínio realmente novo.
+2. **Lead com regra/fato direto.** Em seguida: contexto/exemplo se ajudar, "porquê" se a regra for surpreendente.
+3. **Tabelas** pra paleta, permissões, comparações, status de features.
+4. **Bloco de código `✅ certo / ❌ errado`** pra padrões com armadilha (Supabase queries, paginação, casts de tipo).
+5. **Linkar arquivos** via caminho relativo (ex: `apps/web/middleware.ts`) — facilita navegação.
+6. **Datas em formato absoluto** (`out/2026`, `2026-06-05`) — relativos (`semana passada`) envelhecem mal.
+
+### Estilo
+
+- **Português pt-BR direto.** Sem "vamos garantir que…", "é importante notar que…". Verbo + substantivo concreto.
+- **Sem promessa vazia.** Se algo está em roadmap, escreve "**TODO**" ou "**Pendente**" explícito. Se foi tentado e revertido, marca como "**Histórico:**" com o motivo.
+- **Sem emoji decorativo.** Só ✅/❌/⚠️ funcionais em tabelas de status ou exemplos.
+- **Sem repetir o que código já diz.** Padrão "componentes em PascalCase" sai do CLAUDE.md se já está em config — mas "logo sempre via `<BrandLogo>`" fica porque é decisão não-óbvia.
+
+### Lifecycle e auditoria
+
+- **Toda PR que muda comportamento documentado** precisa atualizar a seção correspondente. Doc velha mentindo é pior que doc ausente.
+- **Marcar como `~~obsoleto~~`** seções de feature removida; remover de vez na próxima limpeza.
+- **Revisão trimestral mínima** das seções "TODO", "Pendente" e "Histórico" — o que virou realidade desce pra fato, o que morreu sai.
+- **Limite de tamanho:** se um `.md` passa de ~600 linhas, considere extrair seção pra arquivo dedicado (ex: `docs/security.md`) e deixar só o link no CLAUDE.md.
+
+### Régua simples
+
+Antes de escrever entrada nova, pergunte: **"Sem isso aqui, o próximo Claude (ou dev humano) novato no projeto cometeria erro previsível?"** Se sim, escreve. Se a resposta é "ele lê o código e descobre", não escreve.
+
+---
 
 ## Comportamento Automático e Economia de Tokens
 Você deve agir como um agente autônomo focado em máxima eficiência e economia de contexto. Adote as seguintes posturas automaticamente em todas as interações:
