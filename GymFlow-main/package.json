@@ -10,6 +10,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "dev:webpack": "pnpm --filter @gymflow/web run dev:webpack",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
     "test": "turbo run test",
