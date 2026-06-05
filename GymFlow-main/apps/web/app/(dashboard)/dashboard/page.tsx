@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import {
   Users, Activity, TrendingUp, Calendar, ArrowUpRight,
   Dumbbell, ChevronRight, Plus, UserPlus, Building2,
@@ -54,8 +55,9 @@ const PLAN_INFO: Record<string, { name: string; color: string; emoji: string }> 
 }
 
 const OWNER_PLAN_INFO: Record<string, { name: string; color: string; emoji: string; price: string; trial?: boolean; features: string[] }> = {
-  starter: { name: 'Starter', color: '#06B6D4', emoji: '⚡', price: 'R$ 197/mês', trial: true,  features: ['Até 50 alunos', 'Até 3 personais', 'Fichas ilimitadas', 'Dashboard básico', 'Convites por código'] },
-  pro:     { name: 'Pro',     color: '#10B981', emoji: '👑', price: 'R$ 397/mês',               features: ['Alunos ilimitados', 'Personais ilimitados', 'Relatórios avançados', 'Mapa de frequência detalhado', 'Exportar dados (CSV)', 'Notificações de inatividade', 'Personalização da academia', 'Histórico completo por aluno', 'Suporte prioritário'] },
+  personal: { name: 'Personal', color: '#10B981', emoji: '🏋️', price: 'R$ 97/mês',  trial: true, features: ['Alunos ilimitados', 'Fichas de treino ilimitadas', 'Histórico e evolução por aluno', 'Convites por código', 'Dashboard completo'] },
+  starter:  { name: 'Starter',  color: '#06B6D4', emoji: '⚡', price: 'R$ 197/mês', trial: true,  features: ['Até 50 alunos', 'Até 3 personais', 'Fichas ilimitadas', 'Dashboard básico', 'Convites por código'] },
+  pro:      { name: 'Pro',      color: '#10B981', emoji: '👑', price: 'R$ 397/mês',               features: ['Alunos ilimitados', 'Personais ilimitados', 'Relatórios avançados', 'Mapa de frequência detalhado', 'Exportar dados (CSV)', 'Notificações de inatividade', 'Personalização da academia', 'Histórico completo por aluno', 'Suporte prioritário'] },
 }
 
 const PRO_UPGRADE_FEATURES = [
@@ -224,6 +226,9 @@ export default function DashboardPage() {
   const isOwner    = currentRole === 'owner'
   const isPersonal = currentRole === 'personal'
   const isStudent  = currentRole === 'student'
+  // Personal trainer SOLO (owner com plan='personal') — esconde multi-personal UI.
+  // Diferente de `isPersonal` acima, que é o role de sub-personal trabalhando pra owner.
+  const isPersonalPlan = currentAcademy?.plan === 'personal'
 
   // Owner
   const [ownerMetrics, setOwnerMetrics] = useState<OwnerMetrics>({
@@ -319,6 +324,7 @@ export default function DashboardPage() {
   const [freeLoggedToday, setFreeLoggedToday] = useState(false)
   const [weekActivity,    setWeekActivity]    = useState<boolean[]>(Array(7).fill(false))
   const [dataLoaded,      setDataLoaded]      = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -330,6 +336,15 @@ export default function DashboardPage() {
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Owner/personal sem academia jamais deveria parar no dashboard — manda pro onboarding.
+  // Sem isso o usuário fica preso numa tela vazia depois de signup incompleto ou após
+  // cancelar checkout do Stripe.
+  useEffect(() => {
+    if (accountType && !currentRole && (accountType === 'owner' || accountType === 'personal')) {
+      router.replace('/onboarding')
+    }
+  }, [accountType, currentRole, router])
 
   useEffect(() => {
     if (!currentAcademy) return
@@ -695,7 +710,9 @@ export default function DashboardPage() {
           <motion.div variants={stagger} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <StatCard label="Total de alunos"     value={ownerMetrics.totalStudents}    delta={ownerMetrics.newThisMonth > 0 ? `+${ownerMetrics.newThisMonth}` : undefined} icon={Users}       color="#6366F1" empty={ownerMetrics.totalStudents === 0} />
             <StatCard label="Novos este mês"      value={ownerMetrics.newThisMonth}                                                                                         icon={UserPlus}    color="#10B981" empty={ownerMetrics.newThisMonth === 0} />
-            <StatCard label="Personais ativos"    value={ownerMetrics.activePersonals}                                                                                      icon={ShieldCheck} color="#8B5CF6" empty={ownerMetrics.activePersonals === 0} />
+            {!isPersonalPlan && (
+              <StatCard label="Personais ativos"    value={ownerMetrics.activePersonals}                                                                                      icon={ShieldCheck} color="#8B5CF6" empty={ownerMetrics.activePersonals === 0} />
+            )}
             <StatCard label="Engajamento"         value={engagementPct} suffix="%"                                                                                          icon={Activity}    color="#06B6D4" empty={ownerMetrics.totalStudents === 0} />
             <StatCard label="Treinos esta semana" value={ownerMetrics.workoutsThisWeek} delta={workoutsDelta}                                                               icon={Dumbbell}    color="#F59E0B" empty={ownerMetrics.totalStudents === 0} />
             <StatCard label="Ativos esta semana"  value={ownerMetrics.activeThisWeek}                                                                                       icon={Flame}       color="#F97316" empty={ownerMetrics.totalStudents === 0} />
@@ -731,6 +748,7 @@ export default function DashboardPage() {
               {currentAcademy?.plan && OWNER_PLAN_INFO[currentAcademy.plan] && (() => {
                 const p = OWNER_PLAN_INFO[currentAcademy.plan!]!
                 const isStarter = currentAcademy.plan === 'starter'
+                const isPersonalCardPlan = currentAcademy.plan === 'personal'
                 const studentUsagePct = isStarter ? Math.min((ownerMetrics.totalStudents / 50) * 100, 100) : 0
                 const personalUsagePct = isStarter ? Math.min((ownerMetrics.activePersonals / 3) * 100, 100) : 0
                 return (
@@ -792,6 +810,21 @@ export default function DashboardPage() {
                     )}
                     {currentAcademy.plan === 'pro' && (
                       <p className="text-[11px] text-center text-emerald-400 font-semibold">Você está no plano máximo 🎉</p>
+                    )}
+                    {isPersonalCardPlan && (
+                      <>
+                        <div className="rounded-xl p-3 mb-2" style={{ background: `${p.color}0A`, border: `1px solid ${p.color}20` }}>
+                          <p className="text-[11px] font-bold mb-1.5" style={{ color: p.color }}>{p.emoji} Inclui:</p>
+                          <ul className="grid grid-cols-1 gap-1">
+                            {p.features.map(f => (
+                              <li key={f} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                <Check className="w-2.5 h-2.5 flex-shrink-0" style={{ color: p.color }} />{f}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        <p className="text-[11px] text-center text-muted-foreground">Solo personal trainer — alunos ilimitados</p>
+                      </>
                     )}
                   </div>
                 )
@@ -884,13 +917,16 @@ export default function DashboardPage() {
               <div className="glass rounded-2xl p-4">
                 <h3 className="font-display font-bold text-sm mb-3">Ações rápidas</h3>
                 <QuickAction icon={UserPlus}    label="Convidar aluno"          href="/alunos"        color="#06B6D4" />
-                <QuickAction icon={ShieldCheck} label="Convidar personal"      href="/personais"    color="#8B5CF6" />
+                {!isPersonalPlan && (
+                  <QuickAction icon={ShieldCheck} label="Convidar personal"      href="/personais"    color="#8B5CF6" />
+                )}
                 <QuickAction icon={Dumbbell}    label="Fichas de treino"       sublabel="Ver e gerenciar fichas" href="/treinos"      color="#10B981" />
                 <QuickAction icon={BarChart3}   label="Relatórios"             sublabel="Engajamento geral"      href="/relatorios"   color="#F97316" />
                 <QuickAction icon={Settings}    label="Configurações"          href="/configuracoes" color="#6366F1" />
               </div>
 
-              {/* Personais */}
+              {/* Personais — só faz sentido pra owners de academia, não pra personal solo */}
+              {!isPersonalPlan && (
               <div className="glass rounded-2xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-display font-bold text-sm">Personais</h3>
@@ -918,6 +954,7 @@ export default function DashboardPage() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Alunos inativos */}
               <div className="glass rounded-2xl p-4">
@@ -1611,13 +1648,20 @@ export default function DashboardPage() {
           <p className="text-sm text-muted-foreground mt-1.5 max-w-sm mx-auto">
             {accountType === 'owner'
               ? 'Crie sua academia para convidar alunos e gerenciar treinos.'
-              : 'Aceite o convite do seu personal trainer para começar.'}
+              : accountType === 'personal'
+                ? 'Termine seu cadastro para começar a gerenciar seus alunos.'
+                : 'Aceite o convite do seu personal trainer para começar.'}
           </p>
           <div className="flex flex-wrap gap-3 justify-center mt-4">
             {accountType === 'owner' && (
               <Link href="/onboarding?type=owner" className="btn-primary text-sm py-2.5 px-5 rounded-xl">Criar academia</Link>
             )}
-            <Link href="/codigo?from=dashboard" className="btn-secondary text-sm py-2.5 px-5 rounded-xl">Tenho um convite</Link>
+            {accountType === 'personal' && (
+              <Link href="/onboarding" className="btn-primary text-sm py-2.5 px-5 rounded-xl">Continuar cadastro</Link>
+            )}
+            {accountType !== 'personal' && (
+              <Link href="/codigo?from=dashboard" className="btn-secondary text-sm py-2.5 px-5 rounded-xl">Tenho um convite</Link>
+            )}
           </div>
         </motion.div>
       )}

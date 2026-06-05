@@ -273,6 +273,29 @@ const { error } = await supabase
 
 ---
 
+## Planos / tenancy — 3 tipos de owner
+
+O enum `academy_plan` (Postgres) aceita: `free | personal | starter | pro`. A migration `042_academy_plan_personal.sql` adiciona `'personal'`. **Owner do tenant = quem assinou o plano**, não importa se é academia ou personal trainer solo.
+
+| Plan | Preço | Quem é | Sub-personais | Limite alunos |
+|---|---|---|---|---|
+| `personal` | R$ 97/mês | Personal trainer solo (próprio tenant) | ❌ não tem | ilimitado |
+| `starter` | R$ 197/mês | Academia pequena | até 3 | até 50 |
+| `pro` | R$ 397/mês | Academia | ilimitado | ilimitado |
+| `free` | — | Trial / pré-pagamento | n/a | n/a |
+
+**Confusão recorrente:** `role` (`owner | personal | student`) e `plan` (`personal | starter | pro`) compartilham a palavra "personal" mas significam coisas diferentes:
+- `role === 'personal'` → **sub-personal** que trabalha pra um owner em academia starter/pro.
+- `plan === 'personal'` → **personal trainer solo**, role no banco é `'owner'` (do próprio mini-tenant).
+
+**Dashboard / sidebar:** quando `plan === 'personal'`, esconder cards de "Personais ativos", "Convidar personal", item de sidebar `/personais` e `/relatorios`. Ver `apps/web/components/layout/sidebar.tsx` (`PERSONAL_PLAN_HIDDEN_HREFS`) e `apps/web/app/(dashboard)/dashboard/page.tsx` (`isPersonalPlan`).
+
+### Bypass de Stripe em dev/test
+
+`apps/web/app/api/academy/route.ts` e `apps/web/app/api/academy/upgrade/route.ts` pulam o Stripe checkout quando `NODE_ENV !== 'production'` OU `SKIP_STRIPE_CHECKOUT=true`. Em dev: cria/atualiza academia direto no banco com o plano escolhido e redireciona pro dashboard, sem cobrança. Em prod: sempre passa pelo Stripe. Útil pra testar fluxo dos 3 planos sem configurar Price IDs.
+
+---
+
 ## Roles e permissões
 
 | Ação | owner | personal | student |
@@ -514,9 +537,14 @@ Você deve agir como um agente autônomo focado em máxima eficiência e economi
 
 Rodar da **raiz do monorepo** (`GymFlow-main/`), não de `apps/web/`:
 
-- `pnpm install` — instalar dependências do workspace
+- `pnpm install` — instalar dependências do workspace. **Rodar sempre depois de `pnpm add` em qualquer pacote** — `pnpm add --filter X dep` deixa o lockfile global stale e o próximo `dev` pode quebrar com "Module not found" mesmo com o pacote fisicamente em `node_modules/`.
 - `doppler run -- pnpm --filter @gymflow/web dev` — dev server com envs reais (recomendado)
 - `pnpm dev` — dev server sem Doppler (precisa de `.env.local` manual em `apps/web/`)
+- **`pnpm --filter @gymflow/web dev:webpack`** — dev sem Turbopack. **Use sempre que estiver mexendo com Sentry, next-pwa ou outros plugins webpack-style.** Turbopack quebra com a combinação Sentry + next-pwa: o erro típico é `TurbopackInternalError: Next.js package not found` ou `Module not found: Can't resolve '@sentry/nextjs'` no `instrumentation.ts`. O próprio Sentry recomenda no warning de boot: "we recommend temporarily removing the `--turbo` flag while you are developing locally".
+
+**Status Turbopack (out/2026):** não viável com a stack atual. Sentry SDK não suporta + next-pwa injeta plugin webpack que turbopack ignora. Esperar maturação ao longo de 2026 ou remover uma das duas deps pra reativar.
+
+**Sentry DSN — pegadinha de placeholder:** `sentry.{client,server,edge}.config.ts` validam o DSN com regex antes de chamar `Sentry.init`. Sem isso, o placeholder `https://...@sentry.io/...` do `.env.example` faz o init explodir com `Invalid Sentry Dsn` e derruba a página inteira (tela preta em dev). Padrão: `^https:\/\/[a-f0-9]+@[^/]+\/\d+$`. **Quando adicionar nova call de `Sentry.init`, replicar a guard.** Mesma família do problema documentado em `lib/rate-limit.ts → hasValidUpstashEnv()`.
 - `pnpm build` — build de tudo via Turbo (passa pelo `doppler run` em `apps/web`)
 - `pnpm type-check` — checks de tipo via tsc em todos os pacotes (rodado no CI)
 - `pnpm lint` — **não configurado** ainda (`next lint` cai em prompt interativo)

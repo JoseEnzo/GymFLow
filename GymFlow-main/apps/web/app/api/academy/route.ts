@@ -75,8 +75,14 @@ export async function POST(request: Request) {
 
   const origin = request.headers.get('origin') ?? process.env['NEXT_PUBLIC_APP_URL'] ?? ''
 
+  // Bypass do Stripe em dev/test: cria academia, pula checkout e cai direto no /dashboard.
+  // Ativa quando NODE_ENV !== 'production' OU env `SKIP_STRIPE_CHECKOUT=true` explicitamente.
+  // Use só em ambiente de teste — em produção sempre cobra via Stripe.
+  const skipStripe =
+    process.env.NODE_ENV !== 'production' || process.env['SKIP_STRIPE_CHECKOUT'] === 'true'
+
   // Plano pago → gera checkout URL na mesma request (evita segundo roundtrip com RLS)
-  if (plan === 'starter' || plan === 'pro' || plan === 'personal') {
+  if (!skipStripe && (plan === 'starter' || plan === 'pro' || plan === 'personal')) {
     try {
       const session = await createCheckoutSession({
         academyId: academy.id,

@@ -87,12 +87,23 @@ function AcademySwitcher() {
 export function Sidebar() {
   const pathname = usePathname()
   const { signOut, profile } = useAuth()
-  const { currentRole } = useAuthStore()
+  const { currentRole, currentAcademy } = useAuthStore()
   const { sidebarCollapsed, setSidebarCollapsed, sidebarOpen, setSidebarOpen } = useUIStore()
 
-  const filteredNav = NAV_ITEMS.filter(
-    (item) => !item.roles || (currentRole && item.roles.includes(currentRole))
-  )
+  // Personal trainer SOLO (plan='personal'): esconder itens que pressupõem academia com
+  // múltiplos personais (ele é o único). "Personais" e "Relatórios" não fazem sentido solo.
+  const isPersonalPlan = currentAcademy?.plan === 'personal'
+  const PERSONAL_PLAN_HIDDEN_HREFS = new Set(['/personais', '/relatorios'])
+
+  const filteredNav = NAV_ITEMS.filter((item) => {
+    // Itens com `roles` exigem currentRole definido E presente na lista.
+    // Sem isso, durante a hidratação do Zustand (currentRole=null), itens dos 3 roles
+    // apareciam todos juntos e gerava duplicate-key porque /alunos, /treinos, /exercicios
+    // existem em owner + personal.
+    if (item.roles && (!currentRole || !item.roles.includes(currentRole))) return false
+    if (isPersonalPlan && PERSONAL_PLAN_HIDDEN_HREFS.has(item.href)) return false
+    return true
+  })
 
   const isActive = (href: string) =>
     pathname === href || (href !== '/dashboard' && pathname.startsWith(href))

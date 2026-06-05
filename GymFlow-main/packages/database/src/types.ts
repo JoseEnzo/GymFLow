@@ -979,7 +979,7 @@ export type Database = {
       }
     }
     Enums: {
-      academy_plan: "free" | "starter" | "pro"
+      academy_plan: "free" | "personal" | "starter" | "pro"
       exercise_difficulty: "beginner" | "intermediate" | "advanced"
       member_role: "owner" | "personal" | "student"
       subscription_status: "active" | "canceled" | "past_due" | "trialing"
@@ -1113,7 +1113,7 @@ export const Constants = {
   },
   public: {
     Enums: {
-      academy_plan: ["free", "starter", "pro"],
+      academy_plan: ["free", "personal", "starter", "pro"],
       exercise_difficulty: ["beginner", "intermediate", "advanced"],
       member_role: ["owner", "personal", "student"],
       subscription_status: ["active", "canceled", "past_due", "trialing"],

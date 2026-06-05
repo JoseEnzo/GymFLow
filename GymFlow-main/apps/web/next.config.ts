@@ -85,14 +85,35 @@ const nextConfig: NextConfig = {
       },
     ]
   },
+  // Silencia warnings "Critical dependency" do @opentelemetry/instrumentation e
+  // require-in-the-middle (transitivas do @sentry/nextjs server-side). Elas usam
+  // require() dinâmico que o webpack não analisa estaticamente — inofensivas.
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.ignoreWarnings = [
+        ...(config.ignoreWarnings ?? []),
+        { module: /@opentelemetry\/instrumentation/ },
+        { module: /require-in-the-middle/ },
+        { module: /import-in-the-middle/ },
+      ]
+    }
+    return config
+  },
 }
 
-export default withSentryConfig(withPWA(nextConfig), {
-  org: process.env['SENTRY_ORG'],
-  project: process.env['SENTRY_PROJECT'],
-  silent: !process.env['CI'],
-  widenClientFileUpload: true,
-  hideSourceMaps: true,
-  disableLogger: true,
-  automaticVercelMonitors: true,
-})
+// Em dev: pula o wrapper do Sentry (source maps + webpack plugin) — webpack fica
+// significativamente mais rápido. Runtime ainda importa Sentry via sentry.{client,server,edge}.config.ts,
+// mas com guard de DSN válido (placeholder não dispara init).
+const finalConfig = withPWA(nextConfig)
+
+export default isDev
+  ? finalConfig
+  : withSentryConfig(finalConfig, {
+      org: process.env['SENTRY_ORG'],
+      project: process.env['SENTRY_PROJECT'],
+      silent: !process.env['CI'],
+      widenClientFileUpload: true,
+      hideSourceMaps: true,
+      disableLogger: true,
+      automaticVercelMonitors: true,
+    })

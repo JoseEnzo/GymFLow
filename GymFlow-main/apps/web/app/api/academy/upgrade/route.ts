@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   }
 
   const { planId } = body
-  if (planId !== 'starter' && planId !== 'pro') {
+  if (planId !== 'starter' && planId !== 'pro' && planId !== 'personal') {
     return NextResponse.json({ error: 'Plano inválido' }, { status: 400 })
   }
 
@@ -35,7 +35,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Academia não encontrada' }, { status: 404 })
   }
 
-  const priceEnvKey = planId === 'pro' ? 'STRIPE_PRICE_PRO_MONTHLY' : 'STRIPE_PRICE_STARTER_MONTHLY'
+  // Bypass do Stripe em dev/test — atualiza plan direto e retorna URL local.
+  // Ver comentário em ../route.ts. Produção sempre passa por Stripe.
+  const skipStripe =
+    process.env.NODE_ENV !== 'production' || process.env['SKIP_STRIPE_CHECKOUT'] === 'true'
+
+  if (skipStripe) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: updateError } = await (admin.from('academies') as any)
+      .update({ plan: planId })
+      .eq('id', academy.id)
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 })
+    }
+    const origin = request.headers.get('origin') ?? process.env['NEXT_PUBLIC_APP_URL'] ?? ''
+    return NextResponse.json({ url: `${origin}/dashboard?plan_upgraded=1` })
+  }
+
+  const priceEnvKey =
+    planId === 'pro' ? 'STRIPE_PRICE_PRO_MONTHLY'
+      : planId === 'personal' ? 'STRIPE_PRICE_PERSONAL_MONTHLY'
+        : 'STRIPE_PRICE_STARTER_MONTHLY'
   if (!process.env[priceEnvKey]) {
     return NextResponse.json({ error: `Variável ${priceEnvKey} não configurada. Adicione o Price ID do Stripe no Doppler.` }, { status: 500 })
   }

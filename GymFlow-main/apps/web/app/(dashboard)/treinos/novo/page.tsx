@@ -30,6 +30,20 @@ const SCHEDULE_TYPES = [
   { id: 'monthly', emoji: '🗓️', label: 'Mensal',   desc: 'Programação dividida em 4 semanas' },
 ]
 
+// Divisão de treino — cria N fichas separadas, uma por "letra" do split.
+// 'single' = comportamento original (1 ficha). Demais criam várias fichas em loop.
+const SPLITS = [
+  { id: 'single' as const, label: 'Única',    desc: 'Uma ficha só',                       letters: 1 },
+  { id: 'ab'     as const, label: 'AB',       desc: '2 treinos alternando',               letters: 2 },
+  { id: 'abc'    as const, label: 'ABC',      desc: '3 treinos rotativos',                letters: 3 },
+  { id: 'abcd'   as const, label: 'ABCD',     desc: '4 treinos rotativos',                letters: 4 },
+  { id: 'abcde'  as const, label: 'ABCDE',    desc: '5 treinos rotativos',                letters: 5 },
+  { id: 'abcdef' as const, label: 'ABCDEF',   desc: '6 treinos (1 por dia útil + 1)',     letters: 6 },
+]
+type SplitChoice = (typeof SPLITS)[number]['id']
+const SPLIT_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'] as const
+const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'] as const
+
 const GOALS = [
   { id: 'Hipertrofia', emoji: '💪' },
   { id: 'Força', emoji: '🏋️' },
@@ -81,6 +95,21 @@ function NovaFichaContent() {
   const [saving, setSaving] = useState(false)
   const [selectedGoal, setSelectedGoal] = useState('')
   const [scheduleType, setScheduleType] = useState<'daily' | 'weekly' | 'monthly'>('daily')
+  const [splitChoice, setSplitChoice] = useState<SplitChoice>('single')
+  // splitDays[i] = dias da semana atribuídos à letra i (0=A, 1=B, ...). Ex: [[1,4],[2,5]]
+  const [splitDays, setSplitDays] = useState<number[][]>([[], [], [], [], [], []])
+
+  function toggleSplitDay(letterIdx: number, day: number) {
+    setSplitDays((prev) => {
+      // Garante exclusividade: cada dia da semana só pode estar em uma letra.
+      const wasInThisLetter = prev[letterIdx]!.includes(day)
+      const next = prev.map((arr) => arr.filter((d) => d !== day))
+      if (!wasInThisLetter) {
+        next[letterIdx] = [...next[letterIdx]!, day].sort((a, b) => a - b)
+      }
+      return next
+    })
+  }
   const [templates, setTemplates] = useState<SheetTemplate[]>([])
   const [selectedMuscleGroup, setSelectedMuscleGroup] = useState<string | null>(null)
   const [selectedTemplate, setSelectedTemplate] = useState<SheetTemplate | null>(null)
@@ -161,6 +190,19 @@ function NovaFichaContent() {
       return
     }
 
+    const splitMeta = SPLITS.find((s) => s.id === splitChoice)!
+    const isSplit = splitChoice !== 'single'
+
+    // Validação extra do split: cada letra precisa ter ao menos 1 dia.
+    if (isSplit) {
+      const lettersUsed = splitDays.slice(0, splitMeta.letters)
+      const missing = lettersUsed.findIndex((arr) => arr.length === 0)
+      if (missing !== -1) {
+        toast.error(`Atribua pelo menos 1 dia ao Treino ${SPLIT_LETTERS[missing]}.`)
+        return
+      }
+    }
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { toast.error('Não autenticado.'); return }
 
@@ -173,44 +215,75 @@ function NovaFichaContent() {
 
     setSaving(true)
     try {
+      if (!isSplit) {
+        // Ficha única — comportamento original.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: sheet, error } = await (supabase as any)
+          .from('workout_sheets')
+          .insert({
+            academy_id: currentAcademy.id,
+            student_id: finalStudentId,
+            personal_id: user.id,
+            name: data.name,
+            goal: selectedGoal,
+            description: data.description || null,
+            is_active: true,
+            schedule_type: scheduleType,
+          })
+          .select('id')
+          .single()
+
+        if (error) throw error
+
+        if (selectedTemplate) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: tmplExs } = await (supabase as any)
+            .from('template_exercises')
+            .select('exercise_id, order_index, sets, reps, rest_seconds, notes')
+            .eq('template_id', selectedTemplate.id)
+            .order('order_index')
+
+          if (tmplExs && tmplExs.length > 0) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (supabase as any)
+              .from('sheet_exercises')
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .insert(tmplExs.map((e: any) => ({ ...e, sheet_id: sheet.id })))
+          }
+        }
+
+        toast.success('Ficha criada com sucesso!')
+        router.push(`/treinos/${sheet.id}`)
+        return
+      }
+
+      // Split AB/ABC/ABCD — cria N fichas em sequência. Cada letra vira uma ficha 'daily'
+      // com scheduled_days próprio. Templates não se aplicam ao split (escolhido depois,
+      // ficha por ficha) — mais simples e evita confusão.
+      const rows = Array.from({ length: splitMeta.letters }).map((_, i) => ({
+        academy_id: currentAcademy.id,
+        student_id: finalStudentId,
+        personal_id: user.id,
+        name: `Treino ${SPLIT_LETTERS[i]} — ${selectedGoal}`,
+        goal: selectedGoal,
+        description: data.description || null,
+        is_active: true,
+        schedule_type: 'daily' as const,
+        scheduled_days: splitDays[i]!,
+      }))
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: sheet, error } = await (supabase as any)
+      const { data: created, error } = await (supabase as any)
         .from('workout_sheets')
-        .insert({
-          academy_id: currentAcademy.id,
-          student_id: finalStudentId,
-          personal_id: user.id,
-          name: data.name,
-          goal: selectedGoal,
-          description: data.description || null,
-          is_active: true,
-          schedule_type: scheduleType,
-        })
+        .insert(rows)
         .select('id')
-        .single()
 
       if (error) throw error
 
-      // Copy template exercises if a template was selected
-      if (selectedTemplate) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: tmplExs } = await (supabase as any)
-          .from('template_exercises')
-          .select('exercise_id, order_index, sets, reps, rest_seconds, notes')
-          .eq('template_id', selectedTemplate.id)
-          .order('order_index')
-
-        if (tmplExs && tmplExs.length > 0) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (supabase as any)
-            .from('sheet_exercises')
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .insert(tmplExs.map((e: any) => ({ ...e, sheet_id: sheet.id })))
-        }
-      }
-
-      toast.success('Ficha criada com sucesso!')
-      router.push(`/treinos/${sheet.id}`)
+      toast.success(`${rows.length} fichas criadas (${SPLIT_LETTERS.slice(0, rows.length).join('/')}).`)
+      // Redireciona pra primeira ficha pra começar a montar exercícios.
+      const firstId = (created as { id: string }[] | null)?.[0]?.id
+      router.push(firstId ? `/treinos/${firstId}` : '/treinos')
     } catch (err: unknown) {
       toast.error((err as Error).message ?? 'Erro ao criar ficha.')
     } finally {
@@ -338,15 +411,18 @@ function NovaFichaContent() {
             <h3 className="font-display font-bold text-sm">Informações básicas</h3>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Nome da ficha <span className="text-red-400">*</span></label>
-            <input
-              {...register('name', { required: 'Nome obrigatório', minLength: { value: 3, message: 'Mínimo 3 caracteres' } })}
-              placeholder="Ex: Treino A — Peito e Tríceps"
-              className={cn('field', errors.name && 'border-destructive/60')}
-            />
-            {errors.name && <p className="text-xs text-red-400">{errors.name.message}</p>}
-          </div>
+          {/* Nome só aparece em ficha única. Splits geram nome auto: "Treino A — <goal>". */}
+          {splitChoice === 'single' && (
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Nome da ficha <span className="text-red-400">*</span></label>
+              <input
+                {...register('name', { required: splitChoice === 'single' ? 'Nome obrigatório' : false, minLength: splitChoice === 'single' ? { value: 3, message: 'Mínimo 3 caracteres' } : undefined })}
+                placeholder="Ex: Treino A — Peito e Tríceps"
+                className={cn('field', errors.name && 'border-destructive/60')}
+              />
+              {errors.name && <p className="text-xs text-red-400">{errors.name.message}</p>}
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Descrição (opcional)</label>
@@ -387,7 +463,83 @@ function NovaFichaContent() {
           </div>
         </motion.div>
 
-        {/* Tipo de programação */}
+        {/* Divisão de treino — split AB/ABC/ABCD cria N fichas separadas */}
+        <motion.div custom={3} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-brand-400" />
+            <h3 className="font-display font-bold text-sm">Divisão de treino <span className="text-red-400">*</span></h3>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            {SPLITS.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setSplitChoice(s.id)}
+                className={cn(
+                  'flex flex-col gap-0.5 p-3 rounded-xl border text-left transition-all',
+                  splitChoice === s.id
+                    ? 'border-brand-500/50 bg-brand-500/8'
+                    : 'border-border/60 hover:border-border hover:bg-surface-100'
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={cn('text-sm font-display font-bold', splitChoice === s.id ? 'text-brand-300' : '')}>{s.label}</span>
+                  {splitChoice === s.id && <Check className="w-3 h-3 text-brand-400" />}
+                </div>
+                <span className="text-[10px] text-muted-foreground leading-tight">{s.desc}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* DayPickers por letra — só quando split !== single */}
+          {splitChoice !== 'single' && (
+            <div className="space-y-2 pt-2">
+              <p className="text-xs text-muted-foreground">
+                Escolha os dias da semana de cada treino. Cada dia pertence a uma única letra.
+              </p>
+              {Array.from({ length: SPLITS.find((s) => s.id === splitChoice)!.letters }).map((_, letterIdx) => (
+                <div key={letterIdx} className="p-3 rounded-xl bg-surface-100 border border-border/40 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-lg bg-brand-500/15 text-brand-300 font-display font-bold flex items-center justify-center text-sm">
+                      {SPLIT_LETTERS[letterIdx]}
+                    </span>
+                    <span className="text-xs font-medium">Treino {SPLIT_LETTERS[letterIdx]}</span>
+                    <span className="text-[10px] text-muted-foreground ml-auto">
+                      {splitDays[letterIdx]!.length === 0 ? 'Sem dias' : `${splitDays[letterIdx]!.length} dia${splitDays[letterIdx]!.length > 1 ? 's' : ''}`}
+                    </span>
+                  </div>
+                  <div className="flex gap-1 flex-wrap">
+                    {DAY_LABELS.map((label, day) => {
+                      const ownedBy = splitDays.findIndex((arr) => arr.includes(day))
+                      const isMine = ownedBy === letterIdx
+                      const isOther = ownedBy !== -1 && !isMine
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => toggleSplitDay(letterIdx, day)}
+                          disabled={isOther}
+                          title={isOther ? `Já atribuído ao Treino ${SPLIT_LETTERS[ownedBy]}` : undefined}
+                          className={cn(
+                            'w-9 h-9 rounded-lg text-[11px] font-bold transition-all',
+                            isMine && 'bg-brand-500 text-white',
+                            isOther && 'bg-surface-200/50 text-muted-foreground/40 cursor-not-allowed',
+                            !isMine && !isOther && 'bg-surface-200 text-muted-foreground hover:bg-surface-300 hover:text-foreground'
+                          )}
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </motion.div>
+
+        {/* Tipo de programação — só aparece em ficha única. Splits forçam daily por letra. */}
+        {splitChoice === 'single' && (
         <motion.div custom={3} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5 space-y-3">
           <div className="flex items-center gap-2">
             <CalendarDays className="w-4 h-4 text-brand-400" />
@@ -416,6 +568,7 @@ function NovaFichaContent() {
             ))}
           </div>
         </motion.div>
+        )}
 
         {/* Aluno — só mostra se não veio da URL */}
         {!studentIdFromUrl && (

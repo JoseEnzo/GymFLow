@@ -149,6 +149,9 @@ function OnboardingContent() {
         setStep('plan')
       } else if (accountType === 'personal') {
         setRole('personal')
+        // Sem isso, o state `plan` ficava no default 'starter' e saveAcademy mandava
+        // plan='starter' pra API mesmo o usuário vendo a tela do R$ 97.
+        setPlan('personal')
         setStep('plan')
       }
     })
