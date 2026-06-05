@@ -134,12 +134,8 @@ export function Sidebar() {
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
-                className="relative flex items-center justify-center w-8 h-8"
               >
-                <div className="absolute inset-0 rounded-lg bg-brand-500 blur-sm opacity-50" />
-                <div className="relative rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 p-1.5">
-                  <Dumbbell className="w-4 h-4 text-white" />
-                </div>
+                <BrandLogo size="lg" showText={false} />
               </motion.div>
             ) : (
               <motion.div
@@ -147,17 +143,8 @@ export function Sidebar() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex items-center gap-2"
               >
-                <div className="relative flex items-center justify-center w-7 h-7">
-                  <div className="absolute inset-0 rounded-lg bg-brand-500 blur-sm opacity-50" />
-                  <div className="relative rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 p-1.5">
-                    <Dumbbell className="w-3.5 h-3.5 text-white" />
-                  </div>
-                </div>
-                <span className="font-display font-bold text-base">
-                  Gym<span className="text-brand-400">Flow</span>
-                </span>
+                <BrandLogo size="md" />
               </motion.div>
             )}
           </AnimatePresence>

@@ -1,9 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { Dumbbell, ArrowLeft, Home } from 'lucide-react'
+import { ArrowLeft, Home } from 'lucide-react'
+
+import { BrandLogo } from '@/components/layout/brand-logo'
+import { useAuthStore } from '@/stores/auth-store'
 
 export default function NotFound() {
+  const profile = useAuthStore((s) => s.profile)
+  const homeHref = profile ? '/dashboard' : '/'
+
   return (
     <div className="relative min-h-screen bg-background bg-mesh flex flex-col items-center justify-center px-4">
       <div
@@ -16,18 +22,8 @@ export default function NotFound() {
       />
 
       <div className="relative z-10 text-center space-y-8 max-w-md">
-        {/* Logo */}
-        <Link href="/" className="inline-flex items-center gap-2">
-          <div className="relative flex items-center justify-center w-9 h-9">
-            <div className="absolute inset-0 rounded-xl bg-brand-500 blur-md opacity-60" />
-            <div className="relative rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 p-2">
-              <Dumbbell className="w-4 h-4 text-white" />
-            </div>
-          </div>
-          <span className="font-display font-bold text-xl tracking-tight">
-            Gym<span className="text-brand-400">Flow</span>
-          </span>
-        </Link>
+        {/* Logo (link smart: leva pra /dashboard se logado, / se não) */}
+        <BrandLogo size="xl" />
 
         {/* Error code */}
         <div className="space-y-3">
@@ -50,11 +46,11 @@ export default function NotFound() {
         {/* Actions */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link
-            href="/"
+            href={homeHref}
             className="inline-flex items-center gap-2 btn-primary px-6 py-2.5 rounded-xl text-sm font-semibold"
           >
             <Home className="w-4 h-4" />
-            Ir para o início
+            {profile ? 'Ir para o dashboard' : 'Ir para o início'}
           </Link>
           <button
             onClick={() => window.history.back()}

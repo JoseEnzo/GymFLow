@@ -172,7 +172,7 @@ function DayCard({ date, isToday, isPast, sheet, completed, onToggle, toggling }
                   </button>
                   {(isToday || isPast) && (
                     <Link
-                      href={`/treinos/executar/${sheet.id}`}
+                      href={`/treinos/executar/${sheet.id}?day=${date.getDay()}`}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all"
                       style={{ background: `${color}15`, color: color!, border: `1px solid ${color}30` }}
                     >

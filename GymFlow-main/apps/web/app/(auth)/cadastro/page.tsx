@@ -202,7 +202,7 @@ function CadastroInner() {
             className="space-y-6"
           >
             <div className="space-y-1.5">
-              <h1 className="text-2xl font-display font-bold">Como você vai usar o GymFlow?</h1>
+              <h1 className="text-2xl font-display font-bold">Como você vai usar o MeuTrein?</h1>
               <p className="text-sm text-muted-foreground">Escolha o perfil que melhor descreve você</p>
             </div>
 
@@ -593,7 +593,7 @@ function CadastroInner() {
                     <Link href="/privacidade" target="_blank" className="text-brand-400 hover:underline font-medium">
                       Política de Privacidade
                     </Link>
-                    {' '}do GymFlow.
+                    {' '}do MeuTrein.
                   </span>
                 </label>
               </motion.div>

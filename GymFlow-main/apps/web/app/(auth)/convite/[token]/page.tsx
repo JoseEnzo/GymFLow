@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, AlertCircle, CheckCircle2, Dumbbell } from 'lucide-react'
 import { toast } from 'sonner'
 
+import { BrandLogo } from '@/components/layout/brand-logo'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 
@@ -115,19 +116,9 @@ export default function ConvitePage() {
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         className="w-full max-w-md glass rounded-3xl p-8 border border-border/60 shadow-glow"
       >
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-1">
-            <div className="relative flex items-center justify-center w-8 h-8">
-              <div className="absolute inset-0 rounded-lg bg-brand-500 blur-md opacity-60" />
-              <div className="relative rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 p-1.5">
-                <Dumbbell className="w-4 h-4 text-white" />
-              </div>
-            </div>
-            <span className="font-display font-bold text-lg">
-              Gym<span className="text-brand-400">Flow</span>
-            </span>
-          </div>
+        {/* Logo (link smart) */}
+        <div className="text-center mb-8 inline-flex w-full justify-center">
+          <BrandLogo size="lg" />
         </div>
 
         <AnimatePresence mode="wait">

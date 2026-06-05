@@ -9,6 +9,7 @@ import {
   ArrowRight, ChevronLeft, Play, BarChart2, Zap, Target,
   Star, Award, Plus, ChevronRight, Bell, Settings, X, Lock,
 } from 'lucide-react'
+import { BrandLogo } from '@/components/layout/brand-logo'
 import { cn } from '@/lib/utils'
 
 const fadeUp = {
@@ -360,17 +361,8 @@ export default function DemoPage() {
               Voltar
             </Link>
             <span className="text-border/60">|</span>
-            <Link href="/" className="flex items-center gap-1.5">
-              <div className="relative flex items-center justify-center w-6 h-6">
-                <div className="absolute inset-0 rounded-md bg-brand-500 blur-sm opacity-60" />
-                <div className="relative rounded-md bg-gradient-to-br from-brand-400 to-brand-600 p-1">
-                  <Dumbbell className="w-3 h-3 text-white" />
-                </div>
-              </div>
-              <span className="font-display font-bold text-sm">
-                Gym<span className="text-brand-400">Flow</span>
-              </span>
-            </Link>
+            <BrandLogo size="sm" />
+
           </div>
 
           <div className="flex items-center gap-2">
@@ -408,7 +400,7 @@ export default function DemoPage() {
               </span>
             </motion.div>
             <motion.h1 variants={fadeUp} className="text-4xl sm:text-5xl font-display font-extrabold tracking-tight mb-4">
-              Explore o GymFlow
+              Explore o MeuTrein
               <span className="block gradient-text">antes de se cadastrar</span>
             </motion.h1>
             <motion.p variants={fadeUp} className="text-muted-foreground text-lg max-w-xl mx-auto">

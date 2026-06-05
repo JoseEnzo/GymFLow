@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
-import { Dumbbell } from 'lucide-react'
+
+import { BrandLogo } from '@/components/layout/brand-logo'
 
 export const metadata: Metadata = {
   title: 'Acesso',
@@ -11,18 +11,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Left — form */}
       <div className="relative flex flex-col items-center justify-center p-8 bg-background">
-        {/* Logo */}
-        <Link href="/" className="absolute top-8 left-8 flex items-center gap-2">
-          <div className="relative flex items-center justify-center w-7 h-7">
-            <div className="absolute inset-0 rounded-lg bg-brand-500 blur-sm opacity-50" />
-            <div className="relative rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 p-1.5">
-              <Dumbbell className="w-3.5 h-3.5 text-white" />
-            </div>
-          </div>
-          <span className="font-display font-bold text-sm">
-            Gym<span className="text-brand-400">Flow</span>
-          </span>
-        </Link>
+        {/* Logo (link smart) */}
+        <div className="absolute top-8 left-8">
+          <BrandLogo size="sm" />
+        </div>
 
         <div className="w-full max-w-sm">
           {children}
@@ -85,7 +77,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               <span className="block gradient-text">próximo nível</span>
             </h2>
             <p className="text-muted-foreground leading-relaxed">
-              +500 academias já gerenciam seus treinos e alunos com o GymFlow.
+              Feito pra academia pequena — onde o dono conhece cada aluno.
             </p>
           </div>
 

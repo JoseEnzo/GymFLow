@@ -41,7 +41,7 @@ function getPageInfo(pathname: string): { title: string; isSubPage: boolean } {
   if (pathname.startsWith('/alunos/')) return { title: 'Aluno', isSubPage: true }
   if (pathname.startsWith('/exercicios/')) return { title: 'Exercício', isSubPage: true }
 
-  return { title: 'GymFlow', isSubPage }
+  return { title: 'MeuTrein', isSubPage }
 }
 
 export function Header() {

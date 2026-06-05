@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, Check, Timer, Dumbbell,
   X, Flame, Volume2, VolumeX, Trophy, Loader2,
 } from 'lucide-react'
+
+const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 import { toast } from 'sonner'
 
 import { cn, formatDuration } from '@/lib/utils'
@@ -35,6 +37,7 @@ interface SetData {
 export default function ExecutarTreinoPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { currentAcademy, profile, currentRole } = useAuthStore()
   const supabase = createClient()
 
@@ -44,8 +47,22 @@ export default function ExecutarTreinoPage() {
     }
   }, [currentRole, id, router])
 
+  // Dia ativo: URL param > hoje. Pra ficha weekly, define quais exercícios
+  // executar (aluno pode antecipar/atrasar um treino mudando aqui).
+  const initialDay = (() => {
+    const fromUrl = searchParams.get('day')
+    if (fromUrl !== null) {
+      const n = parseInt(fromUrl, 10)
+      if (!isNaN(n) && n >= 0 && n <= 6) return n
+    }
+    return new Date().getDay()
+  })()
+
   const [exercises, setExercises] = useState<ExerciseSlot[]>([])
   const [sheetName, setSheetName] = useState('')
+  const [scheduleType, setScheduleType] = useState<'daily' | 'weekly' | 'monthly'>('daily')
+  const [availableDays, setAvailableDays] = useState<number[]>([])
+  const [selectedDay, setSelectedDay] = useState<number>(initialDay)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -69,9 +86,9 @@ export default function ExecutarTreinoPage() {
       const { data, error } = await (supabase as any)
         .from('workout_sheets')
         .select(`
-          id, name,
+          id, name, schedule_type,
           sheet_exercises (
-            id, sets, reps, rest_seconds, weight_suggestion, notes, order_index,
+            id, sets, reps, rest_seconds, weight_suggestion, notes, order_index, day_index,
             exercise:exercises ( id, name_pt )
           )
         `)
@@ -85,12 +102,29 @@ export default function ExecutarTreinoPage() {
         return
       }
 
+      const sheetSchedule = (data.schedule_type ?? 'daily') as 'daily' | 'weekly' | 'monthly'
+      setScheduleType(sheetSchedule)
       setSheetName(data.name)
 
-      const slots: ExerciseSlot[] = (data.sheet_exercises ?? [])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const allRows: any[] = (data.sheet_exercises ?? [])
+
+      // Pra weekly: descobre quais dias tem exercício (alimenta o seletor).
+      if (sheetSchedule === 'weekly') {
+        const days = [...new Set(allRows.map((r) => r.day_index).filter((d) => d !== null && d !== undefined))] as number[]
+        days.sort((a, b) => a - b)
+        setAvailableDays(days)
+        // Se o dia selecionado não tem exercício, cai pro primeiro dia disponível.
+        if (days.length > 0 && !days.includes(selectedDay)) {
+          setSelectedDay(days[0]!)
+          return // o useEffect vai re-rodar com o novo selectedDay
+        }
+      }
+
+      const slots: ExerciseSlot[] = allRows
+        .filter((r) => sheetSchedule !== 'weekly' || r.day_index === selectedDay)
         .sort((a: { order_index: number }, b: { order_index: number }) => a.order_index - b.order_index)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((se: any) => ({
+        .map((se) => ({
           sheetExerciseId: se.id,
           exerciseId: se.exercise.id,
           name: se.exercise.name_pt,
@@ -102,7 +136,11 @@ export default function ExecutarTreinoPage() {
         }))
 
       if (slots.length === 0) {
-        toast.error('Esta ficha não tem exercícios. Adicione exercícios antes de executar.')
+        if (sheetSchedule === 'weekly') {
+          toast.error(`Sem exercícios programados para ${DAY_LABELS[selectedDay]}.`)
+        } else {
+          toast.error('Esta ficha não tem exercícios. Adicione exercícios antes de executar.')
+        }
         router.push(`/treinos/${id}`)
         return
       }
@@ -140,7 +178,11 @@ export default function ExecutarTreinoPage() {
         ])
       )
 
-      const draftKey = profile?.id ? `gymflow_draft_${profile.id}_${id}` : null
+      // Draft separado por dia quando weekly — aluno pode ter rascunhos
+      // distintos pra segunda e quarta sem misturar peso/reps.
+      const draftKey = profile?.id
+        ? `gymflow_draft_${profile.id}_${id}${sheetSchedule === 'weekly' ? `_d${selectedDay}` : ''}`
+        : null
       let restored = false
       if (draftKey) {
         try {
@@ -164,7 +206,7 @@ export default function ExecutarTreinoPage() {
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, currentAcademy])
+  }, [id, currentAcademy, selectedDay])
 
   useInterval(() => setTimer((t) => t + 1), loading || isCompleted ? null : 1000)
 
@@ -200,7 +242,9 @@ export default function ExecutarTreinoPage() {
     restTimer !== null ? 1000 : null
   )
 
-  const draftKey = profile?.id ? `gymflow_draft_${profile.id}_${id}` : null
+  const draftKey = profile?.id
+    ? `gymflow_draft_${profile.id}_${id}${scheduleType === 'weekly' ? `_d${selectedDay}` : ''}`
+    : null
 
   // WakeLock — mantém tela ligada durante o treino
   useEffect(() => {
@@ -399,7 +443,12 @@ export default function ExecutarTreinoPage() {
         </button>
 
         <div className="text-center">
-          <p className="text-xs text-muted-foreground truncate max-w-[200px] sm:max-w-[280px]">{sheetName}</p>
+          <p className="text-xs text-muted-foreground truncate max-w-[200px] sm:max-w-[280px]">
+            {sheetName}
+            {scheduleType === 'weekly' && (
+              <span className="text-brand-400"> · {DAY_LABELS[selectedDay]}</span>
+            )}
+          </p>
           <p className="font-mono font-bold text-brand-400">{formatDuration(timer)}</p>
         </div>
 
@@ -410,6 +459,26 @@ export default function ExecutarTreinoPage() {
           {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
         </button>
       </div>
+
+      {/* Seletor de dia — só weekly. Permite antecipar/atrasar treino do dia. */}
+      {scheduleType === 'weekly' && availableDays.length > 1 && (
+        <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {availableDays.map((d) => (
+            <button
+              key={d}
+              onClick={() => setSelectedDay(d)}
+              className={cn(
+                'flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition-all min-w-[44px]',
+                selectedDay === d
+                  ? 'bg-brand-500 text-white shadow-[0_0_12px_rgba(29,158,117,0.3)]'
+                  : 'bg-surface-200 text-muted-foreground hover:text-foreground hover:bg-surface-300'
+              )}
+            >
+              {DAY_LABELS[d]}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Draft restored banner */}
       <AnimatePresence>

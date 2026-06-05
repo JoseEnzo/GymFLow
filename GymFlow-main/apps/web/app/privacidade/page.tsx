@@ -7,6 +7,7 @@ import {
   FileText, AlertCircle, CheckCircle, Menu, X, ChevronRight,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { BrandLogo } from '@/components/layout/brand-logo'
 import { cn } from '@/lib/utils'
 
 const fadeUp = {
@@ -45,17 +46,7 @@ function Nav() {
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="relative flex items-center justify-center w-8 h-8">
-              <div className="absolute inset-0 rounded-lg bg-brand-500 blur-md opacity-60" />
-              <div className="relative rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 p-1.5">
-                <Dumbbell className="w-4 h-4 text-white" />
-              </div>
-            </div>
-            <span className="font-display font-bold text-lg tracking-tight">
-              Gym<span className="text-brand-400">Flow</span>
-            </span>
-          </Link>
+          <BrandLogo size="lg" />
 
           <div className="hidden md:flex items-center gap-3">
             <Link href="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-4 py-2">
@@ -86,17 +77,9 @@ function Footer() {
     <footer className="border-t border-border/40 py-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="relative flex items-center justify-center w-7 h-7">
-              <div className="absolute inset-0 rounded-lg bg-brand-500 blur-sm opacity-50" />
-              <div className="relative rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 p-1.5">
-                <Dumbbell className="w-3.5 h-3.5 text-white" />
-              </div>
-            </div>
-            <span className="font-display font-bold">Gym<span className="text-brand-400">Flow</span></span>
-          </Link>
+          <BrandLogo size="md" />
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} GymFlow. Todos os direitos reservados.
+            © {new Date().getFullYear()} MeuTrein. Todos os direitos reservados.
           </p>
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <Link href="/privacidade" className="hover:text-foreground transition-colors">Privacidade</Link>
@@ -221,7 +204,7 @@ export default function PrivacidadePage() {
             {/* Quem somos */}
             <Section icon={FileText} color="#6366F1" title="1. Quem Somos">
               <p>
-                O <strong className="text-foreground">GymFlow</strong> é uma plataforma SaaS brasileira para gestão de academias. O controlador dos dados é a empresa responsável pelo GymFlow, com sede no Brasil.
+                O <strong className="text-foreground">MeuTrein</strong> é uma plataforma SaaS brasileira para gestão de academias. O controlador dos dados é a empresa responsável pelo MeuTrein, com sede no Brasil.
               </p>
               <p>
                 Ao usar nossa plataforma, você concorda com os termos desta política. Em caso de dúvidas, entre em contato pelo e-mail <strong className="text-foreground">privacidade@gymflow.app</strong>.
@@ -243,7 +226,7 @@ export default function PrivacidadePage() {
             {/* Google Analytics */}
             <Section icon={BarChart2} color="#10B981" title="3. Google Analytics">
               <p>
-                Utilizamos o <strong className="text-foreground">Google Analytics 4 (GA4)</strong> para entender como os usuários interagem com o GymFlow e assim melhorar a experiência.
+                Utilizamos o <strong className="text-foreground">Google Analytics 4 (GA4)</strong> para entender como os usuários interagem com o MeuTrein e assim melhorar a experiência.
               </p>
 
               <div className="mt-4 rounded-xl bg-surface-100/60 border border-border/40 p-4 space-y-3">
@@ -333,7 +316,7 @@ export default function PrivacidadePage() {
             {/* Finalidade */}
             <Section icon={CheckCircle} color="#06B6D4" title="5. Para Que Usamos os Dados">
               <ul className="space-y-2">
-                <Li>Fornecer e operar os serviços da plataforma GymFlow.</Li>
+                <Li>Fornecer e operar os serviços da plataforma MeuTrein.</Li>
                 <Li>Enviar notificações transacionais (confirmação de e-mail, convites).</Li>
                 <Li>Processar pagamentos via Stripe com segurança.</Li>
                 <Li>Analisar o uso do produto para melhorar funcionalidades.</Li>

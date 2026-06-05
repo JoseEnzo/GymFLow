@@ -25,26 +25,26 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'GymFlow — Plataforma para Academias',
-    template: '%s | GymFlow',
+    default: 'MeuTrein — Plataforma para Academias',
+    template: '%s | MeuTrein',
   },
   description:
     'Plataforma SaaS multi-tenant para academias. Gerencie treinos, alunos e evolução física com facilidade.',
   keywords: ['academia', 'treino', 'personal trainer', 'fitness', 'gestão de academia'],
-  authors: [{ name: 'GymFlow Team' }],
-  creator: 'GymFlow',
+  authors: [{ name: 'MeuTrein Team' }],
+  creator: 'MeuTrein',
   metadataBase: new URL(process.env['NEXT_PUBLIC_APP_URL'] ?? 'https://gymflow.app'),
   openGraph: {
     type: 'website',
     locale: 'pt_BR',
     url: 'https://gymflow.app',
-    title: 'GymFlow — Plataforma para Academias',
+    title: 'MeuTrein — Plataforma para Academias',
     description: 'Gerencie treinos, alunos e evolução física com facilidade.',
-    siteName: 'GymFlow',
+    siteName: 'MeuTrein',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'GymFlow',
+    title: 'MeuTrein',
     description: 'Plataforma SaaS para academias.',
     creator: '@gymflow',
   },

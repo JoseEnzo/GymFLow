@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
+import { BrandLogo } from '@/components/layout/brand-logo'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
@@ -233,17 +234,9 @@ function OnboardingContent() {
   // ─────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-      {/* Logo */}
-      <div className="flex items-center gap-2 mb-10">
-        <div className="relative flex items-center justify-center w-8 h-8">
-          <div className="absolute inset-0 rounded-lg bg-brand-500 blur-sm opacity-50" />
-          <div className="relative rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 p-1.5">
-            <Dumbbell className="w-4 h-4 text-white" />
-          </div>
-        </div>
-        <span className="font-display font-bold text-lg">
-          Gym<span className="text-brand-400">Flow</span>
-        </span>
+      {/* Logo (link smart) */}
+      <div className="mb-10">
+        <BrandLogo size="lg" />
       </div>
 
       <div className="w-full max-w-lg">
@@ -257,7 +250,7 @@ function OnboardingContent() {
                   Bem-vindo, {firstName}! 👋
                 </h1>
                 <p className="text-muted-foreground mt-1.5 text-sm">
-                  Como você vai usar o GymFlow?
+                  Como você vai usar o MeuTrein?
                 </p>
               </div>
 
@@ -669,7 +662,7 @@ function OnboardingContent() {
                 </button>
                 <h1 className="text-2xl font-display font-bold">Plano individual</h1>
                 <p className="text-muted-foreground mt-1.5 text-sm">
-                  Acesse o GymFlow sem precisar de uma academia.
+                  Acesse o MeuTrein sem precisar de uma academia.
                 </p>
               </div>
 

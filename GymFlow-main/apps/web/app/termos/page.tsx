@@ -7,6 +7,7 @@ import {
   Menu, X, Scale, CreditCard, Ban, Mail,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { BrandLogo } from '@/components/layout/brand-logo'
 import { cn } from '@/lib/utils'
 
 const fadeUp = {
@@ -42,17 +43,7 @@ function Nav() {
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="relative flex items-center justify-center w-8 h-8">
-              <div className="absolute inset-0 rounded-lg bg-brand-500 blur-md opacity-60" />
-              <div className="relative rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 p-1.5">
-                <Dumbbell className="w-4 h-4 text-white" />
-              </div>
-            </div>
-            <span className="font-display font-bold text-lg tracking-tight">
-              Gym<span className="text-brand-400">Flow</span>
-            </span>
-          </Link>
+          <BrandLogo size="lg" />
 
           <div className="hidden md:flex items-center gap-3">
             <Link href="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-4 py-2">
@@ -81,17 +72,9 @@ function Footer() {
     <footer className="border-t border-border/40 py-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="relative flex items-center justify-center w-7 h-7">
-              <div className="absolute inset-0 rounded-lg bg-brand-500 blur-sm opacity-50" />
-              <div className="relative rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 p-1.5">
-                <Dumbbell className="w-3.5 h-3.5 text-white" />
-              </div>
-            </div>
-            <span className="font-display font-bold">Gym<span className="text-brand-400">Flow</span></span>
-          </Link>
+          <BrandLogo size="md" />
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} GymFlow. Todos os direitos reservados.
+            © {new Date().getFullYear()} MeuTrein. Todos os direitos reservados.
           </p>
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <Link href="/privacidade" className="hover:text-foreground transition-colors">Privacidade</Link>
@@ -176,7 +159,7 @@ export default function TermosPage() {
               <span className="block gradient-text">sem letras miúdas</span>
             </motion.h1>
             <motion.p variants={fadeUp} className="text-muted-foreground text-lg max-w-xl mx-auto">
-              Leia com atenção os termos que regem o uso da plataforma GymFlow.
+              Leia com atenção os termos que regem o uso da plataforma MeuTrein.
             </motion.p>
             <motion.p variants={fadeUp} className="text-xs text-muted-foreground/60">
               Última atualização: {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
@@ -192,7 +175,7 @@ export default function TermosPage() {
           >
             <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-muted-foreground">
-              Ao criar uma conta ou usar a plataforma GymFlow, você concorda com estes Termos de Uso.
+              Ao criar uma conta ou usar a plataforma MeuTrein, você concorda com estes Termos de Uso.
               Caso não concorde, não utilize o serviço.
             </p>
           </motion.div>
@@ -206,7 +189,7 @@ export default function TermosPage() {
           >
             <Section icon={FileText} color="#6366F1" title="1. Aceitação dos Termos">
               <p>
-                Estes Termos de Uso regulam o acesso e uso da plataforma GymFlow, disponível em{' '}
+                Estes Termos de Uso regulam o acesso e uso da plataforma MeuTrein, disponível em{' '}
                 <span className="text-foreground font-medium">gymflow.app</span> e seus subdomínios.
               </p>
               <p>
@@ -217,7 +200,7 @@ export default function TermosPage() {
             </Section>
 
             <Section icon={Shield} color="#06B6D4" title="2. Uso permitido">
-              <p>Você pode usar o GymFlow para:</p>
+              <p>Você pode usar o MeuTrein para:</p>
               <ul className="space-y-2 mt-2">
                 <Li>Gerenciar treinos, fichas e evolução de alunos</Li>
                 <Li>Convidar e administrar personais e membros da academia</Li>
@@ -242,7 +225,7 @@ export default function TermosPage() {
 
             <Section icon={CreditCard} color="#10B981" title="4. Planos e pagamentos">
               <p>
-                O GymFlow oferece planos pagos com cobrança recorrente mensal, processados via Stripe.
+                O MeuTrein oferece planos pagos com cobrança recorrente mensal, processados via Stripe.
                 Os valores e funcionalidades de cada plano estão disponíveis na página de preços.
               </p>
               <ul className="space-y-2 mt-2">
@@ -255,7 +238,7 @@ export default function TermosPage() {
 
             <Section icon={Shield} color="#8B5CF6" title="5. Dados e privacidade">
               <p>
-                O GymFlow trata seus dados com responsabilidade e em conformidade com a LGPD
+                O MeuTrein trata seus dados com responsabilidade e em conformidade com a LGPD
                 (Lei Geral de Proteção de Dados — Lei nº 13.709/2018).
               </p>
               <p>
@@ -269,7 +252,7 @@ export default function TermosPage() {
 
             <Section icon={AlertCircle} color="#F59E0B" title="6. Disponibilidade do serviço">
               <p>
-                O GymFlow empreende esforços razoáveis para manter a plataforma disponível e funcional,
+                O MeuTrein empreende esforços razoáveis para manter a plataforma disponível e funcional,
                 mas não garante disponibilidade ininterrupta. Manutenções programadas serão comunicadas
                 com antecedência quando possível.
               </p>
@@ -282,7 +265,7 @@ export default function TermosPage() {
             <Section icon={Scale} color="#06B6D4" title="7. Propriedade intelectual">
               <p>
                 Todo o conteúdo da plataforma — incluindo código-fonte, design, marca e textos —
-                é propriedade exclusiva do GymFlow ou de seus licenciantes.
+                é propriedade exclusiva do MeuTrein ou de seus licenciantes.
               </p>
               <p>
                 Os dados inseridos por você (treinos, fichas, cadastros) permanecem de sua propriedade.

@@ -6,12 +6,48 @@ Guia de contexto e boas práticas para o Claude Code trabalhar neste projeto.
 
 ---
 
-## O que é o GymFlow
+## O que é o MeuTrein
 
 Plataforma SaaS multi-tenant para academias. Academias se cadastram, personais montam fichas de treino e alunos registram progresso pelo celular.
 
 **Três roles:** `owner` | `personal` | `student`
 **Modelo:** cada academia é um tenant isolado via RLS no Supabase.
+
+> O **produto** se chama **MeuTrein** (marca exibida ao usuário). O **repositório/monorepo** continua chamado **GymFlow** internamente — ver seção "Marca" abaixo.
+
+---
+
+## Marca: MeuTrein (produto) vs GymFlow (interno)
+
+O produto foi rebrandado para **MeuTrein** mas o repositório, pacotes npm, storage keys e infraestrutura permanecem como `GymFlow`/`gymflow` para evitar quebrar sessões ativas e migrations de infra. **Não confundir as duas pontas.**
+
+### Use "MeuTrein" (visível ao usuário)
+
+- **Logos e nome em UI:** sempre via `<BrandLogo />` em `apps/web/components/layout/brand-logo.tsx`. Esse componente é um Link smart que redireciona pra `/dashboard` se houver sessão ou `/` se não — usar **sempre** em vez de logo manual.
+- **Texto corrido em páginas:** landing, termos, privacidade, demo, not-found, auth pages, etc.
+- **Metadata e SEO:** `title`, `siteName`, `openGraph`, `twitter`, `alt` da OG image — tudo em `app/layout.tsx` e `app/opengraph-image.tsx`.
+- **Títulos do header do dashboard:** fallback em `components/layout/header.tsx`.
+- **E-mails transacionais / comunicações:** futuras notificações, assinatura de e-mails, etc.
+
+### Mantém "GymFlow"/"gymflow" (interno — NÃO trocar)
+
+- **Pacotes npm do monorepo:** `@gymflow/web`, `@gymflow/database`, `@gymflow/ui`, `@gymflow/eslint-config`, `@gymflow/typescript-config`. Mudar exige refactor de todos os imports e republicação.
+- **Workspace paths:** `tsconfig.json` paths apontam pra `@gymflow/*`.
+- **Storage keys** (mudar **desloga todo mundo / apaga rascunhos** em prod):
+  - `gymflow-auth` em `stores/auth-store.ts` (Zustand persist — sessão).
+  - `gymflow_notifications` em `app/(dashboard)/configuracoes/page.tsx` (preferências de notificação).
+  - `gymflow_draft_${userId}_${sheetId}[_d${day}]` em `app/(dashboard)/treinos/executar/[id]/page.tsx` (rascunho de treino em andamento).
+- **Domínio `gymflow.app`** em `app/layout.tsx` (`metadataBase`, `openGraph.url`), `app/sitemap.ts`, `app/robots.ts`, `app/opengraph-image.tsx` (pill bottom). Mudar exige novo domínio comprado + DNS/Vercel/SSL configurados antes.
+- **E-mails do projeto:** `contato@gymflow.app`, `privacidade@gymflow.app`, `@gymflow` (twitter creator) — dependem do domínio.
+- **Projeto Doppler:** `gymflow-s-org` em `.doppler.yaml`.
+- **Comentários técnicos:** referências a "GymFlow Design System" em `globals.css` e similares são livres pra manter ou atualizar conforme conveniência.
+
+### Como adicionar UI nova
+
+- Logo? `<BrandLogo size="md" />`. Nunca crie um logo manual com `<Dumbbell />` + `Gym<span>Flow</span>` inline — esse padrão antigo foi extinto.
+- Mostrar nome em texto corrido? "MeuTrein".
+- Salvar algo em `localStorage`? Use a convenção existente (`gymflow_*`) **a menos que seja key nova** — pra keys novas, pode usar `meutrein_*` à vontade (sem risco de invalidar nada).
+- Mexer em `metadataBase` / domínio? **Só com aprovação explícita** — afeta SEO, OG, callbacks Stripe, callbacks Supabase Auth, etc.
 
 ---
 
@@ -314,8 +350,34 @@ Atalhos no `package.json` da raiz:
 - **Cliente pagante é a academia** — aluno nunca paga diretamente
 - **Churn acontece quando o aluno não engaja** — UX do aluno é a mais crítica
 - **Personal trainer é o usuário mais ativo** — a ferramenta de criação de fichas precisa ser rápida
-- **Academias pequenas são o target** — sem features enterprise desnecessárias no MVP
+- **Pequenas academias são o ÚNICO target** — produto não é para redes/franquias/grandes academias. Ver "Tom de voz e copy" abaixo.
 - **Mobile-first porque o aluno usa na academia** — durante o treino, com as mãos suadas
+
+---
+
+## Tom de voz e copy (landing, e-mails, onboarding)
+
+Toda comunicação com o usuário deve refletir o foco em **pequenas academias** — donos que tocam o negócio pessoalmente, personal trainer único ou pequeno time, dezenas (não centenas/milhares) de alunos.
+
+### Use
+
+- Linguagem **direta, próxima e prática.** "Sua academia", "seus alunos", "seu personal" — em vez de termos genéricos/corporativos.
+- Benefícios **concretos no dia a dia da pequena academia:** "Crie ficha em 2 minutos", "Veja quem está sumindo", "WhatsApp do aluno na mão", "Sem precisar de TI". Sempre vinculado a tarefa real.
+- Provas **honestas e proporcionais:** depoimentos reais, prints de tela do produto, número de exercícios na biblioteca, número de planos disponíveis.
+- Comparações **com a alternativa real da pequena academia:** planilha do Excel, caderno, grupo de WhatsApp — não com Mindbody ou ClassPass.
+- **Preços visíveis** e bem abaixo de soluções enterprise — pequena academia tem orçamento apertado.
+
+### Não use
+
+- **Claims inflados ou falsos:** "Mais de 500 academias", "+10 mil personais", "milhões de treinos registrados". Se não tem o número, não escreva. Se tem mas é pequeno, mostre com orgulho ("As primeiras academias já estão usando" > inventar 500).
+- **Jargão enterprise/SaaS B2B:** "nível enterprise", "escalável", "infraestrutura cloud-native", "ROI", "compliance corporativa". Pequeno dono de academia não fala assim e não compra esses termos.
+- **Promessas vagas:** "Transforme sua academia", "Revolucione seu negócio". Cada frase deve ter substantivo concreto + verbo concreto.
+- **Selo de "grande coisa":** badges falsos, certificados não-existentes, logos de "como visto em…" inflados.
+- **Mencionar features que não temos:** se algo está em roadmap, mantém em roadmap. Não vender o que não existe.
+
+### Régua simples
+
+Antes de aprovar qualquer copy nova, pergunte: **"Um dono de uma academia com 40 alunos no bairro lendo isso entende, acredita e vê valor?"** Se a resposta exigir "ele vai precisar de alguém pra explicar", reescreve.
 
 ## Comportamento Automático e Economia de Tokens
 Você deve agir como um agente autônomo focado em máxima eficiência e economia de contexto. Adote as seguintes posturas automaticamente em todas as interações:

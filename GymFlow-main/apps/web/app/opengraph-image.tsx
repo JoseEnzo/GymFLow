@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og'
 
 export const runtime = 'edge'
-export const alt = 'GymFlow — Plataforma para Academias'
+export const alt = 'MeuTrein — Plataforma para Academias'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
@@ -77,7 +77,7 @@ export default function Image() {
             marginBottom: 16,
           }}
         >
-          Gym<span style={{ color: '#818cf8' }}>Flow</span>
+          Meu<span style={{ color: '#818cf8' }}>Trein</span>
         </div>
 
         {/* Tagline */}

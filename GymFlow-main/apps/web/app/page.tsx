@@ -10,6 +10,7 @@ import {
   ChevronDown, Quote,
 } from 'lucide-react'
 
+import { BrandLogo } from '@/components/layout/brand-logo'
 import { cn } from '@/lib/utils'
 
 // ──────────────────────────────────────────────
@@ -212,18 +213,9 @@ function Nav() {
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <div className="relative flex items-center justify-center w-8 h-8">
-              <div className="absolute inset-0 rounded-lg bg-brand-500 blur-md opacity-60" />
-              <div className="relative rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 p-1.5">
-                <Dumbbell className="w-4 h-4 text-white" />
-              </div>
-            </div>
-            <span className="font-display font-bold text-lg tracking-tight">
-              Gym<span className="text-brand-400">Flow</span>
-            </span>
-          </Link>
+          {/* Logo (link smart: leva pra /dashboard se logado, / se não) */}
+          <BrandLogo size="lg" />
+
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-8">
@@ -352,15 +344,16 @@ function Hero() {
               </motion.div>
 
               {/* Headline */}
-              <motion.h1 variants={fadeUp} className="text-5xl sm:text-6xl lg:text-7xl font-display font-extrabold leading-[0.95] tracking-tight">
-                Sua academia no
-                <span className="block gradient-text mt-1">nível certo.</span>
+              <motion.h1 variants={fadeUp} className="text-4xl sm:text-5xl lg:text-6xl font-display font-extrabold leading-[0.95] tracking-tight">
+                Feito pra
+                <span className="block gradient-text mt-1">academia pequena.</span>
               </motion.h1>
 
               {/* Subheadline */}
               <motion.p variants={fadeUp} className="text-lg text-muted-foreground leading-relaxed max-w-lg">
-                Plataforma completa para academias modernas. Gerencie treinos, acompanhe a
-                evolução dos alunos e escale seu negócio — tudo em um só lugar.
+                Ficha de treino no celular do aluno, evolução nas mãos do personal,
+                dashboard pro dono. Sem TI, sem contrato anual, sem feature corporativa
+                que ninguém usa.
               </motion.p>
 
               {/* CTAs */}
@@ -391,27 +384,12 @@ function Hero() {
                 </a>
               </motion.div>
 
-              {/* Social proof */}
-              <motion.div variants={fadeUp} className="flex items-center gap-6 pt-2">
-                <div className="flex -space-x-2.5">
-                  {['#6366F1', '#06B6D4', '#10B981', '#F59E0B', '#EF4444'].map((color, i) => (
-                    <div
-                      key={i}
-                      className="w-8 h-8 rounded-full border-2 border-background"
-                      style={{ background: `linear-gradient(135deg, ${color}, ${color}88)` }}
-                    />
-                  ))}
-                </div>
-                <div>
-                  <div className="flex items-center gap-1 mb-0.5">
-                    {[1,2,3,4,5].map((s) => (
-                      <Star key={s} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Junte-se às primeiras academias no <span className="text-foreground font-semibold">GymFlow</span>
-                  </p>
-                </div>
+              {/* Social proof — texto honesto, sem avatares/estrelas fake */}
+              <motion.div variants={fadeUp} className="pt-2">
+                <p className="text-xs text-muted-foreground">
+                  Junte-se às primeiras academias no <span className="text-foreground font-semibold">MeuTrein</span>.
+                  Sem fidelidade, sem cartão de crédito agora.
+                </p>
               </motion.div>
             </motion.div>
 
@@ -621,8 +599,8 @@ function FeaturesSection() {
             Tudo que sua academia precisa
           </motion.h2>
           <motion.p variants={fadeUp} className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Do cadastro da academia até o registro do último set — o GymFlow cobre todo o fluxo
-            de gestão fitness em uma plataforma integrada.
+            Do convite do aluno ao último set registrado. Sem feature corporativa, sem complicação.
+            O básico bem feito — pra você cuidar da academia em vez de cuidar do sistema.
           </motion.p>
         </motion.div>
 
@@ -1125,9 +1103,9 @@ function SobreSection() {
             <span className="block gradient-text">o chão da academia</span>
           </motion.h2>
           <motion.p variants={fadeUp} className="text-muted-foreground text-lg max-w-2xl mx-auto leading-relaxed">
-            O GymFlow nasceu da frustração com ferramentas genéricas que não entendiam o dia a dia de academias
-            independentes. Criamos uma plataforma focada em simplicidade, velocidade e experiência mobile — porque
-            o aluno está na academia, não na frente do computador.
+            O MeuTrein nasceu da frustração com ferramentas genéricas que não entendiam o dia a dia da academia
+            pequena. Criamos um app simples, rápido e mobile-first — porque o aluno está suando na academia,
+            não sentado na frente do computador.
           </motion.p>
         </motion.div>
 
@@ -1171,12 +1149,12 @@ function SobreSection() {
                 Uma startup brasileira,<br />com o coração na academia
               </h3>
               <p className="text-muted-foreground text-sm leading-relaxed">
-                Desenvolvido no Brasil, o GymFlow é construído com as melhores tecnologias modernas — Next.js,
-                Supabase e Stripe — para entregar uma experiência de nível enterprise acessível para qualquer academia.
+                Feito no Brasil, focado em academia pequena — daquelas onde o dono conhece cada aluno pelo nome.
+                Sem TI, sem time de implantação, sem contrato anual. Você assina, convida seus alunos e começa.
               </p>
               <p className="text-muted-foreground text-sm leading-relaxed">
-                Nossa prioridade é o aluno que usa o app durante o treino: interface limpa, rápida e que funciona
-                mesmo com sinal fraco.
+                A prioridade é o aluno usando o app no meio do treino: interface limpa, rápida, que funciona mesmo
+                com sinal fraco e com as mãos suadas.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -1225,14 +1203,14 @@ function CTASection() {
           <div className="relative z-10 space-y-6">
             <div className="inline-flex items-center gap-2 text-brand-300 text-sm font-semibold">
               <Zap className="w-4 h-4" />
-              Comece em menos de 5 minutos
+              Em menos de 5 minutos no ar
             </div>
             <h2 className="text-4xl lg:text-5xl font-display font-extrabold">
-              Sua academia merece
-              <span className="block gradient-text">uma gestão profissional</span>
+              Tira sua academia do
+              <span className="block gradient-text">caderno e da planilha</span>
             </h2>
             <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-              Sem cartão de crédito. Sem contratos. Cancele quando quiser.
+              Sem cartão de crédito agora. Sem contrato anual. Cancele quando quiser.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
               <Link
@@ -1262,17 +1240,9 @@ function Footer() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           <div className="col-span-2 md:col-span-1 space-y-4">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="relative flex items-center justify-center w-7 h-7">
-                <div className="absolute inset-0 rounded-lg bg-brand-500 blur-sm opacity-50" />
-                <div className="relative rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 p-1.5">
-                  <Dumbbell className="w-3.5 h-3.5 text-white" />
-                </div>
-              </div>
-              <span className="font-display font-bold">Gym<span className="text-brand-400">Flow</span></span>
-            </Link>
+            <BrandLogo size="md" />
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Plataforma SaaS para academias modernas.
+              Feito pra academia pequena, sem TI.
             </p>
           </div>
 
@@ -1319,7 +1289,7 @@ function Footer() {
 
         <div className="divider pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} GymFlow. Todos os direitos reservados.
+            © {new Date().getFullYear()} MeuTrein. Todos os direitos reservados.
           </p>
           <p className="text-xs text-muted-foreground">
             Feito com ❤️ no Brasil
@@ -1334,10 +1304,10 @@ function Footer() {
 // Stats Bar
 // ──────────────────────────────────────────────
 const STATS = [
-  { label: 'Multi-tenant com RLS',        end: 100,  suffix: '%', color: '#6366F1' },
-  { label: 'Exercícios no catálogo',      end: 200,  suffix: '+', color: '#06B6D4' },
-  { label: 'Uptime de infraestrutura',    end: 99.9, suffix: '%', color: '#10B981' },
-  { label: 'Suporte por e-mail',          end: 24,   suffix: 'h', color: '#F59E0B' },
+  { label: 'Exercícios prontos',          end: 600,  suffix: '+',   color: '#6366F1' },
+  { label: 'Trial grátis',                end: 14,   suffix: ' dias', color: '#06B6D4' },
+  { label: 'Pra criar uma ficha',         end: 5,    suffix: 'min', color: '#10B981' },
+  { label: 'Suporte por e-mail',          end: 24,   suffix: 'h',   color: '#F59E0B' },
 ]
 
 function StatsBar() {
@@ -1374,7 +1344,7 @@ function StatsBar() {
 // ──────────────────────────────────────────────
 const testimonials = [
   {
-    quote: 'Antes eu usava planilha para tudo. O GymFlow substituiu 3 ferramentas de uma vez — e meus alunos adoram o app.',
+    quote: 'Antes eu usava planilha para tudo. O MeuTrein substituiu 3 ferramentas de uma vez — e meus alunos adoram o app.',
     name: 'Rodrigo Faria',
     title: 'Proprietário · Academia Shape',
     location: 'São Paulo, SP',
@@ -1447,7 +1417,7 @@ function TestimonialsSection() {
             Quem usa, recomenda
           </motion.h2>
           <motion.p variants={fadeUp} className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Mais de 500 academias, personais e alunos transformaram a forma de treinar com o GymFlow.
+            As primeiras academias do Brasil já trocaram a planilha e o caderno pelo MeuTrein.
           </motion.p>
 
           {/* Rating bar */}
@@ -1524,8 +1494,8 @@ const faqs = [
     answer: 'Não. O período de trial é 100% gratuito e não exige dados de pagamento. Você só adiciona um método de pagamento quando decidir assinar um plano pago.',
   },
   {
-    question: 'O GymFlow funciona no celular?',
-    answer: 'Sim. O GymFlow é um PWA (Progressive Web App) que pode ser instalado diretamente do navegador no iPhone e Android. Funciona mesmo com sinal fraco — perfeito para usar durante o treino.',
+    question: 'O MeuTrein funciona no celular?',
+    answer: 'Sim. O MeuTrein é um PWA (Progressive Web App) que pode ser instalado diretamente do navegador no iPhone e Android. Funciona mesmo com sinal fraco — perfeito para usar durante o treino.',
   },
   {
     question: 'Como meus alunos entram na plataforma?',
@@ -1533,7 +1503,7 @@ const faqs = [
   },
   {
     question: 'Posso migrar dados de outra plataforma?',
-    answer: 'Atualmente não temos importador automático, mas nossa equipe pode auxiliar na migração manual de fichas e histórico para os planos Pro. Entre em contato pelo suporte.',
+    answer: 'Hoje não tem importador automático. Se a sua base for pequena (até umas dezenas de alunos), dá pra cadastrar tudo na mão em cerca de meia hora. Se for volume maior, manda um e-mail no suporte que a gente combina a melhor forma de migrar.',
   },
   {
     question: 'Quantos personais e alunos posso ter?',
@@ -1541,7 +1511,7 @@ const faqs = [
   },
   {
     question: 'Os dados da minha academia ficam isolados?',
-    answer: 'Sim. Usamos Row Level Security (RLS) no PostgreSQL para garantir isolamento total entre academias. Nenhum dado vaza entre tenants — é isolamento em nível de banco de dados.',
+    answer: 'Sim. Cada academia tem seus alunos, fichas e treinos completamente separados dos da próxima — não tem como um aluno seu ver dados de outra academia, nem por engano nem buscando de propósito. A separação acontece direto no banco de dados, antes da consulta sair.',
   },
   {
     question: 'Posso cancelar quando quiser?',
@@ -1549,7 +1519,7 @@ const faqs = [
   },
   {
     question: 'O suporte é em português?',
-    answer: 'Sim! Somos uma empresa brasileira e todo o suporte é feito em português, via chat e e-mail. Planos Pro têm acesso prioritário com tempo de resposta de até 4 horas.',
+    answer: 'Sim, somos brasileiros e o suporte é todo em português, por e-mail. Geralmente respondemos no mesmo dia útil; planos Pro têm prioridade na fila.',
   },
 ]
 
@@ -1680,7 +1650,8 @@ export default function LandingPage() {
         <SectionTransition />
         <HowItWorksSection />
         <PricingSection />
-        <TestimonialsSection />
+        {/* TestimonialsSection removida — depoimentos atuais eram fictícios.
+            Reativar quando tivermos quotes reais de academias parceiras. */}
         <SobreSection />
         <FAQSection />
         <CTASection />
