@@ -4,13 +4,25 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   BarChart3, TrendingUp, TrendingDown, Users, Dumbbell,
-  Calendar, Flame, ClipboardList, Activity, Minus,
+  Calendar, Flame, ClipboardList, Activity, Minus, Target,
 } from 'lucide-react'
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 
 import { useAuthStore } from '@/stores/auth-store'
 import { FrequencyHeatmap } from '@/components/charts/frequency-heatmap'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+
+// NSM: alunos com >= 2 treinos COMPLETADOS na semana
+const NSM_MIN_WORKOUTS = 2
+const NSM_WEEKS_BACK = 8
+
+interface EngagementWeek {
+  week_start: string
+  active_students: number
+  engaged_students: number
+  engagement_rate: number
+}
 
 const fadeUp = {
   hidden: { opacity: 0, y: 12 },
@@ -77,6 +89,7 @@ export default function RelatoriosPage() {
   const { currentAcademy } = useAuthStore()
   const supabase = createClient()
   const [stats, setStats] = useState<Stats | null>(null)
+  const [engagement, setEngagement] = useState<EngagementWeek[] | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -104,6 +117,7 @@ export default function RelatoriosPage() {
         { data: monthLogs },
         { data: activeMembers },
         { data: newSheets },
+        { data: engagementRows, error: engagementError },
       ] = await Promise.all([
         sb.from('workout_logs').select('created_at, student_id').eq('academy_id', currentAcademy!.id),
         base.gte('created_at', weekStart.toISOString()),
@@ -116,7 +130,19 @@ export default function RelatoriosPage() {
           .eq('academy_id', currentAcademy!.id).eq('role', 'student').eq('is_active', true),
         sb.from('workout_sheets').select('id')
           .eq('academy_id', currentAcademy!.id).gte('created_at', monthStart.toISOString()),
+        sb.rpc('academy_engagement_weekly', {
+          p_academy_id:   currentAcademy!.id,
+          p_weeks_back:   NSM_WEEKS_BACK,
+          p_min_workouts: NSM_MIN_WORKOUTS,
+        }),
       ])
+
+      if (engagementError) {
+        console.warn('[relatorios] RPC academy_engagement_weekly indisponível. Aplique a migration 040.', engagementError?.message ?? engagementError)
+        setEngagement(null)
+      } else {
+        setEngagement((engagementRows ?? []) as EngagementWeek[])
+      }
 
       const workoutsByDay = Array(7).fill(0)
       const studentWorkoutCount: Record<string, number> = {}
@@ -158,9 +184,8 @@ export default function RelatoriosPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentAcademy])
 
-  const engagementPct = stats && stats.totalActiveMembers > 0
-    ? Math.round((stats.activeStudents / stats.totalActiveMembers) * 100)
-    : 0
+  // Engajamento (NSM): vem da RPC. Stat card e card grande consomem o mesmo número.
+  const nsmRate = engagement?.[0]?.engagement_rate
   const maxDay = stats ? Math.max(...stats.workoutsByDay, 1) : 1
 
   return (
@@ -201,10 +226,10 @@ export default function RelatoriosPage() {
                 delta: null,
               },
               {
-                label: 'Taxa de engajamento',
-                value: `${engagementPct}%`,
-                icon: Flame,
-                color: '#F97316',
+                label: 'Engajados (≥2/sem)',
+                value: nsmRate !== undefined ? `${nsmRate.toFixed(1)}%` : '—',
+                icon: Target,
+                color: '#1D9E75',
                 delta: null,
               },
               {
@@ -281,39 +306,107 @@ export default function RelatoriosPage() {
             </div>
           </motion.div>
 
-          {/* Engajamento */}
+          {/* NSM — alunos engajados (>=2 treinos completados/semana) + tendência */}
           <motion.div custom={4} variants={fadeUp} initial="hidden" animate="show"
             className="glass rounded-2xl p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <Activity className="w-4 h-4 text-brand-400" />
-              <h3 className="font-display font-bold text-sm">Engajamento semanal</h3>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-brand-400" />
+                <h3 className="font-display font-bold text-sm">Alunos engajados</h3>
+              </div>
+              <span className="text-[10px] text-muted-foreground bg-surface-200 px-2 py-0.5 rounded-full">
+                ≥{NSM_MIN_WORKOUTS} treinos/sem
+              </span>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="relative w-20 h-20 flex-shrink-0">
-                <svg viewBox="0 0 36 36" className="w-20 h-20 -rotate-90">
-                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="#ffffff10" strokeWidth="3" />
-                  <circle cx="18" cy="18" r="15.9" fill="none"
-                    stroke="#1D9E75" strokeWidth="3"
-                    strokeDasharray={`${engagementPct} 100`}
-                    strokeLinecap="round"
-                    className="transition-all duration-700"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="font-display font-extrabold text-sm">{engagementPct}%</span>
+            <p className="text-xs text-muted-foreground mb-4">
+              Treinos completados (não rascunhos). Preditor de retenção do aluno.
+            </p>
+
+            {engagement === null ? (
+              <p className="text-xs text-muted-foreground italic py-2">
+                Métrica indisponível. Aplique a migration 040 para habilitar.
+              </p>
+            ) : engagement.length === 0 || engagement[0]!.active_students === 0 ? (
+              <p className="text-xs text-muted-foreground italic py-2">
+                Sem alunos ativos ainda.
+              </p>
+            ) : (
+              <>
+                {/* Número atual + delta vs semana anterior */}
+                <div className="flex items-end gap-3 mb-4">
+                  <div>
+                    <p className="font-display font-extrabold text-3xl leading-none">
+                      {engagement[0]!.engaged_students}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      de {engagement[0]!.active_students} alunos · {engagement[0]!.engagement_rate.toFixed(1)}%
+                    </p>
+                  </div>
+                  {engagement[1] && (() => {
+                    const delta = engagement[0]!.engagement_rate - engagement[1]!.engagement_rate
+                    if (Math.abs(delta) < 0.05) {
+                      return (
+                        <span className="flex items-center gap-0.5 text-[11px] font-semibold text-muted-foreground mb-1">
+                          <Minus className="w-3 h-3" /> 0,0 p.p.
+                        </span>
+                      )
+                    }
+                    return (
+                      <span className={cn(
+                        'flex items-center gap-0.5 text-[11px] font-semibold mb-1',
+                        delta > 0 ? 'text-emerald-400' : 'text-red-400'
+                      )}>
+                        {delta > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                        {delta > 0 ? '+' : ''}{delta.toFixed(1)} p.p.
+                      </span>
+                    )
+                  })()}
                 </div>
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-sm font-semibold">
-                  {stats.activeStudents} de {stats.totalActiveMembers} alunos treinaram
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {stats.totalActiveMembers - stats.activeStudents > 0
-                    ? `${stats.totalActiveMembers - stats.activeStudents} aluno${stats.totalActiveMembers - stats.activeStudents > 1 ? 's' : ''} sem treino esta semana`
-                    : 'Todos os alunos treinaram esta semana!'}
-                </p>
-              </div>
-            </div>
+
+                {/* Gráfico de tendência das últimas N semanas */}
+                <div className="h-32">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={[...engagement].reverse().map((w) => ({
+                        week: new Date(w.week_start).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
+                        rate: w.engagement_rate,
+                        engaged: w.engaged_students,
+                      }))}
+                      margin={{ top: 4, right: 4, left: -24, bottom: 0 }}
+                    >
+                      <CartesianGrid stroke="#ffffff08" strokeDasharray="3 3" />
+                      <XAxis dataKey="week" stroke="#888" fontSize={10} tickLine={false} axisLine={false} />
+                      <YAxis
+                        stroke="#888" fontSize={10} tickLine={false} axisLine={false}
+                        domain={[0, 100]}
+                        tickFormatter={(v) => `${v}%`}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          background: 'rgba(20, 20, 30, 0.95)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: 12,
+                          fontSize: 12,
+                        }}
+                        labelStyle={{ color: '#fff', fontWeight: 600 }}
+                        formatter={(value: number, _name, item) => [
+                          `${value.toFixed(1)}% (${item.payload.engaged} alunos)`,
+                          'Engajamento',
+                        ]}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="rate"
+                        stroke="#1D9E75"
+                        strokeWidth={2}
+                        dot={{ r: 3, fill: '#1D9E75' }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
+            )}
           </motion.div>
 
           {/* Top alunos */}

@@ -311,16 +311,6 @@ function Hero() {
   return (
     <section className="relative min-h-screen flex items-center overflow-hidden pt-16">
 
-      {/* Grid pattern */}
-      <div
-        className="absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage: `linear-gradient(rgba(99,102,241,1) 1px, transparent 1px),
-                            linear-gradient(90deg, rgba(99,102,241,1) 1px, transparent 1px)`,
-          backgroundSize: '60px 60px',
-        }}
-      />
-
       {/* Glowing orbs — skipped for reduced motion */}
       {!reduceMotion && (
         <>
@@ -725,8 +715,6 @@ function PersonasSection() {
 
   return (
     <section className="relative py-24 lg:py-32 overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none" aria-hidden="true"
-        style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 50%, rgba(6,182,212,0.06) 0%, transparent 70%)' }} />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
           variants={stagger}
@@ -862,11 +850,6 @@ const steps = [
 function HowItWorksSection() {
   return (
     <section className="relative py-24 lg:py-32 overflow-hidden">
-      {/* Gradiente de entrada — torna a transição visível */}
-      <div
-        className="absolute top-0 inset-x-0 h-48 pointer-events-none"
-        style={{ background: 'linear-gradient(to bottom, rgba(99,102,241,0.13) 0%, rgba(6,182,212,0.04) 60%, transparent 100%)' }}
-      />
       <ParticleField count={6} />
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -1009,8 +992,6 @@ const plans = [
 function PricingSection() {
   return (
     <section id="preco" className="relative py-24 lg:py-32 overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none" aria-hidden="true"
-        style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 50%, rgba(99,102,241,0.07) 0%, transparent 70%)' }} />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
           variants={stagger}
@@ -1362,8 +1343,6 @@ const STATS = [
 function StatsBar() {
   return (
     <section className="relative py-10 overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none"
-        style={{ background: 'linear-gradient(90deg, rgba(99,102,241,0.06) 0%, rgba(6,182,212,0.04) 50%, rgba(99,102,241,0.06) 100%)' }} />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
           variants={stagger}
@@ -1453,8 +1432,6 @@ const testimonials = [
 function TestimonialsSection() {
   return (
     <section className="relative py-24 lg:py-32 overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none" aria-hidden="true"
-        style={{ background: 'radial-gradient(ellipse 80% 50% at 50% 100%, rgba(99,102,241,0.07) 0%, transparent 70%)' }} />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
           variants={stagger}
@@ -1674,7 +1651,17 @@ function FAQSection() {
 // ──────────────────────────────────────────────
 export default function LandingPage() {
   return (
-    <div className="relative min-h-screen bg-background bg-mesh">
+    <div className="relative min-h-screen bg-background bg-mesh bg-fixed">
+      {/* Grid pattern — absolute, rola junto com a página */}
+      <div
+        className="absolute inset-0 pointer-events-none z-0 opacity-[0.04]"
+        aria-hidden="true"
+        style={{
+          backgroundImage: `linear-gradient(rgba(99,102,241,1) 1px, transparent 1px),
+                            linear-gradient(90deg, rgba(99,102,241,1) 1px, transparent 1px)`,
+          backgroundSize: '60px 60px',
+        }}
+      />
       {/* Vignette — fixed viewport overlay, below nav (z-50) */}
       <div
         className="fixed inset-0 pointer-events-none z-[45]"

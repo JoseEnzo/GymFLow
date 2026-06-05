@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Search, ClipboardList, Dumbbell, Clock, Target,
-  ChevronRight, Edit2, Trash2, Play, Users, Eye,
+  ChevronRight, Edit2, Trash2, Play, Users, Eye, UserPlus,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -195,6 +195,7 @@ function SheetCard({ sheet, isPersonal, isStudent, readOnly, onDelete }: {
 export default function TreinosPage() {
   const [search, setSearch] = useState('')
   const [sheets, setSheets] = useState<Sheet[]>([])
+  const [hasStudents, setHasStudents] = useState(false)
   const [loading, setLoading] = useState(true)
   const { currentRole, currentAcademy } = useAuthStore()
   const supabase = createClient()
@@ -207,6 +208,21 @@ export default function TreinosPage() {
       if (!currentAcademy) { setLoading(false); return }
 
       const { data: { user } } = await supabase.auth.getUser()
+
+      // Para personal: precisa saber se tem aluno antes de oferecer "Nova ficha".
+      // Personal sem aluno cai num form que nunca pode ser submetido (precisa selectionar
+      // aluno mas não tem opção). Pré-detectar evita esse beco sem saída.
+      if (isPersonal) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { count, error: countError } = await (supabase as any)
+          .from('academy_members')
+          .select('id', { count: 'exact', head: true })
+          .eq('academy_id', currentAcademy.id)
+          .eq('role', 'student')
+          .eq('is_active', true)
+        if (countError) console.warn('[treinos] count alunos falhou:', countError?.message ?? countError)
+        setHasStudents((count ?? 0) > 0)
+      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let query = (supabase as any)
@@ -283,10 +299,16 @@ export default function TreinosPage() {
             {loading ? 'Carregando...' : `${sheets.length} ${sheets.length === 1 ? 'ficha' : 'fichas'} · ${sheets.filter((s) => s.is_active).length} ativas`}
           </p>
         </div>
-        {isPersonal && (
+        {isPersonal && hasStudents && (
           <Link href="/treinos/novo" className="btn-primary text-sm py-2.5 px-5 rounded-xl">
             <Plus className="w-4 h-4" />
             Nova ficha
+          </Link>
+        )}
+        {isPersonal && !hasStudents && !loading && (
+          <Link href="/alunos" className="btn-primary text-sm py-2.5 px-5 rounded-xl">
+            <UserPlus className="w-4 h-4" />
+            Convidar aluno
           </Link>
         )}
       </motion.div>
@@ -342,22 +364,36 @@ export default function TreinosPage() {
       {!loading && sheets.length === 0 && (
         <motion.div variants={fadeUp} className="text-center py-20">
           <div className="w-14 h-14 rounded-2xl bg-surface-200 flex items-center justify-center mx-auto mb-4">
-            <ClipboardList className="w-7 h-7 text-muted-foreground/40" />
+            {isPersonal && !hasStudents
+              ? <Users className="w-7 h-7 text-muted-foreground/40" />
+              : <ClipboardList className="w-7 h-7 text-muted-foreground/40" />}
           </div>
           <p className="font-semibold text-muted-foreground">
-            {isOwner ? 'Nenhuma ficha cadastrada' : isPersonal ? 'Nenhuma ficha criada ainda' : 'Nenhuma ficha atribuída a você'}
+            {isOwner
+              ? 'Nenhuma ficha cadastrada'
+              : isPersonal
+              ? (hasStudents ? 'Nenhuma ficha criada ainda' : 'Convide alunos para começar')
+              : 'Nenhuma ficha atribuída a você'}
           </p>
           <p className="text-sm text-muted-foreground/60 mt-1">
             {isOwner
               ? 'Os personais ainda não criaram fichas para os alunos.'
               : isPersonal
-              ? 'Crie fichas de treino e atribua aos seus alunos.'
+              ? (hasStudents
+                  ? 'Crie fichas de treino e atribua aos seus alunos.'
+                  : 'Você precisa ter pelo menos 1 aluno antes de criar fichas de treino.')
               : 'Aguarde seu personal trainer criar uma ficha para você.'}
           </p>
-          {isPersonal && (
+          {isPersonal && hasStudents && (
             <Link href="/treinos/novo" className="btn-primary text-sm py-2 px-4 rounded-xl mt-4 inline-flex items-center gap-1.5">
               <Plus className="w-3.5 h-3.5" />
               Criar primeira ficha
+            </Link>
+          )}
+          {isPersonal && !hasStudents && (
+            <Link href="/alunos" className="btn-primary text-sm py-2 px-4 rounded-xl mt-4 inline-flex items-center gap-1.5">
+              <UserPlus className="w-3.5 h-3.5" />
+              Convidar primeiro aluno
             </Link>
           )}
         </motion.div>

@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form'
 import {
   ArrowLeft, Loader2, Target, FileText,
   ChevronRight, Check, User, CalendarDays, Sparkles, X,
+  Users, UserPlus,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -217,6 +218,10 @@ function NovaFichaContent() {
     }
   }
 
+  // Personal sem aluno cai num form que nunca pode ser submetido (precisa selecionar
+  // aluno, mas a lista está vazia). Mostra empty state e link pra convidar antes.
+  const noStudentsAvailable = !loadingStudents && !studentIdFromUrl && students.length === 0
+
   return (
     <div className="space-y-6 max-w-2xl">
       <motion.div custom={0} variants={fadeUp} initial="hidden" animate="show" className="flex items-center gap-3">
@@ -229,6 +234,23 @@ function NovaFichaContent() {
         </div>
       </motion.div>
 
+      {noStudentsAvailable && (
+        <motion.div custom={1} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-8 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-surface-200 flex items-center justify-center mx-auto mb-4">
+            <Users className="w-7 h-7 text-muted-foreground/40" />
+          </div>
+          <p className="font-semibold">Convide alunos antes de criar a ficha</p>
+          <p className="text-sm text-muted-foreground/70 mt-1.5 max-w-sm mx-auto">
+            Uma ficha precisa ser atribuída a um aluno. Convide pelo menos 1 aluno e volte aqui depois.
+          </p>
+          <Link href="/alunos" className="btn-primary text-sm py-2 px-4 rounded-xl mt-5 inline-flex items-center gap-1.5">
+            <UserPlus className="w-3.5 h-3.5" />
+            Convidar aluno
+          </Link>
+        </motion.div>
+      )}
+
+      {!noStudentsAvailable && (
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
 
         {/* Template picker */}
@@ -460,6 +482,7 @@ function NovaFichaContent() {
           </button>
         </motion.div>
       </form>
+      )}
     </div>
   )
 }

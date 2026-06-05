@@ -422,6 +422,60 @@ export type Database = {
           },
         ]
       }
+      expulsion_requests: {
+        Row: {
+          academy_id: string
+          created_at: string | null
+          id: string
+          reason: string
+          requested_by: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          student_id: string
+          student_member_id: string
+        }
+        Insert: {
+          academy_id: string
+          created_at?: string | null
+          id?: string
+          reason: string
+          requested_by: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          student_id: string
+          student_member_id: string
+        }
+        Update: {
+          academy_id?: string
+          created_at?: string | null
+          id?: string
+          reason?: string
+          requested_by?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          student_id?: string
+          student_member_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expulsion_requests_academy_id_fkey"
+            columns: ["academy_id"]
+            isOneToOne: false
+            referencedRelation: "academies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expulsion_requests_student_member_id_fkey"
+            columns: ["student_member_id"]
+            isOneToOne: false
+            referencedRelation: "academy_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invites: {
         Row: {
           academy_id: string
@@ -481,8 +535,8 @@ export type Database = {
           bio: string | null
           birth_date: string | null
           cpf: string | null
-          cref: string | null
           created_at: string
+          cref: string | null
           email: string | null
           full_name: string | null
           gender: string | null
@@ -498,8 +552,8 @@ export type Database = {
           bio?: string | null
           birth_date?: string | null
           cpf?: string | null
-          cref?: string | null
           created_at?: string
+          cref?: string | null
           email?: string | null
           full_name?: string | null
           gender?: string | null
@@ -515,8 +569,8 @@ export type Database = {
           bio?: string | null
           birth_date?: string | null
           cpf?: string | null
-          cref?: string | null
           created_at?: string
+          cref?: string | null
           email?: string | null
           full_name?: string | null
           gender?: string | null
@@ -596,6 +650,7 @@ export type Database = {
       sheet_exercises: {
         Row: {
           created_at: string
+          day_index: number | null
           exercise_id: string
           id: string
           notes: string | null
@@ -609,6 +664,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          day_index?: number | null
           exercise_id: string
           id?: string
           notes?: string | null
@@ -622,6 +678,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          day_index?: number | null
           exercise_id?: string
           id?: string
           notes?: string | null
@@ -664,6 +721,54 @@ export type Database = {
           processed_at?: string
         }
         Relationships: []
+      }
+      template_exercises: {
+        Row: {
+          exercise_id: string
+          id: string
+          notes: string | null
+          order_index: number
+          reps: string
+          rest_seconds: number
+          sets: number
+          template_id: string
+        }
+        Insert: {
+          exercise_id: string
+          id?: string
+          notes?: string | null
+          order_index?: number
+          reps?: string
+          rest_seconds?: number
+          sets?: number
+          template_id: string
+        }
+        Update: {
+          exercise_id?: string
+          id?: string
+          notes?: string | null
+          order_index?: number
+          reps?: string
+          rest_seconds?: number
+          sets?: number
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_exercises_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_exercises_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "workout_sheet_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       workout_logs: {
         Row: {
@@ -725,6 +830,30 @@ export type Database = {
           },
         ]
       }
+      workout_sheet_templates: {
+        Row: {
+          goal: string | null
+          id: string
+          level: string
+          muscle_group: string
+          name: string
+        }
+        Insert: {
+          goal?: string | null
+          id?: string
+          level: string
+          muscle_group: string
+          name: string
+        }
+        Update: {
+          goal?: string | null
+          id?: string
+          level?: string
+          muscle_group?: string
+          name?: string
+        }
+        Relationships: []
+      }
       workout_sheets: {
         Row: {
           academy_id: string
@@ -736,6 +865,7 @@ export type Database = {
           name: string
           order_index: number
           personal_id: string
+          schedule_type: string
           scheduled_days: number[]
           student_id: string
           updated_at: string
@@ -751,6 +881,7 @@ export type Database = {
           name: string
           order_index?: number
           personal_id: string
+          schedule_type?: string
           scheduled_days?: number[]
           student_id: string
           updated_at?: string
@@ -766,6 +897,7 @@ export type Database = {
           name?: string
           order_index?: number
           personal_id?: string
+          schedule_type?: string
           scheduled_days?: number[]
           student_id?: string
           updated_at?: string
@@ -786,6 +918,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      academy_engagement_weekly: {
+        Args: {
+          p_academy_id: string
+          p_min_workouts?: number
+          p_personal_id?: string
+          p_weeks_back?: number
+        }
+        Returns: {
+          active_students: number
+          engaged_students: number
+          engagement_rate: number
+          week_start: string
+        }[]
+      }
       accept_invite: {
         Args: { p_token: string; p_user_id: string }
         Returns: {
