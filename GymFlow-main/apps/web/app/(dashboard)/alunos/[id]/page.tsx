@@ -95,23 +95,25 @@ export default function StudentDetailPage() {
 
       // Load sheets assigned to this student
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: sheetsData } = await (supabase as any)
+      const { data: sheetsData, error: sheetsError } = await (supabase as any)
         .from('workout_sheets')
         .select('id, name, goal, is_active')
         .eq('academy_id', currentAcademy.id)
         .eq('student_id', id)
         .order('created_at', { ascending: false })
 
+      if (sheetsError) console.warn('[aluno] erro ao buscar fichas:', sheetsError?.message ?? sheetsError)
       if (sheetsData) setSheets(sheetsData)
 
       // Count workout logs
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { count } = await (supabase as any)
+      const { count, error: countError } = await (supabase as any)
         .from('workout_logs')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', id)
         .eq('academy_id', currentAcademy.id)
 
+      if (countError) console.warn('[aluno] erro ao contar treinos:', countError?.message ?? countError)
       setTotalWorkouts(count ?? 0)
       setLoading(false)
     }

@@ -135,6 +135,7 @@ function MeasureInput({ label, id, value, onChange }: {
         <input
           id={id}
           type="number"
+          inputMode="decimal"
           step="0.1"
           min="0"
           value={value}
@@ -170,12 +171,13 @@ export function MeasurementsSection({ studentId, academyId, readOnly = false }: 
     async function load() {
       setLoading(true)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from('body_measurements')
         .select('*')
         .eq('academy_id', academyId)
         .eq('student_id', studentId)
         .order('measured_at', { ascending: false })
+      if (error) toast.error('Erro ao carregar medidas.')
       setMeasurements(data ?? [])
       setLoading(false)
     }

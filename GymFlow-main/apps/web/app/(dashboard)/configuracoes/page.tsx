@@ -697,23 +697,26 @@ export default function ConfiguracoesPage() {
       </motion.div>
 
       <motion.div variants={fadeUp} className="flex gap-6 flex-col lg:flex-row">
-        <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible flex-shrink-0 lg:w-48">
-          {TABS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={cn(
-                'flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all',
-                activeTab === id
-                  ? 'bg-brand-500/10 text-brand-300 border border-brand-500/20'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-surface-100'
-              )}
-            >
-              <Icon className="w-4 h-4 flex-shrink-0" />
-              {label}
-            </button>
-          ))}
-        </nav>
+        <div className="relative flex-shrink-0 lg:w-48">
+          <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {TABS.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={cn(
+                  'flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all',
+                  activeTab === id
+                    ? 'bg-brand-500/10 text-brand-300 border border-brand-500/20'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-surface-100'
+                )}
+              >
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                {label}
+              </button>
+            ))}
+          </nav>
+          <div aria-hidden className="lg:hidden pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent" />
+        </div>
 
         <div className="flex-1 min-w-0">
           <div className="glass rounded-2xl p-6">

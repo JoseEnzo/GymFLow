@@ -17,11 +17,13 @@ Plataforma SaaS multi-tenant para academias. Academias se cadastram, personais m
 
 ## Stack
 
-- **Frontend:** Next.js 14 (App Router), TypeScript, Tailwind CSS, shadcn/ui, Zustand
+- **Monorepo:** Turborepo + pnpm workspaces (Node ≥ 20, pnpm ≥ 9)
+- **Frontend:** Next.js 15 (App Router), React 18, TypeScript, Tailwind CSS, shadcn/ui, Zustand, React Hook Form, Zod
 - **Backend:** Supabase (Auth + PostgreSQL + Storage + Realtime)
-- **Segurança:** Row Level Security (RLS) em todas as tabelas
-- **Pagamentos:** Stripe
+- **Segurança:** Row Level Security (RLS) em todas as tabelas + rate limiting + Cloudflare Turnstile
+- **Pagamentos:** Stripe (com webhook idempotente)
 - **E-mail:** Resend
+- **Envs:** Doppler (fonte da verdade)
 - **Deploy:** Vercel
 
 ---
@@ -29,33 +31,38 @@ Plataforma SaaS multi-tenant para academias. Academias se cadastram, personais m
 ## Estrutura de pastas
 
 ```
-/app
-  /auth/login
-  /auth/cadastro
-  /auth/convite          → entrada via link de convite
-  /dashboard             → owner
-  /alunos                → owner e personal
-  /treinos               → personal cria, aluno executa
-  /exercicios            → biblioteca
-  /historico             → aluno
-  /evolucao              → aluno (gráficos)
-  /perfil
-/components
-  /ui                    → shadcn/ui base
-  /layout                → sidebar, bottom nav, header
-  /workout               → componentes de treino
-/lib
-  /supabase.ts
-  /stripe.ts
-  /cnpj.ts               → integração ReceitaWS
-  /places.ts             → integração Google Places
-/types
-  /index.ts              → todos os tipos TypeScript
-/hooks
+/apps
+  /web                          → app Next.js 15 (App Router)
+    /app
+      /(auth)                   → login, cadastro, convite, recuperar/redefinir senha, onboarding
+      /(dashboard)              → dashboard, alunos, treinos, exercícios, frequência, agenda,
+                                   evolução, histórico, configurações, perfil, personais, vídeos
+      /api                      → routes server-side (webhooks, lookup, invites, turnstile, cnpj…)
+    /components
+      /ui                       → shadcn/ui base
+      /layout                   → sidebar, bottom-nav, header
+      /bioimpedance             → cards e formulários de composição corporal
+      /charts                   → evolution-chart, frequency-heatmap
+      /auth                     → social-buttons
+    /lib
+      /supabase/                → clients server/browser
+      /rate-limit.ts            → limiters Upstash + fallback in-memory
+      /turnstile.ts             → verifyTurnstileToken + clientIp
+      /validations.ts           → schemas Zod compartilhados
+      /stripe.ts, /cnpj.ts, /places.ts
+    /stores                     → Zustand (auth-store, ui-store)
+    /hooks
+    /middleware.ts              → guard de sessão + PUBLIC_API_ROUTES allowlist
+/packages
+  /database                     → types.ts gerado via `pnpm db:types`
+  /ui                           → componentes compartilhados
+  /config                       → eslint/tsconfig compartilhados
 /supabase
-  /migrations
-    /001_initial.sql     → schema completo + seed
+  /migrations                   → 001…039 + remote_schema (vai crescendo)
+/scripts
 ```
+
+Mais detalhe em [README do app web](apps/web) se existir; quando bater dúvida sobre onde fica algo, prefira `grep`/`glob` ao chute.
 
 ---
 
@@ -132,25 +139,52 @@ const { data } = await supabase.from('workout_sheets').select('*')
 
 ## Variáveis de ambiente
 
+**Fonte da verdade é o Doppler.** Rodar com `doppler run -- pnpm --filter @gymflow/web dev` pega tudo automaticamente.
+
+`.env.example` lista as chaves esperadas mas usa **placeholders truthy** (ex: `https://...upstash.io`) para documentação. Código que confia em `!process.env.X` para detectar ausência **vai quebrar com esses placeholders** — sempre valide formato/conteúdo, não só presença (ver `lib/rate-limit.ts` → `hasValidUpstashEnv()`).
+
+Chaves principais:
+
 ```env
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=         # apenas server-side
-
-# Google Places
-GOOGLE_PLACES_API_KEY=             # apenas server-side
+SUPABASE_SERVICE_ROLE_KEY=               # server-side
 
 # Stripe
-STRIPE_SECRET_KEY=                 # apenas server-side
-STRIPE_WEBHOOK_SECRET=             # apenas server-side
+STRIPE_SECRET_KEY=                       # server-side
+STRIPE_WEBHOOK_SECRET=                   # server-side
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
 
-# Resend
-RESEND_API_KEY=                    # apenas server-side
+# Cloudflare Turnstile (anti-bot em rotas públicas)
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=                    # server-side
+
+# Upstash Redis (rate limiting — opcional, faz fallback in-memory)
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+
+# Integrações
+GOOGLE_PLACES_API_KEY=                   # server-side
+RESEND_API_KEY=                          # server-side
 ```
 
-Variáveis sem `NEXT_PUBLIC_` nunca chegam ao cliente. Se precisar de uma no frontend, expor via API route.
+Variáveis sem `NEXT_PUBLIC_` nunca chegam ao cliente. Se precisar no frontend, expor via API route.
+
+**Cross-platform:** dev Windows + Linux. Scripts/comandos precisam funcionar em ambos (bash + paths relativos, sem hardcode de `/home/...` ou `C:\...`).
+
+---
+
+## Segurança em camadas
+
+A app tem 4 camadas defensivas — não atalhe nenhuma:
+
+1. **RLS no Postgres** — primeira e última linha. Toda tabela tem RLS habilitada; políticas em `supabase/migrations/002_rls_policies.sql` e revisões posteriores (`025_consolidate_permissive_policies.sql` consolida SELECTs em policies únicas por tabela).
+2. **Middleware de sessão** (`apps/web/middleware.ts`) — protege rotas autenticadas. Mantém `PUBLIC_API_ROUTES` allowlist explícita (`/api/auth/lookup`, `/api/turnstile`, `/api/invites/lookup`, `/api/webhooks/stripe`) e `PUBLIC_PREFIXES` (`/convite/`, `/auth/callback`). API protegida sem sessão → 401 JSON (não redirect).
+3. **Rate limiting** (`apps/web/lib/rate-limit.ts`) — Upstash Redis quando disponível, fallback in-memory caso contrário (validado por `hasValidUpstashEnv()`, não só presença). Limiters nomeados: `auth` (5/15min), `invite` (10/5min). Use sempre `limiter.limit(ip)` em rotas de autenticação/convite.
+4. **Cloudflare Turnstile** (`apps/web/lib/turnstile.ts`) — obrigatório em rotas públicas de auth e lookup. Validação server-side via `verifyTurnstileToken()`. Em `NODE_ENV !== 'production'` com secret ausente, gate permissivo (só pra dev local sem Doppler).
+
+Toda rota nova de auth/lookup pública precisa passar pelas 4 camadas. Mensagens de erro normalizadas pra evitar enumeração (ex: "Credenciais inválidas" cobre user-not-found E senha errada).
 
 ---
 
@@ -208,6 +242,8 @@ if (role === 'owner') {
 - **Mobile-first:** toda tela deve funcionar em 375px
 - **Estado vazio:** sempre ter ícone + mensagem + botão de ação
 - **Loading:** usar skeleton (shadcn/ui `Skeleton`), nunca spinner sozinho em tela cheia
+- **Inputs numéricos no mobile:** sempre passar `inputMode` junto com `type="number"`. Use `"decimal"` para pesos/medidas/percentuais e `"numeric"` para inteiros (reps, idade). Sem isso, o aluno suado registrando carga pega teclado QWERTY.
+- **Scroll horizontal mobile:** quando usar `overflow-x-auto` em tabs/filtros, esconder a scrollbar nativa (`[scrollbar-width:none] [&::-webkit-scrollbar]:hidden`) e adicionar gradient fade na borda direita pra indicar conteúdo cortado (ver `app/(dashboard)/configuracoes/page.tsx`).
 
 ---
 
@@ -232,6 +268,18 @@ Esses três fluxos são o coração do produto. Qualquer mudança neles precisa 
 
 ---
 
+## RPCs críticas (SECURITY INVOKER)
+
+Operações que precisam de atomicidade vivem em RPCs Postgres, não em código de aplicação:
+
+- **`complete_workout(client_id, exercises, ...)`** — `028_complete_workout_rpc.sql`. Salva treino + set_logs em transação única. Idempotência via `client_id` (UUID gerado no draft do cliente) + unique partial index em `workout_logs.client_id`. Substitui o INSERT múltiplo do client que era propenso a estado parcial.
+- **`list_academy_students(p_academy_id, p_search, p_status, p_limit, p_offset)`** — `029_list_academy_students_rpc.sql`. Consolida `academy_members + profiles + workout_logs(agg) + workout_sheets(agg)` numa query só, com search via `extensions.unaccent + ILIKE`, paginação e `total_count`. Permission check owner/personal embutido. Substitui o N+1 + mentira-de-UI antigo.
+- **`accept_invite(p_token, p_user_id)`** — `030_accept_invite_rpc.sql`. `FOR UPDATE` lock + check de `uses_limit` pré-incremento + idempotência por `(academy, user)`. Erros nomeados: `INVITE_UNAVAILABLE`, `EXPIRED`, `EXHAUSTED`, `INVALID_ROLE`. **GRANT só para `service_role`** — chamada exclusivamente do API route, nunca do client.
+
+Webhook Stripe (`apps/web/app/api/webhooks/stripe/route.ts`) usa claim atômico via `upsert ON CONFLICT DO NOTHING RETURNING` em `processed_events` + rollback do registro no `catch` (Stripe retenta evento se o handler subir).
+
+---
+
 ## O que não fazer
 
 - **Não criar componentes de UI do zero** se existe no shadcn/ui
@@ -247,14 +295,17 @@ Esses três fluxos são o coração do produto. Qualquer mudança neles precisa 
 
 ## Migrations
 
-Toda mudança no banco vira um arquivo novo em `/supabase/migrations/`:
+Toda mudança no banco vira um arquivo novo em `supabase/migrations/`. Numeração sequencial (`001…039`) + arquivos `<timestamp>_remote_schema.sql` quando se faz `supabase db pull`.
 
-```
-001_initial.sql          → schema base + seed de exercícios
-002_add_notifications.sql → exemplo de migration futura
-```
+Atalhos no `package.json` da raiz:
+- `pnpm db:push` — aplica migrations locais no projeto linked (CUIDADO: hoje aponta pra prod)
+- `pnpm db:reset` — reseta DB local
+- `pnpm db:types` — regenera `packages/database/src/types.ts` (rodar após toda migration que cria/altera tabela ou RPC)
 
-Nunca editar uma migration já aplicada em produção — sempre criar uma nova.
+**Regras:**
+- Nunca editar uma migration já aplicada em produção — sempre criar uma nova
+- Toda RPC com lado-efeito sensível: `SECURITY INVOKER` + permission check explícito, NÃO `SECURITY DEFINER` solto
+- Sempre regenerar `types.ts` após mexer no schema — sem isso o front cai em `as any`
 
 ---
 
@@ -279,7 +330,14 @@ Você deve agir como um agente autônomo focado em máxima eficiência e economi
 - **Quando o usuário digitar apenas "preparar checkpoint" ou "checkpoint":** Acione imediatamente a skill `.claude/skills/resumidor/SKILL.md`. Gere o bloco markdown ultra-compactado com o estado atual e instrua o usuário a usar `/clear` e colar o bloco a seguir.
 
 ## Comandos Úteis do Projeto
-- Instalar dependências: `pnpm install`
-- Rodar o ambiente de desenvolvimento: `pnpm dev`
-- Executar build: `pnpm build`
-- Executar rotinas integradas: Use a skill `.claude/skills/run-gymflow/SKILL.md`
+
+Rodar da **raiz do monorepo** (`GymFlow-main/`), não de `apps/web/`:
+
+- `pnpm install` — instalar dependências do workspace
+- `doppler run -- pnpm --filter @gymflow/web dev` — dev server com envs reais (recomendado)
+- `pnpm dev` — dev server sem Doppler (precisa de `.env.local` manual em `apps/web/`)
+- `pnpm build` — build de tudo via Turbo
+- `pnpm type-check` / `pnpm lint` — checks
+- `pnpm db:push` / `pnpm db:reset` / `pnpm db:types` — migrations e tipos
+- Smoke test: `PORT=3333 bash .claude/skills/run-gymflow/smoke.sh`
+- Rotinas integradas: skill `.claude/skills/run-gymflow/SKILL.md`

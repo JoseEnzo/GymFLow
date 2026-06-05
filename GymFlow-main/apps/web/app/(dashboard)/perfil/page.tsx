@@ -497,6 +497,7 @@ export default function PerfilPage() {
               <Ruler className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <input
                 type="number"
+                inputMode="numeric"
                 className="field w-full text-sm pl-9"
                 value={form.height_cm}
                 onChange={(e) => setForm((f) => ({ ...f, height_cm: e.target.value }))}
@@ -518,6 +519,7 @@ export default function PerfilPage() {
               <Weight className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <input
                 type="number"
+                inputMode="decimal"
                 className="field w-full text-sm pl-9"
                 value={form.weight_kg}
                 onChange={(e) => setForm((f) => ({ ...f, weight_kg: e.target.value }))}

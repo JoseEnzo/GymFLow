@@ -116,6 +116,7 @@ function MetricInput({
         <input
           id={id}
           type="number"
+          inputMode={step === '1' ? 'numeric' : 'decimal'}
           step={step}
           min="0"
           value={value}
@@ -172,12 +173,13 @@ export function BioimpedanceSection({
     async function load() {
       setLoading(true)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from('bioimpedance_assessments')
         .select('id, assessed_at, weight_kg, body_fat_pct, muscle_mass_kg, bmi, visceral_fat, body_water_pct, bone_mass_kg, metabolic_age, notes')
         .eq('academy_id', academyId)
         .eq('student_id', studentId)
         .order('assessed_at', { ascending: false })
+      if (error) toast.error('Erro ao carregar avaliações.')
       setAssessments(data ?? [])
       setLoading(false)
     }

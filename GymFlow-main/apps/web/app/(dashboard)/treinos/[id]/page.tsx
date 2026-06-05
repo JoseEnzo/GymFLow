@@ -144,7 +144,7 @@ function ExerciseRow({ ex, isPersonal, onDelete, onUpdate }: {
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1">
             <label className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Séries</label>
-            <input type="number" min={1} value={form.sets} onChange={(e) => setForm((f) => ({ ...f, sets: e.target.value }))} className="field text-sm py-2" />
+            <input type="number" inputMode="numeric" min={1} value={form.sets} onChange={(e) => setForm((f) => ({ ...f, sets: e.target.value }))} className="field text-sm py-2" />
           </div>
           <div className="space-y-1">
             <label className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Reps</label>
@@ -152,11 +152,11 @@ function ExerciseRow({ ex, isPersonal, onDelete, onUpdate }: {
           </div>
           <div className="space-y-1">
             <label className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Descanso (s)</label>
-            <input type="number" min={0} value={form.rest_seconds} onChange={(e) => setForm((f) => ({ ...f, rest_seconds: e.target.value }))} className="field text-sm py-2" />
+            <input type="number" inputMode="numeric" min={0} value={form.rest_seconds} onChange={(e) => setForm((f) => ({ ...f, rest_seconds: e.target.value }))} className="field text-sm py-2" />
           </div>
           <div className="space-y-1">
             <label className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Carga (kg)</label>
-            <input type="number" min={0} step={0.5} value={form.weight_suggestion} onChange={(e) => setForm((f) => ({ ...f, weight_suggestion: e.target.value }))} placeholder="Opcional" className="field text-sm py-2" />
+            <input type="number" inputMode="decimal" min={0} step={0.5} value={form.weight_suggestion} onChange={(e) => setForm((f) => ({ ...f, weight_suggestion: e.target.value }))} placeholder="Opcional" className="field text-sm py-2" />
           </div>
         </div>
         <div className="space-y-1">

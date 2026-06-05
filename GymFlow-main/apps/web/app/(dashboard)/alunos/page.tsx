@@ -606,20 +606,23 @@ export default function AlunosPage() {
 
         if (userIds.length > 0) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { data: profileData } = await (supabase as any)
+          const { data: profileData, error: profileError } = await (supabase as any)
             .from('profiles')
             .select('id, full_name, goal')
             .in('id', userIds)
 
+          if (profileError) console.warn('[alunos] profiles enrichment falhou:', profileError?.message ?? profileError)
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const profileMap = new Map<string, any>((profileData ?? []).map((p: any) => [p.id, p]))
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { data: sheetData } = await (supabase as any)
+          const { data: sheetData, error: sheetError } = await (supabase as any)
             .from('workout_sheets')
             .select('student_id')
             .eq('academy_id', currentAcademy.id)
             .in('student_id', userIds)
+
+          if (sheetError) console.warn('[alunos] sheet counts falharam:', sheetError?.message ?? sheetError)
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const sheetCountMap = new Map<string, number>()
@@ -671,13 +674,15 @@ export default function AlunosPage() {
 
     // Invites: query separada com limit defensivo.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: inviteData } = await (supabase as any)
+    const { data: inviteData, error: inviteError } = await (supabase as any)
       .from('invites')
       .select('id, code, token, created_at, expires_at, uses_count, uses_limit, is_active')
       .eq('academy_id', currentAcademy.id)
       .eq('role', 'student')
       .order('created_at', { ascending: false })
       .limit(100)
+
+    if (inviteError) console.warn('[alunos] invites query falhou:', inviteError?.message ?? inviteError)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setInvites((inviteData ?? []).map((i: any) => ({
@@ -724,8 +729,9 @@ export default function AlunosPage() {
     const allIds = [...new Set([...ids, ...reqByIds])]
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: profiles } = await (supabase as any)
+    const { data: profiles, error: profilesError } = await (supabase as any)
       .from('profiles').select('id, full_name').in('id', allIds)
+    if (profilesError) console.warn('[alunos] expulsion profiles enrichment falhou:', profilesError?.message ?? profilesError)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const nameMap: Record<string, string | null> = {}
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -763,9 +769,10 @@ export default function AlunosPage() {
       // O vínculo já foi removido; o pedido some via cascade. O update é um
       // no-op defensivo caso o cascade não exista neste ambiente.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from('expulsion_requests')
+      const { error: approveError } = await (supabase as any).from('expulsion_requests')
         .update({ status: 'approved', resolved_at: new Date().toISOString(), resolved_by: user?.id })
         .eq('id', req.id)
+      if (approveError) console.warn('[alunos] expulsion approve update falhou:', approveError?.message ?? approveError)
       toast.success(`${req.studentName ?? 'Aluno'} foi removido da academia.`)
       setExpulsionRequests((prev) => prev.filter((r) => r.id !== req.id))
       load()
@@ -780,9 +787,10 @@ export default function AlunosPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from('expulsion_requests')
+      const { error: rejectError } = await (supabase as any).from('expulsion_requests')
         .update({ status: 'rejected', resolved_at: new Date().toISOString(), resolved_by: user?.id })
         .eq('id', req.id)
+      if (rejectError) throw rejectError
       toast.success('Pedido de remoção rejeitado.')
       setExpulsionRequests((prev) => prev.filter((r) => r.id !== req.id))
     } catch (err: unknown) {
@@ -796,13 +804,14 @@ export default function AlunosPage() {
     setExpulsionLoading(true)
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: memberList } = await (supabase as any)
+      const { data: memberList, error: memberListError } = await (supabase as any)
         .from('academy_members')
         .select('id')
         .eq('academy_id', currentAcademy.id)
         .eq('user_id', student.id)
         .eq('role', 'student')
         .limit(1)
+      if (memberListError) throw memberListError
       const memberData = memberList?.[0]
       if (!memberData) throw new Error('Membro não encontrado.')
       // Remove só o vínculo via service-role (funciona sem depender da policy 037).
@@ -833,12 +842,13 @@ export default function AlunosPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: memberList2 } = await (supabase as any)
+      const { data: memberList2, error: memberList2Error } = await (supabase as any)
         .from('academy_members')
         .select('id, role')
         .eq('academy_id', currentAcademy.id)
         .eq('user_id', student.id)
         .limit(1)
+      if (memberList2Error) throw memberList2Error
       const memberData = memberList2?.[0]
       if (!memberData) throw new Error('Membro não encontrado.')
       if (memberData.role === 'owner') {

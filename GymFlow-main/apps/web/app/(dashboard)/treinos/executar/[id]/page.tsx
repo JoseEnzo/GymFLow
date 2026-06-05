@@ -399,7 +399,7 @@ export default function ExecutarTreinoPage() {
         </button>
 
         <div className="text-center">
-          <p className="text-xs text-muted-foreground truncate max-w-[160px]">{sheetName}</p>
+          <p className="text-xs text-muted-foreground truncate max-w-[200px] sm:max-w-[280px]">{sheetName}</p>
           <p className="font-mono font-bold text-brand-400">{formatDuration(timer)}</p>
         </div>
 
@@ -550,6 +550,7 @@ export default function ExecutarTreinoPage() {
 
                 <input
                   type="number"
+                  inputMode="decimal"
                   value={set.weight}
                   onChange={(e) => updateSet(i, 'weight', e.target.value === '' ? '' : Number(e.target.value))}
                   disabled={set.done}
@@ -559,6 +560,7 @@ export default function ExecutarTreinoPage() {
 
                 <input
                   type="number"
+                  inputMode="numeric"
                   value={set.reps}
                   onChange={(e) => updateSet(i, 'reps', e.target.value === '' ? '' : Number(e.target.value))}
                   disabled={set.done}

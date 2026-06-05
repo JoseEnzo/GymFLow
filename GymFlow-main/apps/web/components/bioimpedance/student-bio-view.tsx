@@ -7,6 +7,8 @@ import {
   Scale, Zap, BarChart3, TrendingDown, Droplets, Clock,
 } from 'lucide-react'
 
+import { toast } from 'sonner'
+
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 
@@ -107,13 +109,15 @@ function BioCard({ studentId }: { studentId: string }) {
 
   useEffect(() => {
     async function load() {
+      setLoading(true)
       // RLS garante que o aluno só vê seus próprios dados
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from('bioimpedance_assessments')
         .select('id, assessed_at, weight_kg, body_fat_pct, muscle_mass_kg, bmi, visceral_fat, body_water_pct, bone_mass_kg, metabolic_age, notes')
         .eq('student_id', studentId)
         .order('assessed_at', { ascending: false })
+      if (error) toast.error('Erro ao carregar avaliações.')
       setAssessments(data ?? [])
       setLoading(false)
     }
@@ -245,13 +249,15 @@ function MeasuresCard({ studentId }: { studentId: string }) {
 
   useEffect(() => {
     async function load() {
+      setLoading(true)
       // RLS garante que o aluno só vê seus próprios dados
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from('body_measurements')
         .select('*')
         .eq('student_id', studentId)
         .order('measured_at', { ascending: false })
+      if (error) toast.error('Erro ao carregar medidas.')
       setMeasurements(data ?? [])
       setLoading(false)
     }
