@@ -10,6 +10,7 @@ import { MUSCLE_GROUPS } from '@gymflow/database'
 import { cn, MUSCLE_GROUP_COLORS } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
+import { ExerciseAnimation, patternForMuscles, patternLabel } from '@/components/exercise/exercise-animation'
 
 const DIFFICULTY_LABELS = { beginner: 'Iniciante', intermediate: 'Intermediário', advanced: 'Avançado' } as const
 const DIFFICULTY_COLORS = { beginner: 'badge-success', intermediate: 'badge-warning', advanced: 'badge-danger' } as const
@@ -359,6 +360,25 @@ export default function ExercicioDetalhePage() {
             </ol>
           </div>
         )}
+      </div>
+
+      {/* Demonstração — boneco animado (padrão de movimento por grupo muscular) */}
+      <div className="glass rounded-2xl p-6 border border-border/60 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Demonstração</p>
+          <span className="text-[11px] text-muted-foreground">{patternLabel(patternForMuscles(exercise.muscle_groups))}</span>
+        </div>
+        <div className="flex justify-center">
+          <div
+            className="w-44 h-56 rounded-2xl border border-border/40 flex items-center justify-center"
+            style={{ background: `radial-gradient(circle at 50% 35%, ${color}1f, transparent 70%), hsl(var(--surface-100))` }}
+          >
+            <ExerciseAnimation muscleGroups={exercise.muscle_groups} className="w-32 h-48" />
+          </div>
+        </div>
+        <p className="text-[11px] text-center text-muted-foreground/60">
+          Animação ilustrativa do padrão de movimento — não substitui a orientação de um profissional.
+        </p>
       </div>
 
       {/* Confirm delete */}
