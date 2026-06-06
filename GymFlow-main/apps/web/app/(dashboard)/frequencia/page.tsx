@@ -52,7 +52,7 @@ function WeekGrid({ weekDays }: { weekDays: boolean[] }) {
   )
 }
 
-interface FreqStats { thisWeek: number; thisMonth: number; total: number; bestStreak: number; weekDays: boolean[] }
+interface FreqStats { thisWeek: number; thisMonth: number; total: number; bestStreak: number; weekDays: boolean[]; allTimestamps: string[] }
 
 function computeBestStreak(timestamps: string[]): number {
   if (timestamps.length === 0) return 0
@@ -78,7 +78,7 @@ export default function FrequenciaPage() {
     if (currentRole === 'owner') router.replace('/relatorios')
   }, [currentRole, router])
 
-  const [stats, setStats] = useState<FreqStats>({ thisWeek: 0, thisMonth: 0, total: 0, bestStreak: 0, weekDays: Array(7).fill(false) })
+  const [stats, setStats] = useState<FreqStats>({ thisWeek: 0, thisMonth: 0, total: 0, bestStreak: 0, weekDays: Array(7).fill(false), allTimestamps: [] })
 
   useEffect(() => {
     if (!currentAcademy) return
@@ -124,6 +124,7 @@ export default function FrequenciaPage() {
         total: allLogs?.length ?? 0,
         bestStreak,
         weekDays,
+        allTimestamps,
       })
     }
     load()
@@ -185,7 +186,7 @@ export default function FrequenciaPage() {
           </div>
           <TrendingUp className="w-4 h-4 text-brand-400" />
         </div>
-        <FrequencyHeatmap />
+        <FrequencyHeatmap timestamps={stats.allTimestamps} />
         <div className="flex items-center justify-between mt-3 text-[10px] text-muted-foreground">
           <span>Menos</span>
           <div className="flex gap-1">
@@ -198,7 +199,7 @@ export default function FrequenciaPage() {
       </motion.div>
 
       {/* Empty state CTA */}
-      <motion.div custom={4} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-8 text-center">
+      {stats.total === 0 && <motion.div custom={4} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-8 text-center">
         <div className="w-14 h-14 rounded-2xl bg-surface-200 flex items-center justify-center mx-auto mb-4">
           <Dumbbell className="w-7 h-7 text-muted-foreground/40" />
         </div>
@@ -217,7 +218,7 @@ export default function FrequenciaPage() {
           {isOwnerOrPersonal ? 'Criar ficha de treino' : 'Ver meus treinos'}
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
-      </motion.div>
+      </motion.div>}
     </div>
   )
 }

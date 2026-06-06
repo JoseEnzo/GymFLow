@@ -62,24 +62,6 @@ export async function POST(request: Request) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
-        const type    = session.metadata?.['type']
-
-        if (type === 'student') {
-          const userId = session.metadata?.['userId']
-          const planId = session.metadata?.['planId']
-          if (userId) {
-            const { error: userErr } = await supabase.auth.admin.updateUserById(userId, {
-              user_metadata: {
-                subscription_plan:   planId,
-                subscription_status: 'active',
-                stripe_customer_id:  session.customer as string,
-              },
-            })
-            if (userErr) throw userErr
-          }
-          break
-        }
-
         // Plano de academia
         const academyId = session.metadata?.['academyId']
         const planId    = session.metadata?.['planId']

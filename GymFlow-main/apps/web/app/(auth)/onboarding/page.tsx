@@ -4,8 +4,8 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Dumbbell, ArrowRight, ArrowLeft, Check, Loader2,
-  Building2, Users, Ticket, CreditCard, Zap, Lock, Mail,
+  ArrowRight, ArrowLeft, Check, Loader2,
+  Building2, Users, Ticket, Zap, Mail,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -44,52 +44,6 @@ const PLANS = [
   },
 ]
 
-// ── Planos individuais para alunos sem convite ────────────────
-const STUDENT_PLANS = [
-  {
-    id: 'solo',
-    name: 'Solo',
-    price: 29,
-    color: '#6366F1',
-    popular: false,
-    features: [
-      'Acesso completo ao app',
-      'Crie suas próprias fichas',
-      'Histórico e gráficos de evolução',
-      'PWA instalável no celular',
-      'Cancele quando quiser',
-    ],
-  },
-  {
-    id: 'plus',
-    name: 'Plus',
-    price: 49,
-    color: '#06B6D4',
-    popular: true,
-    features: [
-      'Tudo do Solo',
-      'Acompanhamento nutricional',
-      'Treinos sugeridos por IA',
-      'Metas e notificações semanais',
-      'Cancele quando quiser',
-    ],
-  },
-  {
-    id: 'elite',
-    name: 'Elite',
-    price: 89,
-    color: '#10B981',
-    popular: false,
-    features: [
-      'Tudo do Plus',
-      'Vídeos de execução dos exercícios',
-      'Suporte prioritário',
-      'Acesso antecipado a novidades',
-      'Cancele quando quiser',
-    ],
-  },
-]
-
 // ─────────────────────────────────────────────────────────────
 type Role = 'owner' | 'personal' | 'student' | null
 
@@ -108,11 +62,7 @@ function OnboardingContent() {
   const [inviteCode, setInviteCode] = useState('')
   const [hasInvite, setHasInvite] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
-  const [step, setStep] = useState<'role' | 'plan' | 'academy' | 'invite' | 'payment'>('role')
-  const [selectedStudentPlan, setSelectedStudentPlan] = useState(() => {
-    const p = searchParams.get('plan')
-    return STUDENT_PLANS.find(x => x.id === p) ?? STUDENT_PLANS[0]!
-  })
+  const [step, setStep] = useState<'role' | 'plan' | 'academy' | 'invite'>('role')
 
   // Usuário já configurado → direto ao dashboard
   useEffect(() => {
@@ -125,14 +75,6 @@ function OnboardingContent() {
       const accountType = data.user?.user_metadata?.['account_type'] as string | undefined
       const planFromUrl       = searchParams.get('plan')
       const isAcademyPlan     = PLANS.some(x => x.id === planFromUrl)
-      const isStudentPlan     = STUDENT_PLANS.some(x => x.id === planFromUrl)
-
-      // Plano de aluno → pagamento individual
-      if (isStudentPlan) {
-        setRole('student')
-        setStep('payment')
-        return
-      }
 
       // Plano de academia → pula direto para nomear a academia
       if (isAcademyPlan) {
@@ -210,25 +152,6 @@ function OnboardingContent() {
       router.push(`/convite/${(data[0] as { token: string } | undefined)!.token}`)
     } catch {
       toast.error('Erro ao verificar código. Tente novamente.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // ── Stripe checkout placeholder ───────────────────────────
-  async function handleStudentPayment() {
-    setSaving(true)
-    try {
-      const res = await fetch('/api/billing/student-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId: selectedStudentPlan.id }),
-      })
-      const { url, error } = await res.json()
-      if (url) { window.location.href = url; return }
-      toast.error(error ?? 'Erro ao iniciar checkout.')
-    } catch {
-      toast.error('Erro ao iniciar checkout. Tente novamente.')
     } finally {
       setSaving(false)
     }
@@ -578,19 +501,19 @@ function OnboardingContent() {
                   className={cn(
                     'flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-200',
                     hasInvite === false
-                      ? 'border-amber-500/50 bg-amber-500/8'
+                      ? 'border-brand-500/50 bg-brand-500/8'
                       : 'border-border/60 hover:border-border hover:bg-surface-100'
                   )}
                 >
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-amber-500/15 flex-shrink-0">
-                    <CreditCard className="w-5 h-5 text-amber-400" />
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-brand-500/15 flex-shrink-0">
+                    <Users className="w-5 h-5 text-brand-400" />
                   </div>
                   <div>
                     <p className="font-semibold text-sm">Não tenho convite</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Quero assinar um plano individual</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Posso acessar mesmo assim</p>
                   </div>
                   {hasInvite === false && (
-                    <div className="ml-auto w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
+                    <div className="ml-auto w-5 h-5 rounded-full bg-brand-500 flex items-center justify-center">
                       <Check className="w-3 h-3 text-white" />
                     </div>
                   )}
@@ -634,122 +557,14 @@ function OnboardingContent() {
               </AnimatePresence>
 
               {hasInvite === false && (
-                <div className="space-y-2">
-                  <button
-                    onClick={() => setStep('payment')}
-                    className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
-                  >
-                    Ver plano individual <ArrowRight className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => router.replace('/dashboard')}
-                    className="w-full py-3 rounded-xl text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Pular por agora
-                  </button>
-                </div>
+                <button
+                  onClick={() => router.replace('/dashboard')}
+                  className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
+                >
+                  Acessar o app <ArrowRight className="w-4 h-4" />
+                </button>
               )}
 
-            </motion.div>
-          )}
-
-          {/* ── STEP: payment (student without invite) ── */}
-          {step === 'payment' && (
-            <motion.div key="payment" variants={slide} initial="hidden" animate="show" exit="exit" className="space-y-6">
-              <div>
-                <button
-                  onClick={() => STUDENT_PLANS.some(x => x.id === searchParams.get('plan')) ? router.back() : setStep('invite')}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" /> Voltar
-                </button>
-                <h1 className="text-2xl font-display font-bold">Plano individual</h1>
-                <p className="text-muted-foreground mt-1.5 text-sm">
-                  Acesse o MeuTrein sem precisar de uma academia.
-                </p>
-              </div>
-
-              {/* Plan cards */}
-              <div className="grid grid-cols-1 gap-3">
-                {STUDENT_PLANS.map((p) => {
-                  const selected = selectedStudentPlan.id === p.id
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => setSelectedStudentPlan(p)}
-                      className="glass rounded-2xl p-5 text-left transition-all duration-200"
-                      style={{
-                        border: `1px solid ${selected ? p.color : 'rgba(255,255,255,0.08)'}`,
-                        background: selected ? `${p.color}0D` : undefined,
-                      }}
-                    >
-                      <div className="flex items-start justify-between gap-3 mb-3">
-                        <div>
-                          {p.popular && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full mb-1.5 inline-block"
-                              style={{ background: `${p.color}20`, color: p.color }}>
-                              Mais popular
-                            </span>
-                          )}
-                          <p className="font-display font-bold text-base">{p.name}</p>
-                          <div className="flex items-end gap-1 mt-0.5">
-                            <span className="text-2xl font-display font-extrabold" style={{ color: p.color }}>
-                              R$ {p.price}
-                            </span>
-                            <span className="text-xs text-muted-foreground mb-0.5">/mês</span>
-                          </div>
-                        </div>
-                        <div className="w-5 h-5 rounded-full border-2 flex-shrink-0 mt-1 flex items-center justify-center transition-all"
-                          style={{
-                            borderColor: selected ? p.color : 'rgba(255,255,255,0.2)',
-                            background: selected ? p.color : 'transparent',
-                          }}>
-                          {selected && <Check className="w-3 h-3 text-white" />}
-                        </div>
-                      </div>
-                      <ul className="space-y-1.5">
-                        {p.features.map((f) => (
-                          <li key={f} className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Check className="w-3 h-3 flex-shrink-0" style={{ color: p.color }} />
-                            {f}
-                          </li>
-                        ))}
-                      </ul>
-                    </button>
-                  )
-                })}
-              </div>
-
-              <button
-                onClick={handleStudentPayment}
-                disabled={saving}
-                className="w-full py-3.5 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-                style={{ background: `linear-gradient(135deg, ${selectedStudentPlan.color}, ${selectedStudentPlan.color}CC)` }}
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : (
-                  <><CreditCard className="w-4 h-4" />Assinar {selectedStudentPlan.name} por R$ {selectedStudentPlan.price}/mês</>
-                )}
-              </button>
-
-              <p className="text-center text-xs text-muted-foreground flex items-center justify-center gap-1">
-                <Lock className="w-3 h-3" />
-                Pagamento seguro · Cancele quando quiser
-              </p>
-
-              <div className="glass rounded-xl p-4 flex gap-3">
-                <Ticket className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-muted-foreground">
-                  Se você ainda conseguir um convite da sua academia,{' '}
-                  <button
-                    onClick={() => { setHasInvite(true); setStep('invite') }}
-                    className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2 transition-colors"
-                  >
-                    clique aqui para inserir o código
-                  </button>{' '}
-                  e entre gratuitamente.
-                </p>
-              </div>
             </motion.div>
           )}
 

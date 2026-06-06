@@ -119,3 +119,24 @@ export const MUSCLE_GROUP_COLORS: Record<string, string> = {
   Lombar: '#FB923C',
   Cardio: '#F43F5E',
 }
+
+// Cores por refeição do dia (nutrição)
+export const MEAL_TYPE_COLORS: Record<string, string> = {
+  cafe_da_manha: '#F59E0B',
+  lanche_manha: '#10B981',
+  almoco: '#6366F1',
+  lanche_tarde: '#06B6D4',
+  jantar: '#8B5CF6',
+  ceia: '#A78BFA',
+  pre_treino: '#F97316',
+  pos_treino: '#EC4899',
+}
+
+// Cores por objetivo de dieta
+export const DIET_GOAL_COLORS: Record<string, string> = {
+  Emagrecimento: '#F97316',
+  Hipertrofia: '#6366F1',
+  Manutenção: '#10B981',
+  Definição: '#EC4899',
+  Performance: '#06B6D4',
+}

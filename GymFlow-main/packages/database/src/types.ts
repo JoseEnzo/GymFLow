@@ -363,6 +363,182 @@ export type Database = {
           },
         ]
       }
+      diet_plan_meals: {
+        Row: {
+          created_at: string
+          id: string
+          meal_id: string
+          meal_type: string
+          notes: string | null
+          order_index: number
+          plan_id: string
+          portion: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          meal_id: string
+          meal_type?: string
+          notes?: string | null
+          order_index?: number
+          plan_id: string
+          portion?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          meal_id?: string
+          meal_type?: string
+          notes?: string | null
+          order_index?: number
+          plan_id?: string
+          portion?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diet_plan_meals_meal_id_fkey"
+            columns: ["meal_id"]
+            isOneToOne: false
+            referencedRelation: "meals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "diet_plan_meals_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "diet_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      diet_plans: {
+        Row: {
+          academy_id: string
+          created_at: string
+          daily_calories_target: number | null
+          description: string | null
+          goal: string | null
+          id: string
+          is_active: boolean
+          name: string
+          order_index: number
+          personal_id: string
+          student_id: string
+          updated_at: string
+          valid_until: string | null
+        }
+        Insert: {
+          academy_id: string
+          created_at?: string
+          daily_calories_target?: number | null
+          description?: string | null
+          goal?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          order_index?: number
+          personal_id: string
+          student_id: string
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Update: {
+          academy_id?: string
+          created_at?: string
+          daily_calories_target?: number | null
+          description?: string | null
+          goal?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          order_index?: number
+          personal_id?: string
+          student_id?: string
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diet_plans_academy_id_fkey"
+            columns: ["academy_id"]
+            isOneToOne: false
+            referencedRelation: "academies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      diet_template_items: {
+        Row: {
+          id: string
+          meal_type: Database["public"]["Enums"]["meal_type"]
+          order_index: number
+          recipe_id: string
+          servings: number
+          template_id: string
+        }
+        Insert: {
+          id?: string
+          meal_type: Database["public"]["Enums"]["meal_type"]
+          order_index?: number
+          recipe_id: string
+          servings?: number
+          template_id: string
+        }
+        Update: {
+          id?: string
+          meal_type?: Database["public"]["Enums"]["meal_type"]
+          order_index?: number
+          recipe_id?: string
+          servings?: number
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diet_template_items_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "diet_template_items_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "diet_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      diet_templates: {
+        Row: {
+          daily_calories: number | null
+          description: string | null
+          goal: string | null
+          id: string
+          level: string
+          name: string
+          tags: string[]
+        }
+        Insert: {
+          daily_calories?: number | null
+          description?: string | null
+          goal?: string | null
+          id?: string
+          level?: string
+          name: string
+          tags?: string[]
+        }
+        Update: {
+          daily_calories?: number | null
+          description?: string | null
+          goal?: string | null
+          id?: string
+          level?: string
+          name?: string
+          tags?: string[]
+        }
+        Relationships: []
+      }
       exercises: {
         Row: {
           academy_id: string | null
@@ -529,6 +705,181 @@ export type Database = {
           },
         ]
       }
+      meal_plan_items: {
+        Row: {
+          created_at: string
+          day_index: number | null
+          id: string
+          meal_type: Database["public"]["Enums"]["meal_type"]
+          notes: string | null
+          order_index: number
+          plan_id: string
+          recipe_id: string
+          servings: number
+        }
+        Insert: {
+          created_at?: string
+          day_index?: number | null
+          id?: string
+          meal_type: Database["public"]["Enums"]["meal_type"]
+          notes?: string | null
+          order_index?: number
+          plan_id: string
+          recipe_id: string
+          servings?: number
+        }
+        Update: {
+          created_at?: string
+          day_index?: number | null
+          id?: string
+          meal_type?: Database["public"]["Enums"]["meal_type"]
+          notes?: string | null
+          order_index?: number
+          plan_id?: string
+          recipe_id?: string
+          servings?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_plan_items_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "meal_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meal_plan_items_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meal_plans: {
+        Row: {
+          academy_id: string
+          created_at: string
+          daily_calories: number | null
+          description: string | null
+          goal: string | null
+          id: string
+          is_active: boolean
+          name: string
+          order_index: number
+          personal_id: string
+          student_id: string
+          updated_at: string
+          valid_until: string | null
+        }
+        Insert: {
+          academy_id: string
+          created_at?: string
+          daily_calories?: number | null
+          description?: string | null
+          goal?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          order_index?: number
+          personal_id: string
+          student_id: string
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Update: {
+          academy_id?: string
+          created_at?: string
+          daily_calories?: number | null
+          description?: string | null
+          goal?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          order_index?: number
+          personal_id?: string
+          student_id?: string
+          updated_at?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_plans_academy_id_fkey"
+            columns: ["academy_id"]
+            isOneToOne: false
+            referencedRelation: "academies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meals: {
+        Row: {
+          academy_id: string | null
+          calories: number | null
+          carbs_g: number | null
+          categories: string[]
+          created_at: string
+          created_by: string | null
+          description: string | null
+          fat_g: number | null
+          id: string
+          image_url: string | null
+          ingredients: string[]
+          instructions: string[]
+          is_global: boolean
+          meal_type: string
+          name: string
+          prep_minutes: number | null
+          protein_g: number | null
+        }
+        Insert: {
+          academy_id?: string | null
+          calories?: number | null
+          carbs_g?: number | null
+          categories?: string[]
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          fat_g?: number | null
+          id?: string
+          image_url?: string | null
+          ingredients?: string[]
+          instructions?: string[]
+          is_global?: boolean
+          meal_type?: string
+          name: string
+          prep_minutes?: number | null
+          protein_g?: number | null
+        }
+        Update: {
+          academy_id?: string | null
+          calories?: number | null
+          carbs_g?: number | null
+          categories?: string[]
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          fat_g?: number | null
+          id?: string
+          image_url?: string | null
+          ingredients?: string[]
+          instructions?: string[]
+          is_global?: boolean
+          meal_type?: string
+          name?: string
+          prep_minutes?: number | null
+          protein_g?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meals_academy_id_fkey"
+            columns: ["academy_id"]
+            isOneToOne: false
+            referencedRelation: "academies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -582,6 +933,80 @@ export type Database = {
           weight_kg?: number | null
         }
         Relationships: []
+      }
+      recipes: {
+        Row: {
+          academy_id: string | null
+          calories: number
+          carbs_g: number
+          created_at: string
+          created_by: string | null
+          description: string | null
+          difficulty: Database["public"]["Enums"]["exercise_difficulty"]
+          fat_g: number
+          id: string
+          image_url: string | null
+          ingredients: string[]
+          instructions: string[] | null
+          is_global: boolean
+          meal_types: Database["public"]["Enums"]["meal_type"][]
+          name: string
+          prep_minutes: number
+          protein_g: number
+          servings: number
+          tags: string[]
+        }
+        Insert: {
+          academy_id?: string | null
+          calories?: number
+          carbs_g?: number
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          difficulty?: Database["public"]["Enums"]["exercise_difficulty"]
+          fat_g?: number
+          id?: string
+          image_url?: string | null
+          ingredients?: string[]
+          instructions?: string[] | null
+          is_global?: boolean
+          meal_types?: Database["public"]["Enums"]["meal_type"][]
+          name: string
+          prep_minutes?: number
+          protein_g?: number
+          servings?: number
+          tags?: string[]
+        }
+        Update: {
+          academy_id?: string | null
+          calories?: number
+          carbs_g?: number
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          difficulty?: Database["public"]["Enums"]["exercise_difficulty"]
+          fat_g?: number
+          id?: string
+          image_url?: string | null
+          ingredients?: string[]
+          instructions?: string[] | null
+          is_global?: boolean
+          meal_types?: Database["public"]["Enums"]["meal_type"][]
+          name?: string
+          prep_minutes?: number
+          protein_g?: number
+          servings?: number
+          tags?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipes_academy_id_fkey"
+            columns: ["academy_id"]
+            isOneToOne: false
+            referencedRelation: "academies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       set_logs: {
         Row: {
@@ -979,8 +1404,17 @@ export type Database = {
       }
     }
     Enums: {
-      academy_plan: "free" | "personal" | "starter" | "pro"
+      academy_plan: "free" | "starter" | "personal" | "pro"
       exercise_difficulty: "beginner" | "intermediate" | "advanced"
+      meal_type:
+        | "cafe_da_manha"
+        | "lanche_manha"
+        | "almoco"
+        | "lanche_tarde"
+        | "jantar"
+        | "ceia"
+        | "pre_treino"
+        | "pos_treino"
       member_role: "owner" | "personal" | "student"
       subscription_status: "active" | "canceled" | "past_due" | "trialing"
     }
@@ -1113,8 +1547,18 @@ export const Constants = {
   },
   public: {
     Enums: {
-      academy_plan: ["free", "personal", "starter", "pro"],
+      academy_plan: ["free", "starter", "personal", "pro"],
       exercise_difficulty: ["beginner", "intermediate", "advanced"],
+      meal_type: [
+        "cafe_da_manha",
+        "lanche_manha",
+        "almoco",
+        "lanche_tarde",
+        "jantar",
+        "ceia",
+        "pre_treino",
+        "pos_treino",
+      ],
       member_role: ["owner", "personal", "student"],
       subscription_status: ["active", "canceled", "past_due", "trialing"],
     },

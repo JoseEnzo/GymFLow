@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
   ChevronLeft, ChevronRight, CheckCircle2, Circle,
-  Dumbbell, Play, CalendarDays, Target, Loader2,
+  Dumbbell, Play, CalendarDays, Loader2, Moon,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -23,7 +23,6 @@ const fadeUp = {
 }
 
 const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
-const DAY_LABELS_FULL = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 
 const GOAL_COLORS: Record<string, string> = {
   'Hipertrofia': '#6366F1',
@@ -83,28 +82,49 @@ interface DayCardProps {
 }
 
 function DayCard({ date, isToday, isPast, sheet, completed, onToggle, toggling }: DayCardProps) {
-  const dayIndex = date.getDay()
-  const dayLabel = DAY_LABELS[dayIndex]
+  const dayLabel = DAY_LABELS[date.getDay()]
   const dayNum = date.getDate()
   const color = sheet ? (GOAL_COLORS[sheet.goal ?? ''] ?? '#6366F1') : null
+
+  if (!sheet) {
+    return (
+      <div className={cn(
+        'rounded-2xl border border-dashed flex flex-col items-center justify-center gap-2 p-5 min-h-[200px]',
+        isToday
+          ? 'border-brand-500/30 bg-brand-500/5'
+          : 'border-border/30 bg-surface-200/30',
+      )}>
+        <div className={cn(
+          'w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold mb-1',
+          isToday ? 'bg-brand-500 text-white' : 'bg-surface-200 text-muted-foreground',
+        )}>
+          {dayNum}
+        </div>
+        <span className={cn(
+          'text-[11px] font-semibold uppercase tracking-widest',
+          isToday ? 'text-brand-400' : 'text-muted-foreground/50',
+        )}>
+          {dayLabel}
+        </span>
+        <Moon className="w-4 h-4 text-muted-foreground/30 mt-1" />
+        <span className="text-[10px] text-muted-foreground/40">Descanso</span>
+      </div>
+    )
+  }
 
   return (
     <motion.div
       layout
       className={cn(
-        'glass rounded-2xl overflow-hidden flex flex-col transition-all duration-300',
-        isToday && 'ring-1 ring-brand-500/40 shadow-[0_0_20px_rgba(29,158,117,0.08)]',
-        !sheet && 'opacity-50',
+        'glass rounded-2xl overflow-hidden flex flex-col transition-all duration-300 min-h-[200px]',
+        isToday && 'ring-1 ring-brand-500/50 shadow-[0_0_24px_rgba(99,102,241,0.12)]',
+        completed && 'opacity-80',
       )}
     >
-      {/* Colored top bar */}
+      {/* Accent top bar */}
       <div
-        className="h-1 flex-shrink-0"
-        style={{
-          background: color
-            ? `linear-gradient(90deg, ${color}, ${color}44)`
-            : 'transparent',
-        }}
+        className="h-[3px] flex-shrink-0"
+        style={{ background: `linear-gradient(90deg, ${color}, ${color}55)` }}
       />
 
       <div className="p-4 flex flex-col gap-3 flex-1">
@@ -112,100 +132,82 @@ function DayCard({ date, isToday, isPast, sheet, completed, onToggle, toggling }
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className={cn(
-              'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold',
-              isToday
-                ? 'bg-brand-500 text-white'
-                : 'bg-surface-200 text-muted-foreground'
+              'w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold',
+              isToday ? 'bg-brand-500 text-white' : 'bg-surface-200 text-muted-foreground',
             )}>
               {dayNum}
             </div>
             <span className={cn(
-              'text-xs font-semibold uppercase tracking-wider',
-              isToday ? 'text-brand-400' : 'text-muted-foreground'
+              'text-[11px] font-semibold uppercase tracking-widest',
+              isToday ? 'text-brand-400' : 'text-muted-foreground/70',
             )}>
               {dayLabel}
             </span>
           </div>
-
           {completed && (
-            <CheckCircle2 className="w-4.5 h-4.5 text-emerald-400 flex-shrink-0" style={{ width: '1.125rem', height: '1.125rem' }} />
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
           )}
         </div>
 
-        {/* Workout content */}
-        {sheet ? (
-          <div className="flex-1 flex flex-col gap-3">
-            <div>
-              {sheet.goal && (
-                <span
-                  className="badge text-[10px] mb-1"
-                  style={{ background: `${color}15`, color: color!, borderColor: `${color}30` }}
-                >
-                  {sheet.goal}
-                </span>
-              )}
-              <p className="font-display font-bold text-sm leading-snug">{sheet.name}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
-                <Dumbbell className="w-2.5 h-2.5" />
-                {sheet.exercise_count} exercícios
-              </p>
-            </div>
+        {/* Workout info */}
+        <div className="flex-1 flex flex-col gap-1">
+          {sheet.goal && (
+            <span
+              className="inline-flex w-fit text-[10px] font-semibold px-2 py-0.5 rounded-full border"
+              style={{ background: `${color}18`, color: color!, borderColor: `${color}35` }}
+            >
+              {sheet.goal}
+            </span>
+          )}
+          <p className="font-semibold text-sm leading-snug mt-1">{sheet.name}</p>
+          <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+            <Dumbbell className="w-2.5 h-2.5" />
+            {sheet.exercise_count} exercícios
+          </p>
+        </div>
 
-            <div className="flex gap-2 mt-auto">
-              {!completed ? (
-                <>
-                  <button
-                    onClick={() => onToggle(date, sheet)}
-                    disabled={toggling}
-                    className={cn(
-                      'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all',
-                      'border border-border/60 text-muted-foreground hover:text-foreground hover:bg-surface-200',
-                      toggling && 'opacity-50 cursor-not-allowed'
-                    )}
-                  >
-                    {toggling ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <Circle className="w-3 h-3" />
-                    )}
-                    Concluir
-                  </button>
-                  {(isToday || isPast) && (
-                    <Link
-                      href={`/treinos/executar/${sheet.id}?day=${date.getDay()}`}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all"
-                      style={{ background: `${color}15`, color: color!, border: `1px solid ${color}30` }}
-                    >
-                      <Play className="w-3 h-3" />
-                      Iniciar
-                    </Link>
-                  )}
-                </>
-              ) : (
-                <button
-                  onClick={() => onToggle(date, sheet)}
-                  disabled={toggling}
-                  className={cn(
-                    'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all',
-                    'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20',
-                    toggling && 'opacity-50 cursor-not-allowed'
-                  )}
-                >
-                  {toggling ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="w-3 h-3" />
-                  )}
-                  Concluído
-                </button>
+        {/* Actions */}
+        <div className="flex flex-col gap-2 mt-auto">
+          {completed ? (
+            <button
+              onClick={() => onToggle(date, sheet)}
+              disabled={toggling}
+              className={cn(
+                'w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-all',
+                'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-500/20',
+                toggling && 'opacity-50 cursor-not-allowed',
               )}
-            </div>
-          </div>
-        ) : (
-          <div className="flex-1 flex items-center justify-center py-2">
-            <p className="text-[11px] text-muted-foreground/50 italic">Descanso</p>
-          </div>
-        )}
+            >
+              {toggling ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+              Concluído
+            </button>
+          ) : (
+            <>
+              {(isToday || isPast) && (
+                <Link
+                  href={`/treinos/executar/${sheet.id}?day=${date.getDay()}`}
+                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all"
+                  style={{ background: `${color}20`, color: color!, border: `1px solid ${color}35` }}
+                >
+                  <Play className="w-3 h-3 fill-current" />
+                  Iniciar treino
+                </Link>
+              )}
+              <button
+                onClick={() => onToggle(date, sheet)}
+                disabled={toggling}
+                className={cn(
+                  'w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-medium transition-all',
+                  'border border-border/40 text-muted-foreground hover:text-foreground hover:bg-surface-200',
+                  toggling && 'opacity-50 cursor-not-allowed',
+                )}
+              >
+                {toggling ? <Loader2 className="w-3 h-3 animate-spin" /> : <Circle className="w-3 h-3" />}
+                Marcar concluído
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </motion.div>
   )
@@ -394,13 +396,13 @@ export default function AgendaPage() {
 
       {/* Loading */}
       {loading && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+        <div className="flex gap-3 overflow-x-auto pb-3 [scrollbar-width:thin] [scrollbar-color:hsl(var(--border))_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border">
           {Array.from({ length: 7 }).map((_, i) => (
-            <div key={i} className="glass rounded-2xl overflow-hidden">
-              <Skeleton className="h-1 rounded-none" />
+            <div key={i} className="glass rounded-2xl overflow-hidden flex-shrink-0 w-[180px]">
+              <Skeleton className="h-[3px] rounded-none" />
               <div className="p-4 space-y-3">
                 <div className="flex items-center gap-2">
-                  <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
+                  <Skeleton className="w-9 h-9 rounded-full flex-shrink-0" />
                   <Skeleton className="h-3 w-8" />
                 </div>
                 <Skeleton className="h-3.5 w-16" />
@@ -435,9 +437,9 @@ export default function AgendaPage() {
       {/* Week grid */}
       {!loading && sheets.length > 0 && (
         <motion.div custom={2} variants={fadeUp} initial="hidden" animate="show"
-          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3"
+          className="flex gap-3 overflow-x-auto pb-3 [scrollbar-width:thin] [scrollbar-color:hsl(var(--border))_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border"
         >
-          {weekDays.map((date, i) => {
+          {weekDays.map((date) => {
             const sheet = getSheetForDay(date.getDay())
             const dateStr = toDateStr(date)
             const isPast = date < today
@@ -446,16 +448,17 @@ export default function AgendaPage() {
             const key = `${dateStr}-${sheet?.id}`
 
             return (
-              <DayCard
-                key={dateStr}
-                date={date}
-                isToday={isToday}
-                isPast={isPast}
-                sheet={sheet}
-                completed={done}
-                onToggle={handleToggle}
-                toggling={toggling === key}
-              />
+              <div key={dateStr} className="flex-shrink-0 w-[175px]">
+                <DayCard
+                  date={date}
+                  isToday={isToday}
+                  isPast={isPast}
+                  sheet={sheet}
+                  completed={done}
+                  onToggle={handleToggle}
+                  toggling={toggling === key}
+                />
+              </div>
             )
           })}
         </motion.div>

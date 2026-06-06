@@ -15,10 +15,6 @@ export const portalSchema = z.object({
   academyId: z.string().uuid('academyId inválido'),
 })
 
-export const studentCheckoutSchema = z.object({
-  planId: z.enum(['solo', 'plus', 'elite'], { message: 'planId deve ser solo, plus ou elite' }),
-})
-
 // ── Upload ───────────────────────────────────────────────────────────────────
 
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const

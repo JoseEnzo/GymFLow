@@ -7,7 +7,7 @@ import {
   Dumbbell, LayoutDashboard, Users, ClipboardList, BookOpen,
   Settings, ChevronLeft, ChevronRight, LogOut, ChevronsUpDown,
   Activity, CalendarDays, History, TrendingUp, ShieldCheck, UserCircle, Video,
-  UserCog, BarChart2, BarChart3, Scale,
+  UserCog, BarChart2, BarChart3, Scale, Salad, UtensilsCrossed,
 } from 'lucide-react'
 
 import { BrandLogo } from '@/components/layout/brand-logo'
@@ -27,6 +27,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Personais',        href: '/personais',    icon: UserCog,         roles: ['owner'] },
   { label: 'Fichas de treino', href: '/treinos',      icon: ClipboardList,   roles: ['owner'] },
   { label: 'Exercícios',       href: '/exercicios',   icon: BookOpen,        roles: ['owner'] },
+  { label: 'Receitas',         href: '/receitas',     icon: UtensilsCrossed, roles: ['owner'] },
+  { label: 'Planos alimentares',href: '/dietas',      icon: Salad,           roles: ['owner'] },
   { label: 'Bioimpedância',    href: '/bioimpedancia',icon: Scale,           roles: ['owner'] },
   { label: 'Relatórios',       href: '/relatorios',   icon: BarChart3,       roles: ['owner'] },
 
@@ -34,11 +36,15 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Meus alunos',      href: '/alunos',       icon: Users,           roles: ['personal'] },
   { label: 'Fichas & Treinos', href: '/treinos',      icon: ClipboardList,   roles: ['personal'] },
   { label: 'Exercícios',       href: '/exercicios',   icon: BookOpen,        roles: ['personal'] },
+  { label: 'Receitas',         href: '/receitas',     icon: UtensilsCrossed, roles: ['personal'] },
+  { label: 'Planos alimentares',href: '/dietas',      icon: Salad,           roles: ['personal'] },
   { label: 'Bioimpedância',    href: '/bioimpedancia',icon: Scale,           roles: ['personal'] },
   { label: 'Frequência',       href: '/frequencia',   icon: Activity,        roles: ['personal'] },
 
   // ── Student ───────────────────────────────────────────────────
   { label: 'Meus treinos',     href: '/treinos',      icon: Dumbbell,        roles: ['student'] },
+  { label: 'Meu plano alimentar',href: '/dietas',     icon: Salad,           roles: ['student'] },
+  { label: 'Receitas',         href: '/receitas',     icon: UtensilsCrossed, roles: ['student'] },
   { label: 'Agenda',           href: '/agenda',       icon: CalendarDays,    roles: ['student'] },
   { label: 'Histórico',        href: '/historico',    icon: History,         roles: ['student'] },
   { label: 'Evolução',         href: '/evolucao',     icon: TrendingUp,      roles: ['student'] },

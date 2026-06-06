@@ -1,25 +1,33 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useMemo } from 'react'
 import { cn } from '@/lib/utils'
 
 type Entry = { level: 0 | 1 | 2 | 3 | 4; date: string }
 
-function seededLevel(dateStr: string): 0 | 1 | 2 | 3 | 4 {
-  let h = 0
-  for (let i = 0; i < dateStr.length; i++) h = (Math.imul(31, h) + dateStr.charCodeAt(i)) | 0
-  const v = (((h >>> 0) % 100) + 100) % 100
-  return v < 35 ? 0 : v < 55 ? 1 : v < 72 ? 2 : v < 88 ? 3 : 4
+function countToLevel(count: number): 0 | 1 | 2 | 3 | 4 {
+  if (count === 0) return 0
+  if (count === 1) return 1
+  if (count === 2) return 2
+  if (count === 3) return 3
+  return 4
 }
 
-function generateData(): Entry[] {
+function generateData(timestamps: string[]): Entry[] {
   const data: Entry[] = []
   const now = new Date()
-  for (let i = 83; i >= 0; i--) {
+  const dayCounts: Record<string, number> = {}
+
+  timestamps.forEach(ts => {
+    const dateStr = new Date(ts).toISOString().slice(0, 10)
+    dayCounts[dateStr] = (dayCounts[dateStr] ?? 0) + 1
+  })
+
+  for (let i = 364; i >= 0; i--) {
     const d = new Date(now)
     d.setDate(d.getDate() - i)
     const dateStr = d.toISOString().slice(0, 10)
-    data.push({ level: seededLevel(dateStr), date: dateStr })
+    data.push({ level: countToLevel(dayCounts[dateStr] ?? 0), date: dateStr })
   }
   return data
 }
@@ -32,18 +40,18 @@ const COLORS: Record<0 | 1 | 2 | 3 | 4, string> = {
   4: 'bg-brand-400',
 }
 
-export function FrequencyHeatmap() {
-  const [entries, setEntries] = useState<{ data: Entry[]; pad: number } | null>(null)
-
-  useEffect(() => {
-    const data = generateData()
+export function FrequencyHeatmap({ timestamps = [] }: { timestamps?: string[] }) {
+  // Dado derivado puro de props → useMemo (NÃO useEffect+setState). O default
+  // `timestamps = []` gera referência nova a cada render; com useEffect isso
+  // causava setState → re-render → loop infinito. A key serializada garante que
+  // só recalcula quando os valores realmente mudam.
+  const key = timestamps.join(',')
+  const entries = useMemo(() => {
+    const data = generateData(timestamps)
     const firstDay = new Date(data[0]!.date).getDay()
-    setEntries({ data, pad: (firstDay + 6) % 7 })
-  }, [])
-
-  if (!entries) {
-    return <div className="flex flex-wrap gap-[3px] h-[10px]" style={{ maxWidth: '100%' }} />
-  }
+    return { data, pad: (firstDay + 6) % 7 }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
 
   return (
     <div className="flex flex-wrap gap-[3px]" style={{ maxWidth: '100%' }}>
