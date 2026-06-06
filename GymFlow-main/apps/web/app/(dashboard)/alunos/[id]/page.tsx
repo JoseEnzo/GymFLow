@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 import {
   ArrowLeft, Dumbbell, Flame, Clock, Target, Scale,
   Ruler, ClipboardList, Loader2, Users, Plus, ChevronRight,
-  Calendar,
+  Calendar, Salad,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -44,6 +44,13 @@ interface WorkoutSheetBasic {
   is_active: boolean
 }
 
+interface MealPlanBasic {
+  id: string
+  name: string
+  goal: string | null
+  is_active: boolean
+}
+
 function getInitials(name: string | null) {
   if (!name) return 'A'
   return name.split(' ').slice(0, 2).map((n) => n[0]).join('').toUpperCase()
@@ -59,6 +66,7 @@ export default function StudentDetailPage() {
 
   const [student, setStudent] = useState<StudentProfile | null>(null)
   const [sheets, setSheets] = useState<WorkoutSheetBasic[]>([])
+  const [mealPlans, setMealPlans] = useState<MealPlanBasic[]>([])
   const [totalWorkouts, setTotalWorkouts] = useState(0)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -104,6 +112,18 @@ export default function StudentDetailPage() {
 
       if (sheetsError) console.warn('[aluno] erro ao buscar fichas:', sheetsError?.message ?? sheetsError)
       if (sheetsData) setSheets(sheetsData)
+
+      // Load meal plans assigned to this student
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: plansData, error: plansError } = await (supabase as any)
+        .from('meal_plans')
+        .select('id, name, goal, is_active')
+        .eq('academy_id', currentAcademy.id)
+        .eq('student_id', id)
+        .order('created_at', { ascending: false })
+
+      if (plansError) console.warn('[aluno] erro ao buscar planos:', plansError?.message ?? plansError)
+      if (plansData) setMealPlans(plansData)
 
       // Count workout logs
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -306,6 +326,58 @@ export default function StudentDetailPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {s.is_active && <span className="badge-success text-[9px]">Ativa</span>}
+                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-muted-foreground" />
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Planos alimentares */}
+      <motion.div custom={6} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-display font-bold text-sm">Planos alimentares ({mealPlans.length})</h3>
+          {isPersonal && (
+            <Link
+              href={`/dietas/novo?studentId=${id}`}
+              className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1"
+            >
+              <Plus className="w-3 h-3" /> Novo plano
+            </Link>
+          )}
+        </div>
+
+        {mealPlans.length === 0 ? (
+          <div className="flex flex-col items-center py-8 text-center">
+            <div className="w-10 h-10 rounded-xl bg-surface-200 flex items-center justify-center mb-3">
+              <Salad className="w-4.5 h-4.5 text-muted-foreground/40" />
+            </div>
+            <p className="text-sm text-muted-foreground">Nenhum plano atribuído</p>
+            {isPersonal && (
+              <Link
+                href={`/dietas/novo?studentId=${id}`}
+                className="btn-primary text-xs py-2 px-4 rounded-xl mt-3 inline-flex items-center gap-1.5"
+              >
+                <Plus className="w-3 h-3" /> Criar plano
+              </Link>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {mealPlans.map((p) => (
+              <Link key={p.id} href={`/dietas/${p.id}`}>
+                <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-surface-200 transition-all group cursor-pointer">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                    <Salad className="w-3.5 h-3.5 text-emerald-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate">{p.name}</p>
+                    {p.goal && <p className="text-xs text-muted-foreground">{p.goal}</p>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {p.is_active && <span className="badge-success text-[9px]">Ativo</span>}
                     <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-muted-foreground" />
                   </div>
                 </div>

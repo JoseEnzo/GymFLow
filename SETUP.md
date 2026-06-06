@@ -106,7 +106,7 @@ git add .                     # todos os arquivos
 git commit -m "Feat receitas"
 
 # 5. Enviar pro GitHub
-git push origin main:JoseEnzo
+git push origin Branch_Jose
 ```
 ```
 

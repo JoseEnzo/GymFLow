@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "doppler run -- next dev --turbopack",
+    "dev": "doppler run -- next dev",
     "dev:webpack": "doppler run -- next dev",
+    "dev:turbo": "doppler run -- next dev --turbopack",
     "dev:stripe": "doppler run -- concurrently -n next,stripe -c cyan,magenta \"next dev --turbopack\" \"stripe listen --forward-to localhost:3000/api/webhooks/stripe\"",
     "dev:local": "next dev --turbopack",
     "dev:next": "doppler run -- next dev --turbopack",

@@ -4,6 +4,7 @@ import { Toaster } from 'sonner'
 
 import './globals.css'
 import { Providers } from '@/components/providers'
+import { NavigationProgress } from '@/components/ui/navigation-progress'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -85,6 +86,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${inter.variable} ${plusJakarta.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-screen bg-background antialiased">
+        <NavigationProgress />
         <Providers>
           {children}
         </Providers>

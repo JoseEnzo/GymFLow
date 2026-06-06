@@ -9,7 +9,7 @@ import {
   Dumbbell, ChevronRight, Plus, UserPlus, Building2,
   ClipboardList, Flame, AlertTriangle, Clock, Play, CheckCircle2,
   ShieldCheck, BarChart3, BookOpen, CalendarCheck, Trophy, Timer, Check,
-  Video, Sparkles, X, Loader2, Settings,
+  Video, Loader2, Settings,
 } from 'lucide-react'
 
 import {
@@ -59,11 +59,6 @@ interface LastWorkoutSummary { sheetName: string; durationSeconds: number | null
 interface NextWorkout    { id: string; name: string; goal: string | null; exerciseCount: number; dayLabel: string }
 interface MonthlyWorkout { month: string; count: number }
 
-const PLAN_INFO: Record<string, { name: string; color: string; emoji: string }> = {
-  solo:  { name: 'Solo',  color: '#6366F1', emoji: '⚡' },
-  plus:  { name: 'Plus',  color: '#06B6D4', emoji: '💎' },
-  elite: { name: 'Elite', color: '#10B981', emoji: '👑' },
-}
 
 const OWNER_PLAN_INFO: Record<string, { name: string; color: string; emoji: string; price: string; trial?: boolean; features: string[] }> = {
   personal: { name: 'Personal', color: '#10B981', emoji: '🏋️', price: 'R$ 97/mês',  trial: true, features: ['Alunos ilimitados', 'Fichas de treino ilimitadas', 'Histórico e evolução por aluno', 'Convites por código', 'Dashboard completo'] },
@@ -163,24 +158,7 @@ export default function DashboardPage() {
     }
   }
 
-  async function handleUpgrade(planId: string) {
-    setUpgrading(planId)
-    try {
-      const res = await fetch('/api/billing/student-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId }),
-      })
-      const { url, error } = await res.json()
-      if (error) throw new Error(error)
-      window.location.href = url
-    } catch {
-      toast.error('Erro ao iniciar pagamento. Tente novamente.')
-      setUpgrading(null)
-    }
-  }
-
-  async function logFreeWorkout() {
+async function logFreeWorkout() {
     if (!freeCategory || !currentAcademy) return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -213,8 +191,6 @@ export default function DashboardPage() {
   const [todayWorkout, setTodayWorkout] = useState<TodayWorkout | null>(null)
   const [nextWorkout,  setNextWorkout]  = useState<NextWorkout | null>(null)
   const [lastWorkout,  setLastWorkout]  = useState<LastWorkoutSummary | null>(null)
-  const [subscriptionPlan, setSubscriptionPlan] = useState<string | null>(null)
-  const [showSuccessBanner, setShowSuccessBanner] = useState(false)
   const [monthlyWorkouts, setMonthlyWorkouts] = useState<MonthlyWorkout[]>([])
   const [freeCategory,    setFreeCategory]    = useState<string | null>(null)
   const [freeDuration,    setFreeDuration]    = useState<number | null>(null)
@@ -225,12 +201,8 @@ export default function DashboardPage() {
   const router = useRouter()
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('subscription') === 'success') setShowSuccessBanner(true)
     supabase.auth.getUser().then(({ data: { user } }) => {
       setAccountType(user?.user_metadata?.['account_type'] ?? 'owner')
-      const plan = user?.user_metadata?.['subscription_plan'] ?? params.get('plan') ?? null
-      setSubscriptionPlan(plan)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -543,13 +515,7 @@ export default function DashboardPage() {
           <h2 className="text-2xl font-display font-bold">
             {greeting()}, {profile?.full_name?.split(' ')[0] ?? 'usuário'} 👋
           </h2>
-          {isStudent && subscriptionPlan && PLAN_INFO[subscriptionPlan] && (
-            <span className="text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1"
-              style={{ background: `${PLAN_INFO[subscriptionPlan].color}18`, color: PLAN_INFO[subscriptionPlan].color, border: `1px solid ${PLAN_INFO[subscriptionPlan].color}30` }}>
-              {PLAN_INFO[subscriptionPlan].emoji} Plano {PLAN_INFO[subscriptionPlan].name}
-            </span>
-          )}
-          {isOwner && currentAcademy?.plan && OWNER_PLAN_INFO[currentAcademy.plan] && (
+{isOwner && currentAcademy?.plan && OWNER_PLAN_INFO[currentAcademy.plan] && (
             <span className="text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1"
               style={{ background: `${OWNER_PLAN_INFO[currentAcademy.plan]!.color}18`, color: OWNER_PLAN_INFO[currentAcademy.plan]!.color, border: `1px solid ${OWNER_PLAN_INFO[currentAcademy.plan]!.color}30` }}>
               {OWNER_PLAN_INFO[currentAcademy.plan]!.emoji} Plano {OWNER_PLAN_INFO[currentAcademy.plan]!.name}
@@ -1009,43 +975,6 @@ export default function DashboardPage() {
       ════════════════════════════════════════ */}
       {isStudent && dataLoaded && (
         <>
-          {/* Banner de boas-vindas após pagamento */}
-          {showSuccessBanner && subscriptionPlan && PLAN_INFO[subscriptionPlan] && (
-            <motion.div variants={fadeUp} className="relative overflow-hidden rounded-2xl p-5 border"
-              style={{ background: `${PLAN_INFO[subscriptionPlan].color}10`, borderColor: `${PLAN_INFO[subscriptionPlan].color}25` }}>
-              <button onClick={() => setShowSuccessBanner(false)}
-                className="absolute top-3 right-3 p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/10 transition-all">
-                <X className="w-4 h-4" />
-              </button>
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
-                  style={{ background: `${PLAN_INFO[subscriptionPlan].color}18` }}>
-                  {PLAN_INFO[subscriptionPlan].emoji}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-display font-bold text-base" style={{ color: PLAN_INFO[subscriptionPlan].color }}>
-                    Bem-vindo ao Plano {PLAN_INFO[subscriptionPlan].name}!
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    Sua assinatura está ativa. Explore seus treinos, acompanhe sua frequência e evolução.
-                  </p>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    <Link href="/treinos" className="text-xs font-semibold py-1.5 px-3 rounded-xl transition-all flex items-center gap-1"
-                      style={{ background: `${PLAN_INFO[subscriptionPlan].color}20`, color: PLAN_INFO[subscriptionPlan].color }}>
-                      <Dumbbell className="w-3 h-3" /> Meus treinos
-                    </Link>
-                    {subscriptionPlan === 'elite' && (
-                      <Link href="/videos" className="text-xs font-semibold py-1.5 px-3 rounded-xl transition-all flex items-center gap-1"
-                        style={{ background: `${PLAN_INFO[subscriptionPlan].color}20`, color: PLAN_INFO[subscriptionPlan].color }}>
-                        <Video className="w-3 h-3" /> Biblioteca de vídeos
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
           {/* KPIs */}
           <motion.div variants={stagger} className="grid grid-cols-3 gap-3">
             <StatCard label="Treinos totais" value={studentStats.totalWorkouts} icon={Dumbbell}      color="#6366F1" empty={studentStats.totalWorkouts === 0} />
@@ -1428,21 +1357,7 @@ export default function DashboardPage() {
                 <QuickAction icon={CalendarCheck} label="Minha agenda"    href="/agenda"    color="#10B981" />
                 <QuickAction icon={TrendingUp}    label="Evolução"        sublabel="Gráficos e progresso"  href="/evolucao"   color="#F97316" />
                 <QuickAction icon={Activity}      label="Frequência"      href="/frequencia" color="#06B6D4" />
-                {subscriptionPlan === 'elite' && (
-                  <QuickAction icon={Video} label="Biblioteca de vídeos" sublabel="Execução de exercícios" href="/videos" color="#10B981" />
-                )}
-                {subscriptionPlan && subscriptionPlan !== 'elite' && (
-                  <Link href="/videos" className="flex items-center gap-3 p-3 rounded-xl hover:bg-surface-200 transition-all group opacity-60">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-surface-200">
-                      <Video className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium">Vídeos</p>
-                      <p className="text-[10px] text-muted-foreground">Plano Elite</p>
-                    </div>
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400/70" />
-                  </Link>
-                )}
+                <QuickAction icon={Video} label="Biblioteca de vídeos" sublabel="Execução de exercícios" href="/videos" color="#10B981" />
               </div>
 
               {/* Perfil incompleto */}
@@ -1493,55 +1408,6 @@ export default function DashboardPage() {
             </motion.div>
           )}
 
-          {/* Upgrade de plano */}
-          {!subscriptionPlan && (
-            <motion.div variants={fadeUp} className="glass rounded-2xl p-5">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                </div>
-                <div>
-                  <h3 className="font-display font-bold text-sm">Desbloquear recursos premium</h3>
-                  <p className="text-xs text-muted-foreground">Vídeos de execução, gráficos avançados e mais</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {[
-                  { id: 'solo',  name: 'Solo',  price: 'R$ 29', color: '#6366F1', popular: false, features: ['Histórico avançado', 'Gráficos de evolução', 'Conquistas e metas'] },
-                  { id: 'plus',  name: 'Plus',  price: 'R$ 49', color: '#06B6D4', popular: true,  features: ['Tudo do Solo', 'Notificações de treino', 'Relatórios semanais'] },
-                  { id: 'elite', name: 'Elite', price: 'R$ 89', color: '#10B981', popular: false, features: ['Tudo do Plus', 'Vídeos de execução', 'Suporte prioritário'] },
-                ].map(p => (
-                  <div key={p.id} className={cn('rounded-xl p-3.5 border flex flex-col gap-2',
-                    p.popular ? 'border-brand-500/30 bg-brand-500/5' : 'border-surface-300/20 bg-surface-100')}>
-                    {p.popular && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-500/15 text-brand-400 w-fit">Mais popular</span>
-                    )}
-                    <div>
-                      <span className="text-lg font-display font-extrabold" style={{ color: p.color }}>{p.price}</span>
-                      <span className="text-[10px] text-muted-foreground">/mês</span>
-                    </div>
-                    <p className="font-semibold text-xs">{p.name}</p>
-                    <ul className="space-y-1 flex-1">
-                      {p.features.map(f => (
-                        <li key={f} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                          <Check className="w-2.5 h-2.5 flex-shrink-0" style={{ color: p.color }} />{f}
-                        </li>
-                      ))}
-                    </ul>
-                    <button
-                      onClick={() => handleUpgrade(p.id)}
-                      disabled={!!upgrading}
-                      className="mt-1 w-full text-[11px] font-semibold py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
-                      style={{ background: `${p.color}18`, color: p.color, border: `1px solid ${p.color}25` }}
-                    >
-                      {upgrading === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Assinar'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <p className="text-[10px] text-muted-foreground text-center mt-3">Cancele quando quiser · Sem fidelidade</p>
-            </motion.div>
-          )}
         </>
       )}
 

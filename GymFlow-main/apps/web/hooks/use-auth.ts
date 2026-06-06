@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
@@ -10,8 +10,12 @@ import { useAuthStore } from '@/stores/auth-store'
 export function useAuth() {
   const router = useRouter()
   const { profile, currentAcademy, currentRole, setProfile, setAcademies, reset } = useAuthStore()
+  // useMemo garante instância única do client. Sem isso, createClient() retorna um
+  // objeto novo a cada render → loadUserData (useCallback) é recriado → o useEffect
+  // abaixo roda a cada render → setAcademies atualiza o store → re-render → loop
+  // infinito ("Maximum update depth exceeded") em TODAS as páginas do dashboard.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const supabase = createClient() as any
+  const supabase = useMemo(() => createClient(), []) as any
 
   const loadUserData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()

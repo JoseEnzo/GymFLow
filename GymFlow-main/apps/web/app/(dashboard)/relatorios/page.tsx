@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   BarChart3, TrendingUp, TrendingDown, Users, Dumbbell,
@@ -87,7 +87,7 @@ function DeltaBadge({ current, previous }: { current: number; previous: number }
 
 export default function RelatoriosPage() {
   const { currentAcademy } = useAuthStore()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const [stats, setStats] = useState<Stats | null>(null)
   const [engagement, setEngagement] = useState<EngagementWeek[] | null>(null)
   const [loading, setLoading] = useState(true)
@@ -182,7 +182,7 @@ export default function RelatoriosPage() {
     }
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentAcademy])
+  }, [currentAcademy?.id])
 
   // Engajamento (NSM): vem da RPC. Stat card e card grande consomem o mesmo número.
   const nsmRate = engagement?.[0]?.engagement_rate

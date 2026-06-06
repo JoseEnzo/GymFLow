@@ -58,3 +58,50 @@ export const EQUIPMENT = [
 
 export type MuscleGroup = (typeof MUSCLE_GROUPS)[number]
 export type Equipment = (typeof EQUIPMENT)[number]
+
+// ── Nutrição ──────────────────────────────────────────────
+// Ordem reflete a sequência das refeições ao longo do dia.
+export const MEAL_TYPES = [
+  'cafe_da_manha',
+  'lanche_manha',
+  'almoco',
+  'lanche_tarde',
+  'jantar',
+  'ceia',
+  'pre_treino',
+  'pos_treino',
+] as const
+
+export type MealType = (typeof MEAL_TYPES)[number]
+
+export const MEAL_TYPE_LABELS: Record<MealType, string> = {
+  cafe_da_manha: 'Café da manhã',
+  lanche_manha: 'Lanche da manhã',
+  almoco: 'Almoço',
+  lanche_tarde: 'Lanche da tarde',
+  jantar: 'Jantar',
+  ceia: 'Ceia',
+  pre_treino: 'Pré-treino',
+  pos_treino: 'Pós-treino',
+}
+
+export const MEAL_TYPE_EMOJI: Record<MealType, string> = {
+  cafe_da_manha: '🍳',
+  lanche_manha: '🍎',
+  almoco: '🍽️',
+  lanche_tarde: '🥪',
+  jantar: '🌙',
+  ceia: '🥛',
+  pre_treino: '⚡',
+  pos_treino: '💪',
+}
+
+export const DIET_GOALS = [
+  'Emagrecimento',
+  'Hipertrofia',
+  'Manutenção',
+  'Definição',
+  'Performance',
+] as const
+
+export type DietGoal = (typeof DIET_GOALS)[number]
