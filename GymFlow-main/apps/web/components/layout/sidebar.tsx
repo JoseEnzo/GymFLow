@@ -7,7 +7,7 @@ import {
   Dumbbell, LayoutDashboard, Users, ClipboardList, BookOpen,
   Settings, ChevronLeft, ChevronRight, LogOut, ChevronsUpDown,
   Activity, CalendarDays, History, TrendingUp, ShieldCheck, UserCircle, Video,
-  UserCog, BarChart2, BarChart3,
+  UserCog, BarChart2, BarChart3, Scale,
 } from 'lucide-react'
 
 import { BrandLogo } from '@/components/layout/brand-logo'
@@ -27,12 +27,14 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Personais',        href: '/personais',    icon: UserCog,         roles: ['owner'] },
   { label: 'Fichas de treino', href: '/treinos',      icon: ClipboardList,   roles: ['owner'] },
   { label: 'Exercícios',       href: '/exercicios',   icon: BookOpen,        roles: ['owner'] },
+  { label: 'Bioimpedância',    href: '/bioimpedancia',icon: Scale,           roles: ['owner'] },
   { label: 'Relatórios',       href: '/relatorios',   icon: BarChart3,       roles: ['owner'] },
 
   // ── Personal: foco em treino ──────────────────────────────────
   { label: 'Meus alunos',      href: '/alunos',       icon: Users,           roles: ['personal'] },
   { label: 'Fichas & Treinos', href: '/treinos',      icon: ClipboardList,   roles: ['personal'] },
   { label: 'Exercícios',       href: '/exercicios',   icon: BookOpen,        roles: ['personal'] },
+  { label: 'Bioimpedância',    href: '/bioimpedancia',icon: Scale,           roles: ['personal'] },
   { label: 'Frequência',       href: '/frequencia',   icon: Activity,        roles: ['personal'] },
 
   // ── Student ───────────────────────────────────────────────────

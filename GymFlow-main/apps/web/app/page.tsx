@@ -13,6 +13,7 @@ import {
 import { BrandLogo } from '@/components/layout/brand-logo'
 import { InstallButton } from '@/components/pwa/install-button'
 import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/auth-store'
 
 // ──────────────────────────────────────────────
 // Animation variants
@@ -193,6 +194,7 @@ function SectionTransition() {
 function Nav() {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const isAuthenticated = useAuthStore((s) => !!s.profile)
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 20)
@@ -237,12 +239,20 @@ function Nav() {
 
           {/* CTA */}
           <div className="hidden md:flex items-center gap-3">
-            <Link href="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-4 py-2">
-              Entrar
-            </Link>
-            <Link href="/cadastro" className="btn-primary text-sm px-5 py-2.5 rounded-xl">
-              Começar grátis
-            </Link>
+            {isAuthenticated ? (
+              <Link href="/dashboard" className="btn-primary text-sm px-5 py-2.5 rounded-xl">
+                Entrar
+              </Link>
+            ) : (
+              <>
+                <Link href="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-4 py-2">
+                  Entrar
+                </Link>
+                <Link href="/cadastro" className="btn-primary text-sm px-5 py-2.5 rounded-xl">
+                  Começar grátis
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -280,12 +290,20 @@ function Nav() {
                 </a>
               ))}
               <div className="pt-2 border-t border-border/60 flex flex-col gap-2">
-                <Link href="/login" className="px-4 py-3 rounded-xl text-sm font-medium text-center text-muted-foreground hover:bg-surface-100 transition-all">
-                  Entrar
-                </Link>
-                <Link href="/cadastro" className="btn-primary text-sm py-3 rounded-xl text-center">
-                  Começar grátis
-                </Link>
+                {isAuthenticated ? (
+                  <Link href="/dashboard" className="btn-primary text-sm py-3 rounded-xl text-center">
+                    Entrar
+                  </Link>
+                ) : (
+                  <>
+                    <Link href="/login" className="px-4 py-3 rounded-xl text-sm font-medium text-center text-muted-foreground hover:bg-surface-100 transition-all">
+                      Entrar
+                    </Link>
+                    <Link href="/cadastro" className="btn-primary text-sm py-3 rounded-xl text-center">
+                      Começar grátis
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </motion.div>
@@ -300,6 +318,7 @@ function Nav() {
 // ──────────────────────────────────────────────
 function Hero() {
   const reduceMotion = useReducedMotion()
+  const isAuthenticated = useAuthStore((s) => !!s.profile)
 
   return (
     <section className="relative min-h-screen flex items-center overflow-hidden pt-16">
@@ -360,29 +379,31 @@ function Hero() {
               {/* CTAs */}
               <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-4">
                 <Link
-                  href="/cadastro"
+                  href={isAuthenticated ? '/dashboard' : '/cadastro'}
                   className="group relative inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl font-bold text-white overflow-hidden transition-all duration-300"
                   style={{ background: 'linear-gradient(135deg, #6366F1, #4F46E5)' }}
                 >
                   <span className="relative z-10 flex items-center gap-2">
-                    Começar grátis
+                    {isAuthenticated ? 'Entrar' : 'Começar grátis'}
                     <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                   </span>
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
                     style={{ background: 'linear-gradient(135deg, #818CF8, #6366F1)' }} />
                 </Link>
 
-                <a
-                  href="/demo"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-2xl font-semibold text-muted-foreground hover:text-foreground border border-border/60 hover:border-border hover:bg-surface-100 transition-all duration-200"
-                >
-                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-brand-500/15">
-                    <Play className="w-3 h-3 text-brand-400 ml-0.5" />
-                  </div>
-                  Ver demonstração
-                </a>
+                {!isAuthenticated && (
+                  <a
+                    href="/demo"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-2xl font-semibold text-muted-foreground hover:text-foreground border border-border/60 hover:border-border hover:bg-surface-100 transition-all duration-200"
+                  >
+                    <div className="flex items-center justify-center w-7 h-7 rounded-full bg-brand-500/15">
+                      <Play className="w-3 h-3 text-brand-400 ml-0.5" />
+                    </div>
+                    Ver demonstração
+                  </a>
+                )}
               </motion.div>
 
               {/* PWA install — só renderiza quando navegador aceita instalar. */}
@@ -1191,6 +1212,8 @@ function SobreSection() {
 // CTA Section
 // ──────────────────────────────────────────────
 function CTASection() {
+  const isAuthenticated = useAuthStore((s) => !!s.profile)
+  if (isAuthenticated) return null
   return (
     <section className="py-24 lg:py-32">
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
@@ -1281,13 +1304,24 @@ function Footer() {
             <div key={col.title}>
               <h4 className="font-semibold text-sm mb-4">{col.title}</h4>
               <ul className="space-y-2.5">
-                {col.links.map((link) => (
-                  <li key={link.label}>
-                    <Link href={link.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
+                {col.links.map((link) => {
+                  const isExternal = link.href.startsWith('mailto:') || link.href.startsWith('http')
+                  const isHashOnly = link.href.startsWith('#')
+                  const className = 'text-sm text-muted-foreground hover:text-foreground transition-colors'
+                  return (
+                    <li key={link.label}>
+                      {isExternal || isHashOnly ? (
+                        <a href={link.href} className={className}>
+                          {link.label}
+                        </a>
+                      ) : (
+                        <Link href={link.href} className={className}>
+                          {link.label}
+                        </Link>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           ))}

@@ -5,13 +5,15 @@ import { motion } from 'framer-motion'
 import { useForm } from 'react-hook-form'
 import {
   User, Building2, Bell, CreditCard, Shield,
-  Loader2, Check, ExternalLink, Eye, EyeOff,
+  Loader2, Check, ExternalLink, Eye, EyeOff, LogOut,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 import { createClient } from '@/lib/supabase/client'
+import { LeaveAcademyModal } from '@/components/ui/leave-academy-modal'
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.07 } } }
 const fadeUp = {
@@ -20,6 +22,65 @@ const fadeUp = {
 }
 
 type Tab = 'perfil' | 'academia' | 'notificacoes' | 'plano' | 'seguranca'
+
+// Botão + modal de "Sair desta academia" usado em qualquer branch non-owner
+// da AcademiaTab (sub-personal e student). Owner não pode sair — usa rota
+// diferente (transferir/deletar academia).
+function LeaveAcademySection() {
+  const router = useRouter()
+  const { currentAcademy, academies, setAcademies, setCurrentAcademy } = useAuthStore()
+  const [showModal, setShowModal] = useState(false)
+
+  if (!currentAcademy) return null
+
+  async function handleLeave() {
+    if (!currentAcademy) return
+    try {
+      const res = await fetch('/api/members/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ academyId: currentAcademy.id }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Erro ao sair da academia')
+
+      // Remove a academia da lista local e troca pra próxima (ou nenhuma).
+      const remaining = academies.filter((a) => a.academy.id !== currentAcademy.id)
+      setAcademies(remaining)
+      if (remaining.length === 0) {
+        setCurrentAcademy(null, null)
+      }
+      setShowModal(false)
+      toast.success(`Você saiu de ${currentAcademy.name}.`)
+      router.push(remaining.length > 0 ? '/dashboard' : '/onboarding')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao sair da academia')
+    }
+  }
+
+  return (
+    <>
+      <div className="pt-4 mt-4 border-t border-red-500/15 space-y-2">
+        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Zona de perigo</p>
+        <button
+          type="button"
+          onClick={() => setShowModal(true)}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-sm text-red-300 hover:text-red-200 transition-all"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          Sair desta academia
+        </button>
+      </div>
+      {showModal && (
+        <LeaveAcademyModal
+          academyName={currentAcademy.name}
+          onConfirm={handleLeave}
+          onClose={() => setShowModal(false)}
+        />
+      )}
+    </>
+  )
+}
 
 const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'perfil', label: 'Perfil', icon: User },
@@ -157,12 +218,185 @@ function AcademiaTab() {
   }, [currentAcademy, reset])
 
   const isOwner = currentRole === 'owner'
+  const isPersonalPlan = currentAcademy?.plan === 'personal'
+  const isSubPersonal = currentRole === 'personal'
+  const isStudent = currentRole === 'student'
 
   if (!currentAcademy) {
     return (
       <div className="text-center py-12">
         <Building2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
         <p className="text-sm text-muted-foreground">Você não está em nenhuma academia.</p>
+      </div>
+    )
+  }
+
+  // Personal independente: plano próprio, sem vínculo com academia
+  if (isOwner && isPersonalPlan) {
+    return (
+      <div className="space-y-5 max-w-lg">
+        <div className="glass rounded-xl p-4 flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center flex-shrink-0">
+            <User className="w-5 h-5 text-emerald-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-muted-foreground">Vínculo profissional</p>
+            <p className="font-semibold text-sm">Personal independente</p>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              Você atua por conta própria, sem vínculo com nenhuma academia. Seus alunos são gerenciados diretamente por você.
+            </p>
+          </div>
+        </div>
+
+        {academies.length > 1 && (
+          <div className="pt-2">
+            <p className="text-xs text-muted-foreground font-medium mb-2">Seus vínculos</p>
+            <div className="space-y-1.5">
+              {academies.map(({ academy, role }) => (
+                <button
+                  key={academy.id}
+                  type="button"
+                  onClick={() => setCurrentAcademy(academy, role)}
+                  className={cn(
+                    'w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all text-sm',
+                    currentAcademy.id === academy.id
+                      ? 'border-brand-500/30 bg-brand-500/5 text-brand-300'
+                      : 'border-border/60 text-muted-foreground hover:bg-surface-100'
+                  )}
+                >
+                  <Building2 className="w-4 h-4 flex-shrink-0" />
+                  <span className="flex-1 truncate">{academy.name}</span>
+                  <span className="text-[10px] opacity-60 capitalize">{role}</span>
+                  {currentAcademy.id === academy.id && <Check className="w-3.5 h-3.5" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Aluno: entrou por convite. Não edita nada da academia, só visualiza + pode sair.
+  if (isStudent) {
+    return (
+      <div className="space-y-5 max-w-lg">
+        <div className="glass rounded-xl p-4 flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-brand-500/15 border border-brand-500/25 flex items-center justify-center flex-shrink-0">
+            <Building2 className="w-5 h-5 text-brand-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-muted-foreground">Sua academia</p>
+            <p className="font-semibold text-sm truncate">{currentAcademy.name}</p>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              Os dados da academia abaixo só podem ser editados pelo dono.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Dados da academia</p>
+          {[
+            { label: 'Cidade', value: [currentAcademy.address_city, currentAcademy.address_state].filter(Boolean).join(' / ') || '—' },
+            { label: 'Telefone', value: currentAcademy.phone || '—' },
+            { label: 'E-mail', value: currentAcademy.email || '—' },
+          ].map(({ label, value }) => (
+            <div key={label} className="glass rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+              <span className="text-xs text-muted-foreground">{label}</span>
+              <span className="text-sm font-medium truncate">{value}</span>
+            </div>
+          ))}
+        </div>
+
+        {academies.length > 1 && (
+          <div className="pt-2">
+            <p className="text-xs text-muted-foreground font-medium mb-2">Suas academias</p>
+            <div className="space-y-1.5">
+              {academies.map(({ academy, role }) => (
+                <button
+                  key={academy.id}
+                  type="button"
+                  onClick={() => setCurrentAcademy(academy, role)}
+                  className={cn(
+                    'w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all text-sm',
+                    currentAcademy.id === academy.id
+                      ? 'border-brand-500/30 bg-brand-500/5 text-brand-300'
+                      : 'border-border/60 text-muted-foreground hover:bg-surface-100'
+                  )}
+                >
+                  <Building2 className="w-4 h-4 flex-shrink-0" />
+                  <span className="flex-1 truncate">{academy.name}</span>
+                  <span className="text-[10px] opacity-60 capitalize">{role}</span>
+                  {currentAcademy.id === academy.id && <Check className="w-3.5 h-3.5" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <LeaveAcademySection />
+      </div>
+    )
+  }
+
+  // Sub-personal: entrou por convite de uma academia
+  if (isSubPersonal) {
+    return (
+      <div className="space-y-5 max-w-lg">
+        <div className="glass rounded-xl p-4 flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-brand-500/15 border border-brand-500/25 flex items-center justify-center flex-shrink-0">
+            <Building2 className="w-5 h-5 text-brand-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-muted-foreground">Vínculo profissional</p>
+            <p className="font-semibold text-sm truncate">Filiado a {currentAcademy.name}</p>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              Você foi convidado pelo proprietário desta academia. Os dados abaixo são da academia e só podem ser editados pelo dono.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Dados da academia</p>
+          {[
+            { label: 'Cidade', value: [currentAcademy.address_city, currentAcademy.address_state].filter(Boolean).join(' / ') || '—' },
+            { label: 'Telefone', value: currentAcademy.phone || '—' },
+            { label: 'E-mail', value: currentAcademy.email || '—' },
+          ].map(({ label, value }) => (
+            <div key={label} className="glass rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+              <span className="text-xs text-muted-foreground">{label}</span>
+              <span className="text-sm font-medium truncate">{value}</span>
+            </div>
+          ))}
+        </div>
+
+        {academies.length > 1 && (
+          <div className="pt-2">
+            <p className="text-xs text-muted-foreground font-medium mb-2">Seus vínculos</p>
+            <div className="space-y-1.5">
+              {academies.map(({ academy, role }) => (
+                <button
+                  key={academy.id}
+                  type="button"
+                  onClick={() => setCurrentAcademy(academy, role)}
+                  className={cn(
+                    'w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all text-sm',
+                    currentAcademy.id === academy.id
+                      ? 'border-brand-500/30 bg-brand-500/5 text-brand-300'
+                      : 'border-border/60 text-muted-foreground hover:bg-surface-100'
+                  )}
+                >
+                  <Building2 className="w-4 h-4 flex-shrink-0" />
+                  <span className="flex-1 truncate">{academy.name}</span>
+                  <span className="text-[10px] opacity-60 capitalize">{role}</span>
+                  {currentAcademy.id === academy.id && <Check className="w-3.5 h-3.5" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <LeaveAcademySection />
       </div>
     )
   }

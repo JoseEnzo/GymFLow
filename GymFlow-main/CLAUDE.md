@@ -186,6 +186,39 @@ Para **código novo**: use `supabase.from('tabela')` direto, sem cast. Se `as an
 
 Para **limpeza retroativa**: ataque por categoria (queries → casts inline → outros), rodando `pnpm type-check` entre lotes.
 
+#### Otimização do dashboard — pendente
+
+`apps/web/app/(dashboard)/dashboard/page.tsx` (~1600 linhas) — owner faz ~14 queries Supabase em duas levas de `Promise.all` (linhas ~380 e ~405). Em prod WAN é ~1-1.5s só de network.
+
+**Já aplicado:**
+- `_components.tsx` extraído (StatCard/QuickAction/EmptyState/AlertBanner + helpers) — HMR só recompila o arquivo mexido.
+- `next/dynamic` em FrequencyHeatmap + StudentBioView (carregam só quando renderizam).
+- `memo` nos 4 cards repetidos.
+- `MotionConfig reducedMotion='always'` em dev (`apps/web/app/(dashboard)/dashboard/page.tsx`).
+
+**Próximo passo (não feito — risco médio):** RPC `get_owner_dashboard(academy_id, week_ago, month_ago)` que retorna num único JSON: counts (alunos, personais, treinos esta sem, semana passada, novos no mês), arrays (recent_workouts, recent_students, inactive_students, personais_perf). Vira 1 roundtrip em vez de 14. Esqueleto sugerido:
+
+```sql
+CREATE OR REPLACE FUNCTION public.get_owner_dashboard(
+  p_academy_id uuid, p_week_ago timestamptz, p_month_ago timestamptz
+) RETURNS jsonb LANGUAGE sql SECURITY INVOKER STABLE AS $$
+  SELECT jsonb_build_object(
+    'total_students',    (SELECT count(*) FROM academy_members WHERE academy_id = p_academy_id AND role = 'student' AND is_active),
+    'active_personals',  (SELECT count(*) FROM academy_members WHERE academy_id = p_academy_id AND role = 'personal' AND is_active),
+    'workouts_this_week',(SELECT count(*) FROM workout_logs WHERE academy_id = p_academy_id AND created_at >= p_week_ago),
+    'new_this_month',    (SELECT count(*) FROM academy_members WHERE academy_id = p_academy_id AND role = 'student' AND joined_at >= p_month_ago),
+    'recent_students',   (SELECT jsonb_agg(jsonb_build_object('user_id', am.user_id, 'joined_at', am.joined_at, 'full_name', p.full_name))
+                          FROM (SELECT * FROM academy_members WHERE academy_id = p_academy_id AND role = 'student' AND is_active ORDER BY joined_at DESC LIMIT 5) am
+                          LEFT JOIN profiles p ON p.id = am.user_id),
+    'recent_workouts',   (SELECT jsonb_agg(jsonb_build_object('id', wl.id, 'created_at', wl.created_at, 'student_id', wl.student_id, 'duration_seconds', wl.duration_seconds, 'sheet_id', wl.sheet_id))
+                          FROM (SELECT * FROM workout_logs WHERE academy_id = p_academy_id ORDER BY created_at DESC LIMIT 8) wl)
+    -- + outros campos que o dashboard usa
+  );
+$$;
+```
+
+**Por que ainda não foi feito:** sem Supabase local rodando (Docker Desktop instalado mas precisa estar ligado) não dá pra validar a função antes de aplicar em prod. Decidir entre: (a) ligar Docker + `supabase start` pra testar local, (b) escrever a RPC em uma branch staging do projeto Supabase, (c) aplicar em prod e iterar (SECURITY INVOKER limita o blast radius — não pode escalar privilégio).
+
 ### Zustand
 - Store global apenas para: usuário logado, `academy_id` ativo e `role`
 - Estado de UI (loading, modal aberto) fica local com `useState`
@@ -541,6 +574,7 @@ Rodar da **raiz do monorepo** (`GymFlow-main/`), não de `apps/web/`:
 - `doppler run -- pnpm --filter @gymflow/web dev` — dev server com envs reais (recomendado)
 - `pnpm dev` — dev server sem Doppler (precisa de `.env.local` manual em `apps/web/`)
 - **`pnpm --filter @gymflow/web dev:webpack`** — dev sem Turbopack. **Use sempre que estiver mexendo com Sentry, next-pwa ou outros plugins webpack-style.** Turbopack quebra com a combinação Sentry + next-pwa: o erro típico é `TurbopackInternalError: Next.js package not found` ou `Module not found: Can't resolve '@sentry/nextjs'` no `instrumentation.ts`. O próprio Sentry recomenda no warning de boot: "we recommend temporarily removing the `--turbo` flag while you are developing locally".
+- **`supabase start`** (precisa Docker Desktop **rodando**, não só instalado) — sobe Postgres local em containers e Supabase Studio em `localhost:54323`. Queries ficam ~10x mais rápidas que prod (~5-20ms vs ~150-300ms WAN). Não usado hoje por inércia, mas é o maior ganho disponível pra dev se você ligar o Docker.
 
 **Status Turbopack (out/2026):** não viável com a stack atual. Sentry SDK não suporta + next-pwa injeta plugin webpack que turbopack ignora. Esperar maturação ao longo de 2026 ou remover uma das duas deps pra reativar.
 

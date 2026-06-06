@@ -1,15 +1,21 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import {
-  Users, Activity, TrendingUp, Calendar, ArrowUpRight,
+  Users, Activity, TrendingUp, Calendar,
   Dumbbell, ChevronRight, Plus, UserPlus, Building2,
-  ClipboardList, ArrowRight, Flame, AlertTriangle, Clock, Play, CheckCircle2,
+  ClipboardList, Flame, AlertTriangle, Clock, Play, CheckCircle2,
   ShieldCheck, BarChart3, BookOpen, CalendarCheck, Trophy, Timer, Check,
   Video, Sparkles, X, Loader2, Settings,
 } from 'lucide-react'
+
+import {
+  stagger, fadeUp, dateKey, computeStreak, formatTimeAgo, formatDuration,
+  StatCard, EmptyState, AlertBanner, QuickAction,
+} from './_components'
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import Link from 'next/link'
 
@@ -17,13 +23,18 @@ import { toast } from 'sonner'
 
 import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
-import { FrequencyHeatmap } from '@/components/charts/frequency-heatmap'
 import { createClient } from '@/lib/supabase/client'
-import { StudentBioView } from '@/components/bioimpedance/student-bio-view'
+// Pesos: heatmap + bio-view só carregam quando a respectiva seção renderiza.
+// Reduz JS inicial e tempo de compile em dev.
+const FrequencyHeatmap = dynamic(
+  () => import('@/components/charts/frequency-heatmap').then((m) => m.FrequencyHeatmap),
+  { ssr: false, loading: () => <div className="h-32 rounded-xl bg-surface-100 animate-pulse" /> }
+)
+const StudentBioView = dynamic(
+  () => import('@/components/bioimpedance/student-bio-view').then((m) => m.StudentBioView),
+  { ssr: false, loading: () => <div className="h-48 rounded-xl bg-surface-100 animate-pulse" /> }
+)
 import { Skeleton } from '@/components/ui/skeleton'
-
-const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.07 } } }
-const fadeUp  = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } } }
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -103,119 +114,6 @@ const FREE_DURATIONS = [
   { label: '1h',    value: 60 },
   { label: '1h30',  value: 90 },
 ]
-
-// ─────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────
-function dateKey(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-function computeStreak(timestamps: string[]) {
-  if (!timestamps.length) return 0
-  const daySet = new Set(timestamps.map(t => dateKey(new Date(t))))
-  const cursor = new Date(); cursor.setHours(0, 0, 0, 0)
-  if (!daySet.has(dateKey(cursor))) cursor.setDate(cursor.getDate() - 1)
-  let streak = 0
-  while (daySet.has(dateKey(cursor))) { streak++; cursor.setDate(cursor.getDate() - 1) }
-  return streak
-}
-function formatTimeAgo(dateStr: string) {
-  const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000)
-  if (mins < 60) return `${mins}min atrás`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h atrás`
-  const days = Math.floor(hours / 24)
-  if (days === 1) return 'ontem'
-  if (days < 7) return `${days}d atrás`
-  return new Date(dateStr).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })
-}
-function formatDuration(seconds: number) {
-  const mins = Math.floor(seconds / 60)
-  if (mins < 60) return `${mins}min`
-  const h = Math.floor(mins / 60), m = mins % 60
-  return m > 0 ? `${h}h${m}min` : `${h}h`
-}
-
-// ─────────────────────────────────────────────────────────────
-// UI components
-// ─────────────────────────────────────────────────────────────
-function StatCard({ label, value, delta, icon: Icon, color, suffix = '', empty = false, warning = false }: {
-  label: string; value: number; delta?: string; icon: React.ComponentType<{ className?: string }>
-  color: string; suffix?: string; empty?: boolean; warning?: boolean
-}) {
-  return (
-    <motion.div variants={fadeUp} className={cn(
-      'stat-card group transition-all duration-300 hover:-translate-y-0.5',
-      warning ? 'hover:border-amber-500/30' : 'hover:border-brand-500/20',
-    )}>
-      <div className="flex items-center justify-between">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{ background: `${color}18`, border: `1px solid ${color}25` }}>
-          <span style={{ color }}><Icon className="w-4 h-4" /></span>
-        </div>
-        {delta && !empty && (
-          <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full flex items-center gap-1',
-            delta.startsWith('+') ? 'text-emerald-400 bg-emerald-500/10' : 'text-red-400 bg-red-500/10')}>
-            <ArrowUpRight className="w-3 h-3" />{delta}
-          </span>
-        )}
-      </div>
-      <div>
-        <p className={cn('text-2xl font-display font-extrabold tracking-tight', empty && 'text-muted-foreground/40')}>
-          {empty ? '—' : `${value}${suffix}`}
-        </p>
-        <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
-      </div>
-    </motion.div>
-  )
-}
-
-function EmptyState({ icon: Icon, title, description, cta, ctaHref }: {
-  icon: React.ComponentType<{ className?: string }>; title: string; description: string; cta: string; ctaHref: string
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
-      <div className="w-14 h-14 rounded-2xl bg-surface-200 flex items-center justify-center mb-4">
-        <Icon className="w-6 h-6 text-muted-foreground/50" />
-      </div>
-      <p className="font-semibold text-sm">{title}</p>
-      <p className="text-xs text-muted-foreground mt-1 max-w-[220px]">{description}</p>
-      <Link href={ctaHref} className="btn-primary text-xs py-2 px-4 rounded-xl mt-4 inline-flex items-center gap-1.5">
-        {cta} <ArrowRight className="w-3.5 h-3.5" />
-      </Link>
-    </div>
-  )
-}
-
-function AlertBanner({ icon: Icon, color, children }: {
-  icon: React.ComponentType<{ className?: string }>; color: string; children: React.ReactNode
-}) {
-  return (
-    <div className="flex items-center gap-3 p-3 rounded-xl border"
-      style={{ background: `${color}08`, borderColor: `${color}20` }}>
-      <span style={{ color }}><Icon className="w-4 h-4 flex-shrink-0" /></span>
-      <p className="text-xs">{children}</p>
-    </div>
-  )
-}
-
-function QuickAction({ icon: Icon, label, sublabel, href, color }: {
-  icon: React.ComponentType<{ className?: string }>; label: string; sublabel?: string; href: string; color: string
-}) {
-  return (
-    <Link href={href} className="flex items-center gap-3 p-3 rounded-xl hover:bg-surface-200 transition-all group">
-      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all group-hover:scale-105"
-        style={{ background: `${color}18` }}>
-        <span style={{ color }}><Icon className="w-4 h-4" /></span>
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium">{label}</p>
-        {sublabel && <p className="text-[10px] text-muted-foreground">{sublabel}</p>}
-      </div>
-      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />
-    </Link>
-  )
-}
 
 // ─────────────────────────────────────────────────────────────
 // Page
@@ -633,6 +531,10 @@ export default function DashboardPage() {
   const streakAtRisk    = studentStats.streak > 0 && !trainedToday
 
   return (
+    // Em dev, força reducedMotion pra desligar transições do framer-motion. Em prod,
+    // respeita prefers-reduced-motion do usuário. Tira ~30-50% de overhead de render
+    // em dashboards com muitos motion.div animados em paralelo.
+    <MotionConfig reducedMotion={process.env.NODE_ENV === 'development' ? 'always' : 'user'}>
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6">
 
       {/* Welcome */}
@@ -710,8 +612,10 @@ export default function DashboardPage() {
           <motion.div variants={stagger} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <StatCard label="Total de alunos"     value={ownerMetrics.totalStudents}    delta={ownerMetrics.newThisMonth > 0 ? `+${ownerMetrics.newThisMonth}` : undefined} icon={Users}       color="#6366F1" empty={ownerMetrics.totalStudents === 0} />
             <StatCard label="Novos este mês"      value={ownerMetrics.newThisMonth}                                                                                         icon={UserPlus}    color="#10B981" empty={ownerMetrics.newThisMonth === 0} />
-            {!isPersonalPlan && (
+            {!isPersonalPlan ? (
               <StatCard label="Personais ativos"    value={ownerMetrics.activePersonals}                                                                                      icon={ShieldCheck} color="#8B5CF6" empty={ownerMetrics.activePersonals === 0} />
+            ) : (
+              <StatCard label="Sem ficha"           value={ownerMetrics.studentsWithoutSheets}                                                                                icon={ClipboardList} color="#8B5CF6" empty={ownerMetrics.studentsWithoutSheets === 0} />
             )}
             <StatCard label="Engajamento"         value={engagementPct} suffix="%"                                                                                          icon={Activity}    color="#06B6D4" empty={ownerMetrics.totalStudents === 0} />
             <StatCard label="Treinos esta semana" value={ownerMetrics.workoutsThisWeek} delta={workoutsDelta}                                                               icon={Dumbbell}    color="#F59E0B" empty={ownerMetrics.totalStudents === 0} />
@@ -1013,8 +917,9 @@ export default function DashboardPage() {
 
           {/* Main grid */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* My students */}
-            <motion.div variants={fadeUp} className="xl:col-span-2 glass rounded-2xl p-5">
+            {/* My students + Bio do personal vinculado */}
+            <motion.div variants={fadeUp} className="xl:col-span-2 space-y-4">
+            <div className="glass rounded-2xl p-5">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="font-display font-bold">Meus alunos</h3>
@@ -1050,6 +955,8 @@ export default function DashboardPage() {
                   ))}
                 </div>
               )}
+            </div>
+
             </motion.div>
 
             {/* Right col */}
@@ -1667,5 +1574,6 @@ export default function DashboardPage() {
       )}
 
     </motion.div>
+    </MotionConfig>
   )
 }
