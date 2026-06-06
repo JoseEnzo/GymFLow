@@ -103,7 +103,7 @@ git status
 git add .                     # todos os arquivos
 
 # 4. Criar o commit com mensagem
-git commit -m "Correção dos fluxos"
+git commit -m "Feat receitas"
 
 # 5. Enviar pro GitHub
 git push origin main:JoseEnzo
