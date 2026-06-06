@@ -1,5 +1,9 @@
 import { ImageResponse } from 'next/og'
 
+// Favicon (32×32) usado por browser tabs, Google search results, etc.
+// IMPORTANTE: sem `borderRadius`. Google envolve o favicon no container redondo
+// dele — se o ícone já tiver cantos arredondados, vira "ícone dentro de ícone".
+// O quadrado preenche o canvas inteiro; quem arredonda é quem renderiza.
 export const size = { width: 32, height: 32 }
 export const contentType = 'image/png'
 
@@ -10,13 +14,15 @@ export default function Icon() {
         style={{
           width: 32,
           height: 32,
-          borderRadius: 8,
-          background: 'linear-gradient(135deg, #818cf8, #6366f1)',
+          background: 'linear-gradient(135deg, #818cf8, #4f46e5)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
+        {/* Dumbbell — paths simples (linhas + retângulos) renderizam limpos em 32px.
+            Os paths com arcos curvos do Dumbbell moderno do lucide ficam mushy
+            nesse tamanho por causa do anti-aliasing. */}
         <svg
           width="20"
           height="20"

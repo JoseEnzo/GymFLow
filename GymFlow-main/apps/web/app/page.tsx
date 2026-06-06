@@ -717,6 +717,7 @@ const personas = [
 
 function PersonasSection() {
   const [activeRole, setActiveRole] = useState(0)
+  const isAuthenticated = useAuthStore((s) => !!s.profile)
 
   return (
     <section className="relative py-24 lg:py-32 overflow-hidden">
@@ -800,11 +801,11 @@ function PersonasSection() {
                   </div>
                   <div className="mt-7 pt-7 border-t border-border/40">
                     <Link
-                      href="/cadastro"
+                      href={isAuthenticated ? '/dashboard' : '/cadastro'}
                       className="inline-flex items-center gap-2 font-semibold text-sm transition-all"
                       style={{ color: p.color }}
                     >
-                      Criar conta gratuita
+                      {isAuthenticated ? 'Ir pro dashboard' : 'Criar conta gratuita'}
                       <ChevronRight className="w-4 h-4" />
                     </Link>
                   </div>
@@ -995,6 +996,7 @@ const plans = [
 ]
 
 function PricingSection() {
+  const isAuthenticated = useAuthStore((s) => !!s.profile)
   return (
     <section id="preco" className="relative py-24 lg:py-32 overflow-hidden">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -1069,7 +1071,7 @@ function PricingSection() {
               </ul>
 
               <Link
-                href={plan.href}
+                href={isAuthenticated ? '/dashboard' : plan.href}
                 className={cn(
                   'btn text-sm py-3 rounded-xl text-center font-bold',
                   plan.popular
@@ -1077,7 +1079,7 @@ function PricingSection() {
                     : 'bg-surface-200 text-foreground hover:bg-surface-300 border border-border'
                 )}
               >
-                {plan.cta}
+                {isAuthenticated ? 'Ir pro dashboard' : plan.cta}
               </Link>
             </motion.div>
           ))}

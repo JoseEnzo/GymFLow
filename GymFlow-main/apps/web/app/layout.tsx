@@ -49,15 +49,18 @@ export const metadata: Metadata = {
     creator: '@gymflow',
   },
   manifest: '/manifest.json',
-  // Ícones PNG vivem em /public/icons (192/512 + maskable). Apple Touch Icon
-  // fica em /public/apple-touch-icon.png (180x180). Sem esses PNGs, Chrome
-  // não considera a app instalável.
+  // Apple touch icon vem de `app/apple-icon.tsx` (Next.js gera dinamicamente
+  // em 180x180 com o gradient indigo + dumbbell). Não setamos `icons.apple`
+  // aqui de propósito — Next.js detecta automaticamente o arquivo de convenção
+  // e setar manualmente sobrescreve isso e quebra o flow.
+  //
+  // PNGs do Android (192/512 + maskable) ainda precisam ser gerados em
+  // /public/icons — Chrome usa eles pra prompt de install.
   icons: {
     icon: [
       { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
       { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
     ],
-    apple: '/apple-touch-icon.png',
   },
   appleWebApp: {
     capable: true,
