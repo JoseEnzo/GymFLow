@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, Suspense, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -50,7 +50,7 @@ type Role = 'owner' | 'personal' | 'student' | null
 function OnboardingContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const { profile, academies } = useAuthStore()
 
   const [role, setRole] = useState<Role>(null)
@@ -63,6 +63,7 @@ function OnboardingContent() {
   const [hasInvite, setHasInvite] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
   const [step, setStep] = useState<'role' | 'plan' | 'academy' | 'invite'>('role')
+  const [authChecked, setAuthChecked] = useState(false)
 
   // Usuário já configurado → direto ao dashboard
   useEffect(() => {
@@ -72,7 +73,13 @@ function OnboardingContent() {
   // Pula seleção de perfil se account_type já está no metadata (login com credenciais)
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      const accountType = data.user?.user_metadata?.['account_type'] as string | undefined
+      // Não autenticado → redireciona para login
+      if (!data.user) {
+        router.replace('/login')
+        return
+      }
+
+      const accountType = data.user.user_metadata?.['account_type'] as string | undefined
       const planFromUrl       = searchParams.get('plan')
       const isAcademyPlan     = PLANS.some(x => x.id === planFromUrl)
 
@@ -80,10 +87,7 @@ function OnboardingContent() {
       if (isAcademyPlan) {
         setRole('owner')
         setStep('academy')
-        return
-      }
-
-      if (accountType === 'student') {
+      } else if (accountType === 'student') {
         setRole('student')
         setStep('invite')
       } else if (accountType === 'owner') {
@@ -96,6 +100,7 @@ function OnboardingContent() {
         setPlan('personal')
         setStep('plan')
       }
+      setAuthChecked(true)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -113,14 +118,22 @@ function OnboardingContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), plan }),
       })
-      const { academy: newAcademy, checkoutUrl, error } = await res.json()
-      if (!res.ok) throw new Error(error ?? 'Erro ao criar academia')
+      const json = await res.json()
 
-      useAuthStore.getState().setCurrentAcademy(newAcademy, 'owner')
-      useAuthStore.getState().setAcademies([{ academy: newAcademy, role: 'owner' }])
+      if (res.status === 409) {
+        toast.error(json.error ?? 'CNPJ já cadastrado em outra academia.')
+        await supabase.auth.signOut()
+        router.replace('/cadastro')
+        return
+      }
 
-      if (checkoutUrl) {
-        window.location.href = checkoutUrl
+      if (!res.ok) throw new Error(json.error ?? 'Erro ao criar academia')
+
+      useAuthStore.getState().setCurrentAcademy(json.academy, 'owner')
+      useAuthStore.getState().setAcademies([{ academy: json.academy, role: 'owner' }])
+
+      if (json.checkoutUrl) {
+        window.location.href = json.checkoutUrl
         return
       }
 
@@ -158,6 +171,10 @@ function OnboardingContent() {
   }
 
   // ─────────────────────────────────────────────────────────
+  if (!authChecked) {
+    return <div className="min-h-screen bg-background" />
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       {/* Logo (link smart) */}

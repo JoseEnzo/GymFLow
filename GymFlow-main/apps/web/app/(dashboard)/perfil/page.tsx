@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   User, Camera, Save, Loader2, CheckCircle2,
@@ -81,7 +81,7 @@ function Field({
 export default function PerfilPage() {
   const { profile: storeProfile, setProfile, currentAcademy, currentRole } = useAuthStore()
   const isStudent = currentRole === 'student'
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const [profile, setLocalProfile] = useState<Profile | null>(storeProfile)
   const [editing, setEditing] = useState(false)
