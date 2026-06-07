@@ -5,12 +5,13 @@ import Stripe from 'stripe'
 import { stripe } from '@/lib/stripe'
 import { createAdminClient } from '@/lib/supabase/server'
 
-const PLAN_MAP: Record<string, 'starter' | 'pro'> = {
+const PLAN_MAP: Record<string, 'starter' | 'pro' | 'personal'> = {
   [process.env['STRIPE_PRICE_STARTER_MONTHLY']!]: 'starter',
   [process.env['STRIPE_PRICE_PRO_MONTHLY']!]: 'pro',
+  [process.env['STRIPE_PRICE_PERSONAL_MONTHLY']!]: 'personal',
 }
 
-const VALID_ACADEMY_PLANS = ['starter', 'pro'] as const
+const VALID_ACADEMY_PLANS = ['starter', 'pro', 'personal'] as const
 type AcademyPlan = (typeof VALID_ACADEMY_PLANS)[number]
 
 function isAcademyPlan(value: unknown): value is AcademyPlan {

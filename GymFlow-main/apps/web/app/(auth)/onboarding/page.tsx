@@ -62,7 +62,7 @@ function OnboardingContent() {
   const [inviteCode, setInviteCode] = useState('')
   const [hasInvite, setHasInvite] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
-  const [step, setStep] = useState<'role' | 'plan' | 'academy' | 'invite'>('role')
+  const [step, setStep] = useState<'role' | 'personal-invite' | 'plan' | 'academy' | 'invite'>('role')
   const [authChecked, setAuthChecked] = useState(false)
 
   // Usuário já configurado → direto ao dashboard
@@ -96,10 +96,7 @@ function OnboardingContent() {
           setStep('plan')
         } else if (accountType === 'personal') {
           setRole('personal')
-          // Sem isso, o state `plan` ficava no default 'starter' e saveAcademy mandava
-          // plan='starter' pra API mesmo o usuário vendo a tela do R$ 97.
-          setPlan('personal')
-          setStep('plan')
+          setStep('personal-invite')
         }
         setAuthChecked(true)
       })
@@ -139,6 +136,12 @@ function OnboardingContent() {
 
       if (json.checkoutUrl) {
         window.location.href = json.checkoutUrl
+        return
+      }
+
+      if (json.stripeError) {
+        toast.error('Academia criada, mas houve um erro ao iniciar o pagamento. Finalize em Configurações → Plano.')
+        router.push('/configuracoes?tab=plano')
         return
       }
 
@@ -224,7 +227,7 @@ function OnboardingContent() {
                 </button>
 
                 <button
-                  onClick={() => { setRole('personal'); setPlan('personal'); setStep('plan') }}
+                  onClick={() => { setRole('personal'); setStep('personal-invite') }}
                   className="flex items-center gap-4 p-5 rounded-2xl border border-border/60 hover:border-brand-500/40 hover:bg-brand-500/5 text-left transition-all duration-200 group"
                 >
                   <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-500/15 flex-shrink-0 group-hover:scale-105 transition-transform">
@@ -251,6 +254,51 @@ function OnboardingContent() {
                     <p className="text-xs text-muted-foreground mt-0.5">
                       Quero acompanhar meus treinos e evolução
                     </p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto group-hover:translate-x-1 transition-transform" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* ── STEP: personal — tem convite de academia? ── */}
+          {step === 'personal-invite' && (
+            <motion.div key="personal-invite" variants={slide} initial="hidden" animate="show" exit="exit" className="space-y-6">
+              <div>
+                <button onClick={() => setStep('role')} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors">
+                  <ArrowLeft className="w-3.5 h-3.5" /> Voltar
+                </button>
+                <h1 className="text-2xl font-display font-bold">Você tem convite? 🎯</h1>
+                <p className="text-muted-foreground mt-1.5 text-sm">
+                  Se uma academia já te convidou, entre de graça. Senão, crie sua própria conta.
+                </p>
+              </div>
+
+              <div className="grid gap-3">
+                <button
+                  onClick={() => setStep('invite')}
+                  className="flex items-center gap-4 p-5 rounded-2xl border border-border/60 hover:border-emerald-500/40 hover:bg-emerald-500/5 text-left transition-all duration-200 group"
+                >
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-emerald-500/15 flex-shrink-0 group-hover:scale-105 transition-transform">
+                    <Ticket className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">Sim, tenho convite de uma academia</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Vou trabalhar como personal nessa academia — sem custo</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto group-hover:translate-x-1 transition-transform" />
+                </button>
+
+                <button
+                  onClick={() => { setPlan('personal'); setStep('plan') }}
+                  className="flex items-center gap-4 p-5 rounded-2xl border border-border/60 hover:border-brand-500/40 hover:bg-brand-500/5 text-left transition-all duration-200 group"
+                >
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-500/15 flex-shrink-0 group-hover:scale-105 transition-transform">
+                    <Users className="w-6 h-6 text-brand-400" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">Não, trabalho de forma independente</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Vou criar minha própria conta e gerenciar meus alunos</p>
                   </div>
                   <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto group-hover:translate-x-1 transition-transform" />
                 </button>
