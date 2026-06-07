@@ -72,36 +72,41 @@ function OnboardingContent() {
 
   // Pula seleção de perfil se account_type já está no metadata (login com credenciais)
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      // Não autenticado → redireciona para login
-      if (!data.user) {
+    supabase.auth.getUser()
+      .then(({ data }) => {
+        // Não autenticado → redireciona para login
+        if (!data.user) {
+          router.replace('/login')
+          return
+        }
+
+        const accountType = data.user.user_metadata?.['account_type'] as string | undefined
+        const planFromUrl       = searchParams.get('plan')
+        const isAcademyPlan     = PLANS.some(x => x.id === planFromUrl)
+
+        // Plano de academia → pula direto para nomear a academia
+        if (isAcademyPlan) {
+          setRole('owner')
+          setStep('academy')
+        } else if (accountType === 'student') {
+          setRole('student')
+          setStep('invite')
+        } else if (accountType === 'owner') {
+          setRole('owner')
+          setStep('plan')
+        } else if (accountType === 'personal') {
+          setRole('personal')
+          // Sem isso, o state `plan` ficava no default 'starter' e saveAcademy mandava
+          // plan='starter' pra API mesmo o usuário vendo a tela do R$ 97.
+          setPlan('personal')
+          setStep('plan')
+        }
+        setAuthChecked(true)
+      })
+      .catch(() => {
+        // Falha de rede ao verificar sessão — redireciona para login como fallback seguro.
         router.replace('/login')
-        return
-      }
-
-      const accountType = data.user.user_metadata?.['account_type'] as string | undefined
-      const planFromUrl       = searchParams.get('plan')
-      const isAcademyPlan     = PLANS.some(x => x.id === planFromUrl)
-
-      // Plano de academia → pula direto para nomear a academia
-      if (isAcademyPlan) {
-        setRole('owner')
-        setStep('academy')
-      } else if (accountType === 'student') {
-        setRole('student')
-        setStep('invite')
-      } else if (accountType === 'owner') {
-        setRole('owner')
-        setStep('plan')
-      } else if (accountType === 'personal') {
-        setRole('personal')
-        // Sem isso, o state `plan` ficava no default 'starter' e saveAcademy mandava
-        // plan='starter' pra API mesmo o usuário vendo a tela do R$ 97.
-        setPlan('personal')
-        setStep('plan')
-      }
-      setAuthChecked(true)
-    })
+      })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -172,7 +177,11 @@ function OnboardingContent() {
 
   // ─────────────────────────────────────────────────────────
   if (!authChecked) {
-    return <div className="min-h-screen bg-background" />
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (

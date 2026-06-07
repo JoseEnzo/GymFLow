@@ -127,7 +127,7 @@ function LoginInner() {
   const turnstileRef = useRef<TurnstileRef>(null)
 
   const { register, handleSubmit, setValue, reset, formState: { errors } } =
-    useForm<FormData>({ resolver: zodResolver(schema) })
+    useForm<FormData>({ resolver: zodResolver(schema), defaultValues: { identifier: '', password: '' } })
 
   // O callback de OAuth redireciona pra /login?error=auth_callback_failed quando
   // o login social falha. Avisa o usuário (toast funciona em qualquer etapa).
