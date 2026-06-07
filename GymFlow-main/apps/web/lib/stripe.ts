@@ -1,8 +1,27 @@
 import Stripe from 'stripe'
 
-export const stripe = new Stripe(process.env['STRIPE_SECRET_KEY']!, {
-  apiVersion: '2025-02-24.acacia',
-  typescript: true,
+let _stripe: Stripe | null = null
+function getStripeClient(): Stripe {
+  if (!_stripe) {
+    _stripe = new Stripe(process.env['STRIPE_SECRET_KEY']!, {
+      apiVersion: '2025-02-24.acacia',
+      typescript: true,
+    })
+  }
+  return _stripe
+}
+
+// Lazy: o Stripe só é instanciado no primeiro acesso a uma propriedade (em
+// runtime, dentro dos handlers). Sem isso, `new Stripe(undefined)` rodava no
+// carregamento do módulo e quebrava o `next build` na fase "Collecting page
+// data" quando STRIPE_SECRET_KEY não está definida (deploy sem Stripe +
+// SKIP_STRIPE_CHECKOUT=true). Os call sites (`stripe.checkout...`) não mudam.
+export const stripe = new Proxy({} as Stripe, {
+  get(_target, prop) {
+    const client = getStripeClient()
+    const value = Reflect.get(client, prop)
+    return typeof value === 'function' ? value.bind(client) : value
+  },
 })
 
 export const PLANS = {
