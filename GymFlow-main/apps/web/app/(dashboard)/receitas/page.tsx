@@ -564,26 +564,39 @@ function ReceitasContent() {
   // Owner tem as mesmas capacidades de personal (criar e atribuir receitas).
   const isPersonal = currentRole === 'personal' || currentRole === 'owner'
 
+  const [activeTab, setActiveTab] = useState<'receitas' | 'ingredientes'>('receitas')
   const [recipes, setRecipes] = useState<Recipe[]>([])
+  const [foods, setFoods] = useState<FoodItem[]>([])
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selectedMeal, setSelectedMeal] = useState<MealType | null>(mealParam ?? null)
   const [showModal, setShowModal] = useState(false)
   const [adding, setAdding] = useState<string | null>(null)
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set())
+  const [addedFoodIds, setAddedFoodIds] = useState<Set<string>>(new Set())
   const [planName, setPlanName] = useState('')
   const [pending, setPending] = useState<Recipe | null>(null)
+  const [pendingFood, setPendingFood] = useState<FoodItem | null>(null)
   const [detail, setDetail] = useState<Recipe | null>(null)
 
   useEffect(() => {
     async function load() {
-      let query = supabase.from('recipes').select(RECIPE_COLS).order('name')
-      if (currentAcademy) query = query.or(`is_global.eq.true,academy_id.eq.${currentAcademy.id}`)
-      else query = query.eq('is_global', true)
+      let rq = supabase.from('recipes').select(RECIPE_COLS).order('name')
+      let fq = supabase.from('food_items').select(FOOD_COLS).order('name')
+      if (currentAcademy) {
+        rq = rq.or(`is_global.eq.true,academy_id.eq.${currentAcademy.id}`)
+        fq = fq.or(`is_global.eq.true,academy_id.eq.${currentAcademy.id}`)
+      } else {
+        rq = rq.eq('is_global', true)
+        fq = fq.eq('is_global', true)
+      }
 
-      const { data, error } = await query
-      if (error) { toast.error('Erro ao carregar receitas.'); setLoading(false); return }
-      setRecipes((data ?? []) as Recipe[])
+      const [rRes, fRes] = await Promise.all([rq, fq])
+      if (rRes.error) toast.error('Erro ao carregar receitas.')
+      else setRecipes((rRes.data ?? []) as Recipe[])
+      if (fRes.error) toast.error('Erro ao carregar ingredientes.')
+      else setFoods((fRes.data ?? []) as FoodItem[])
       setLoading(false)
     }
     load()
@@ -631,6 +644,41 @@ function ReceitasContent() {
     }
   }
 
+  async function handleAddFoodToPlan(food: FoodItem, cfg: AddFoodConfig) {
+    if (!addTo || !mealParam || addedFoodIds.has(food.id)) return
+    setAdding(food.id)
+    try {
+      let countQuery = supabase
+        .from('meal_plan_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('plan_id', addTo)
+        .eq('meal_type', mealParam)
+      if (dayIndex !== null) countQuery = countQuery.eq('day_index', dayIndex)
+      const { count } = await countQuery
+
+      const { error } = await supabase.from('meal_plan_items').insert({
+        plan_id: addTo,
+        food_item_id: food.id,
+        recipe_id: null,
+        meal_type: mealParam,
+        order_index: count ?? 0,
+        servings: 1,
+        grams: cfg.grams,
+        notes: cfg.notes || null,
+        ...(dayIndex !== null ? { day_index: dayIndex } : {}),
+      })
+
+      if (error) throw error
+      setAddedFoodIds((prev) => new Set([...prev, food.id]))
+      setPendingFood(null)
+      toast.success('Ingrediente adicionado ao plano!')
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? 'Erro ao adicionar ingrediente.')
+    } finally {
+      setAdding(null)
+    }
+  }
+
   const filtered = recipes.filter((r) => {
     const matchSearch = r.name.toLowerCase().includes(search.toLowerCase()) ||
       r.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()))
@@ -638,7 +686,18 @@ function ReceitasContent() {
     return matchSearch && matchMeal
   })
 
-  const hasActiveFilter = search || selectedMeal
+  const filteredFoods = foods.filter((f) => {
+    const matchSearch = f.name.toLowerCase().includes(search.toLowerCase()) ||
+      (f.category ?? '').toLowerCase().includes(search.toLowerCase())
+    const matchCategory = !selectedCategory || f.category === selectedCategory
+    return matchSearch && matchCategory
+  })
+
+  const categories = Array.from(new Set(foods.map((f) => f.category).filter(Boolean) as string[])).sort()
+
+  const hasActiveFilter = activeTab === 'receitas'
+    ? !!(search || selectedMeal)
+    : !!(search || selectedCategory)
 
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6">
@@ -652,7 +711,7 @@ function ReceitasContent() {
             <p className="text-sm font-semibold text-brand-300">Adicionar à {mealLabel}</p>
             <p className="text-xs text-muted-foreground truncate">{planName || 'Carregando...'}</p>
           </div>
-          {addedIds.size > 0 && <span className="badge-success text-[10px]">{addedIds.size} adicionada{addedIds.size > 1 ? 's' : ''}</span>}
+          {(addedIds.size + addedFoodIds.size) > 0 && <span className="badge-success text-[10px]">{addedIds.size + addedFoodIds.size} adicionado{(addedIds.size + addedFoodIds.size) > 1 ? 's' : ''}</span>}
           <button onClick={() => router.push(`/dietas/${addTo}`)} className="btn-primary text-xs py-2 px-4 rounded-xl">Concluir</button>
         </motion.div>
       )}
@@ -660,52 +719,109 @@ function ReceitasContent() {
       {/* Header */}
       <motion.div variants={fadeUp} className="flex items-center justify-between">
         <div>
-          <h2 className="section-title">Biblioteca de Receitas</h2>
-          <p className="section-subtitle mt-1">{loading ? 'Carregando...' : `${recipes.length} receitas disponíveis`}</p>
+          <h2 className="section-title">{activeTab === 'receitas' ? 'Biblioteca de Receitas' : 'Ingredientes'}</h2>
+          <p className="section-subtitle mt-1">
+            {loading
+              ? 'Carregando...'
+              : activeTab === 'receitas'
+                ? `${recipes.length} receitas disponíveis`
+                : `${foods.length} ingredientes disponíveis`}
+          </p>
         </div>
-        {isPersonal && !addTo && (
+        {isPersonal && !addTo && activeTab === 'receitas' && (
           <button onClick={() => setShowModal(true)} className="btn-primary text-sm py-2.5 px-5 rounded-xl">
             <Plus className="w-4 h-4" /> Nova receita
           </button>
         )}
       </motion.div>
 
+      {/* Tab switcher */}
+      <motion.div variants={fadeUp}>
+        <div className="inline-flex p-1 rounded-2xl bg-surface-100 border border-border/60">
+          <button
+            onClick={() => setActiveTab('receitas')}
+            className={cn('px-5 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2',
+              activeTab === 'receitas'
+                ? 'bg-card text-foreground shadow-md border border-border/60'
+                : 'text-muted-foreground hover:text-foreground')}>
+            <UtensilsCrossed className="w-4 h-4" /> Receitas
+          </button>
+          <button
+            onClick={() => setActiveTab('ingredientes')}
+            className={cn('px-5 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2',
+              activeTab === 'ingredientes'
+                ? 'bg-card text-foreground shadow-md border border-border/60'
+                : 'text-muted-foreground hover:text-foreground')}>
+            <Apple className="w-4 h-4" /> Ingredientes
+          </button>
+        </div>
+      </motion.div>
+
       {/* Filtros */}
       <motion.div variants={fadeUp} className="space-y-3">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar receitas, tags..." className="field pl-10" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={activeTab === 'receitas' ? 'Buscar receitas, tags...' : 'Buscar ingredientes, categoria...'}
+            className="field pl-10" />
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          <button onClick={() => setSelectedMeal(null)}
-            className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap flex-shrink-0',
-              !selectedMeal ? 'bg-brand-500/15 text-brand-300 border-brand-500/30' : 'border-border/60 text-muted-foreground hover:border-border')}>
-            Todas
-          </button>
-          {MEAL_TYPES.map((m) => {
-            const color = MEAL_TYPE_COLORS[m] ?? '#6366F1'
-            const active = selectedMeal === m
-            return (
-              <button key={m} onClick={() => setSelectedMeal(active ? null : m)}
-                className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap flex-shrink-0', active ? 'text-white' : 'text-muted-foreground hover:text-foreground')}
-                style={active ? { background: color, borderColor: color } : { borderColor: 'hsl(var(--border) / 0.6)' }}>
-                {MEAL_TYPE_EMOJI[m]} {MEAL_TYPE_LABELS[m]}
-              </button>
-            )
-          })}
-        </div>
+        {activeTab === 'receitas' ? (
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <button onClick={() => setSelectedMeal(null)}
+              className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap flex-shrink-0',
+                !selectedMeal ? 'bg-brand-500/15 text-brand-300 border-brand-500/30' : 'border-border/60 text-muted-foreground hover:border-border')}>
+              Todas
+            </button>
+            {MEAL_TYPES.map((m) => {
+              const color = MEAL_TYPE_COLORS[m] ?? '#6366F1'
+              const active = selectedMeal === m
+              return (
+                <button key={m} onClick={() => setSelectedMeal(active ? null : m)}
+                  className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap flex-shrink-0', active ? 'text-white' : 'text-muted-foreground hover:text-foreground')}
+                  style={active ? { background: color, borderColor: color } : { borderColor: 'hsl(var(--border) / 0.6)' }}>
+                  {MEAL_TYPE_EMOJI[m]} {MEAL_TYPE_LABELS[m]}
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <button onClick={() => setSelectedCategory(null)}
+              className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap flex-shrink-0',
+                !selectedCategory ? 'bg-brand-500/15 text-brand-300 border-brand-500/30' : 'border-border/60 text-muted-foreground hover:border-border')}>
+              Todas
+            </button>
+            {categories.map((c) => {
+              const color = CATEGORY_COLORS[c] ?? '#6366F1'
+              const active = selectedCategory === c
+              return (
+                <button key={c} onClick={() => setSelectedCategory(active ? null : c)}
+                  className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-all whitespace-nowrap flex-shrink-0', active ? 'text-white' : 'text-muted-foreground hover:text-foreground')}
+                  style={active ? { background: color, borderColor: color } : { borderColor: 'hsl(var(--border) / 0.6)' }}>
+                  {CATEGORY_LABELS[c] ?? c}
+                </button>
+              )
+            })}
+          </div>
+        )}
       </motion.div>
 
       <motion.div variants={fadeUp} className="text-xs text-muted-foreground">
-        {loading ? 'Carregando...' : `${filtered.length} receita${filtered.length !== 1 ? 's' : ''} encontrada${filtered.length !== 1 ? 's' : ''}`}
+        {loading
+          ? 'Carregando...'
+          : activeTab === 'receitas'
+            ? `${filtered.length} receita${filtered.length !== 1 ? 's' : ''} encontrada${filtered.length !== 1 ? 's' : ''}`
+            : `${filteredFoods.length} ingrediente${filteredFoods.length !== 1 ? 's' : ''} encontrado${filteredFoods.length !== 1 ? 's' : ''}`}
       </motion.div>
 
       {loading && (
         <div className="flex justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-brand-400" /></div>
       )}
 
-      {!loading && (
+      {!loading && activeTab === 'receitas' && (
         <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtered.map((r) => {
             const primaryMeal = r.meal_types[0]
@@ -757,7 +873,58 @@ function ReceitasContent() {
         </motion.div>
       )}
 
-      {!loading && filtered.length === 0 && (
+      {!loading && activeTab === 'ingredientes' && (
+        <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredFoods.map((f) => {
+            const color = f.category ? (CATEGORY_COLORS[f.category] ?? '#6366F1') : '#6366F1'
+            const isAdded = addedFoodIds.has(f.id)
+            const isAddingThis = adding === f.id
+            return (
+              <motion.div key={f.id} variants={fadeUp}>
+                <div
+                  onClick={() => { if (addTo && !isAdded) setPendingFood(f) }}
+                  className={cn('glass rounded-2xl p-4 group hover:border-brand-500/20 hover:-translate-y-0.5 transition-all duration-300 hover:shadow-card-hover',
+                    addTo ? 'cursor-pointer' : 'cursor-default',
+                    isAdded && 'border-emerald-500/20 bg-emerald-500/3')}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110"
+                      style={{ background: `${color}15`, border: `1px solid ${color}25` }}>
+                      <Apple style={{ color, width: '1.125rem', height: '1.125rem' }} />
+                    </div>
+                    {f.category && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium"
+                        style={{ background: `${color}15`, color, border: `1px solid ${color}30` }}>
+                        {CATEGORY_LABELS[f.category] ?? f.category}
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="font-semibold text-sm leading-snug mb-1 line-clamp-2">{f.name}</h3>
+                  <p className="text-[10px] text-muted-foreground mb-2">por 100g</p>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <MacroPill icon={Flame} value={f.kcal_per_100g} unit=" kcal" color="#F97316" />
+                    <MacroPill icon={Beef} value={f.protein_per_100g} unit="g" color="#EC4899" />
+                    <MacroPill icon={Wheat} value={f.carbs_per_100g} unit="g" color="#6366F1" />
+                    <MacroPill icon={Droplet} value={f.fat_per_100g} unit="g" color="#10B981" />
+                  </div>
+                  {addTo && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); if (!isAdded) setPendingFood(f) }}
+                      disabled={isAdded || isAddingThis}
+                      className={cn('w-full mt-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5',
+                        isAdded ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 cursor-default' : 'bg-brand-500/15 text-brand-400 border border-brand-500/20 hover:bg-brand-500/25')}
+                    >
+                      {isAddingThis ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : isAdded ? <><Check className="w-3.5 h-3.5" /> Adicionado</> : <><Plus className="w-3.5 h-3.5" /> Adicionar</>}
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )
+          })}
+        </motion.div>
+      )}
+
+      {!loading && activeTab === 'receitas' && filtered.length === 0 && (
         <motion.div variants={fadeUp} className="text-center py-20">
           <div className="w-14 h-14 rounded-2xl bg-surface-200 flex items-center justify-center mx-auto mb-4">
             <UtensilsCrossed className="w-7 h-7 text-muted-foreground/40" />
@@ -769,12 +936,27 @@ function ReceitasContent() {
         </motion.div>
       )}
 
+      {!loading && activeTab === 'ingredientes' && filteredFoods.length === 0 && (
+        <motion.div variants={fadeUp} className="text-center py-20">
+          <div className="w-14 h-14 rounded-2xl bg-surface-200 flex items-center justify-center mx-auto mb-4">
+            <Apple className="w-7 h-7 text-muted-foreground/40" />
+          </div>
+          <p className="font-semibold text-muted-foreground">Nenhum ingrediente encontrado</p>
+          {hasActiveFilter && (
+            <button onClick={() => { setSearch(''); setSelectedCategory(null) }} className="text-sm text-brand-400 mt-2 hover:underline">Limpar filtros</button>
+          )}
+        </motion.div>
+      )}
+
       <AnimatePresence>
         {showModal && (
           <NewRecipeModal onClose={() => setShowModal(false)} onCreated={(r) => { setRecipes((prev) => [r, ...prev]); setShowModal(false) }} />
         )}
         {pending && (
           <AddToPlanModal recipe={pending} mealLabel={mealLabel} saving={adding === pending.id} onClose={() => setPending(null)} onConfirm={(cfg) => handleAddToPlan(pending, cfg)} />
+        )}
+        {pendingFood && (
+          <AddFoodToPlanModal food={pendingFood} mealLabel={mealLabel} saving={adding === pendingFood.id} onClose={() => setPendingFood(null)} onConfirm={(cfg) => handleAddFoodToPlan(pendingFood, cfg)} />
         )}
         {detail && !addTo && <RecipeDetailModal recipe={detail} onClose={() => setDetail(null)} />}
       </AnimatePresence>
