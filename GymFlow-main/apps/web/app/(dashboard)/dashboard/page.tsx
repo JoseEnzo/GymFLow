@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence, MotionConfig } from 'framer-motion'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
@@ -115,7 +115,7 @@ const FREE_DURATIONS = [
 // ─────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { currentRole, profile, currentAcademy } = useAuthStore()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const isOwner    = currentRole === 'owner'
   const isPersonal = currentRole === 'personal'
   const isStudent  = currentRole === 'student'
