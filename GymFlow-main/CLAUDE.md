@@ -187,38 +187,20 @@ Para **código novo**: use `supabase.from('tabela')` direto, sem cast. Se `as an
 
 Para **limpeza retroativa**: ataque por categoria (queries → casts inline → outros), rodando `pnpm type-check` entre lotes.
 
-#### Otimização do dashboard — pendente
+#### Otimização do dashboard
 
-`apps/web/app/(dashboard)/dashboard/page.tsx` (~1600 linhas) — owner faz ~14 queries Supabase em duas levas de `Promise.all` (linhas ~380 e ~405). Em prod WAN é ~1-1.5s só de network.
+`apps/web/app/(dashboard)/dashboard/page.tsx` — owner agora faz **1 chamada RPC** em vez das 14 queries originais.
 
 **Já aplicado:**
 - `_components.tsx` extraído (StatCard/QuickAction/EmptyState/AlertBanner + helpers) — HMR só recompila o arquivo mexido.
 - `next/dynamic` em FrequencyHeatmap + StudentBioView (carregam só quando renderizam).
 - `memo` nos 4 cards repetidos.
-- `MotionConfig reducedMotion='always'` em dev (`apps/web/app/(dashboard)/dashboard/page.tsx`).
+- `MotionConfig reducedMotion='always'` em dev.
+- **RPC `get_owner_dashboard` (migration 056, out/2026):** consolida counts (students, personals, workouts week/last week, new this month, active this week, inactive, sem ficha) + arrays (recent_students, recent_workouts com profiles+sheet name embedded, inactive_students com last_workout_at, personais_perf com student_count). 14 → 1 roundtrip. Permission check `owner` embutido (`RAISE EXCEPTION OWNER_ONLY`). SECURITY INVOKER, GRANT EXECUTE pra `authenticated`. Aplicado em prod sem fallback — se a RPC falhar, dashboard fica vazio até reload (log em `console.error('get_owner_dashboard failed', ...)`).
 
-**Próximo passo (não feito — risco médio):** RPC `get_owner_dashboard(academy_id, week_ago, month_ago)` que retorna num único JSON: counts (alunos, personais, treinos esta sem, semana passada, novos no mês), arrays (recent_workouts, recent_students, inactive_students, personais_perf). Vira 1 roundtrip em vez de 14. Esqueleto sugerido:
+**Como NÃO quebrar:** qualquer novo campo que o dashboard renderiza precisa **vir da RPC** — adicionar uma query Supabase paralela no `loadOwnerData` reintroduz o problema. Alterar a RPC exige nova migration (não editar 056), regen de types e ajustar o cast `as { ... }` em `loadOwnerData`.
 
-```sql
-CREATE OR REPLACE FUNCTION public.get_owner_dashboard(
-  p_academy_id uuid, p_week_ago timestamptz, p_month_ago timestamptz
-) RETURNS jsonb LANGUAGE sql SECURITY INVOKER STABLE AS $$
-  SELECT jsonb_build_object(
-    'total_students',    (SELECT count(*) FROM academy_members WHERE academy_id = p_academy_id AND role = 'student' AND is_active),
-    'active_personals',  (SELECT count(*) FROM academy_members WHERE academy_id = p_academy_id AND role = 'personal' AND is_active),
-    'workouts_this_week',(SELECT count(*) FROM workout_logs WHERE academy_id = p_academy_id AND created_at >= p_week_ago),
-    'new_this_month',    (SELECT count(*) FROM academy_members WHERE academy_id = p_academy_id AND role = 'student' AND joined_at >= p_month_ago),
-    'recent_students',   (SELECT jsonb_agg(jsonb_build_object('user_id', am.user_id, 'joined_at', am.joined_at, 'full_name', p.full_name))
-                          FROM (SELECT * FROM academy_members WHERE academy_id = p_academy_id AND role = 'student' AND is_active ORDER BY joined_at DESC LIMIT 5) am
-                          LEFT JOIN profiles p ON p.id = am.user_id),
-    'recent_workouts',   (SELECT jsonb_agg(jsonb_build_object('id', wl.id, 'created_at', wl.created_at, 'student_id', wl.student_id, 'duration_seconds', wl.duration_seconds, 'sheet_id', wl.sheet_id))
-                          FROM (SELECT * FROM workout_logs WHERE academy_id = p_academy_id ORDER BY created_at DESC LIMIT 8) wl)
-    -- + outros campos que o dashboard usa
-  );
-$$;
-```
-
-**Por que ainda não foi feito:** sem Supabase local rodando (Docker Desktop instalado mas precisa estar ligado) não dá pra validar a função antes de aplicar em prod. Decidir entre: (a) ligar Docker + `supabase start` pra testar local, (b) escrever a RPC em uma branch staging do projeto Supabase, (c) aplicar em prod e iterar (SECURITY INVOKER limita o blast radius — não pode escalar privilégio).
+Os paths `loadPersonalData` e `loadStudentData` continuam usando queries diretas (volumes menores; otimizar só se virarem gargalo).
 
 ### Zustand
 - Store global apenas para: usuário logado, `academy_id` ativo e `role`
@@ -454,6 +436,7 @@ Operações que precisam de atomicidade vivem em RPCs Postgres, não em código 
 - **`complete_workout(client_id, exercises, ...)`** — `028_complete_workout_rpc.sql`. Salva treino + set_logs em transação única. Idempotência via `client_id` (UUID gerado no draft do cliente) + unique partial index em `workout_logs.client_id`. Substitui o INSERT múltiplo do client que era propenso a estado parcial.
 - **`list_academy_students(p_academy_id, p_search, p_status, p_limit, p_offset)`** — `029_list_academy_students_rpc.sql`. Consolida `academy_members + profiles + workout_logs(agg) + workout_sheets(agg)` numa query só, com search via `extensions.unaccent + ILIKE`, paginação e `total_count`. Permission check owner/personal embutido. Substitui o N+1 + mentira-de-UI antigo.
 - **`accept_invite(p_token, p_user_id)`** — `030_accept_invite_rpc.sql`. `FOR UPDATE` lock + check de `uses_limit` pré-incremento + idempotência por `(academy, user)`. Erros nomeados: `INVITE_UNAVAILABLE`, `EXPIRED`, `EXHAUSTED`, `INVALID_ROLE`. **GRANT só para `service_role`** — chamada exclusivamente do API route, nunca do client.
+- **`get_owner_dashboard(p_academy_id, p_week_ago, p_two_weeks_ago, p_month_ago)`** — `056_get_owner_dashboard_rpc.sql`. Retorna jsonb com todas as métricas + arrays do dashboard do owner. Permission check `'owner'` no início (`RAISE EXCEPTION OWNER_ONLY`). GRANT EXECUTE pra `authenticated` (RLS aplicada via `SECURITY INVOKER`).
 
 Webhook Stripe (`apps/web/app/api/webhooks/stripe/route.ts`) usa claim atômico via `upsert ON CONFLICT DO NOTHING RETURNING` em `processed_events` + rollback do registro no `catch` (Stripe retenta evento se o handler subir).
 

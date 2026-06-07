@@ -478,6 +478,184 @@ function AddFoodToPlanModal({ food, mealLabel, onClose, onConfirm, saving }: {
   )
 }
 
+interface PlanOption { id: string; name: string; student_name: string | null }
+
+function QuickAddFoodModal({ food, onClose, onSaved }: {
+  food: FoodItem
+  onClose: () => void
+  onSaved: () => void
+}) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = createClient() as any
+  const [plans, setPlans] = useState<PlanOption[]>([])
+  const [loadingPlans, setLoadingPlans] = useState(true)
+  const [planId, setPlanId] = useState<string>('')
+  const [mealType, setMealType] = useState<MealType>('almoco')
+  const [grams, setGrams] = useState(100)
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    async function loadPlans() {
+      const { data, error } = await supabase
+        .from('meal_plans')
+        .select('id, name, student_id, is_active')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+
+      if (error || !data) { setLoadingPlans(false); return }
+
+      const studentIds = Array.from(new Set(data.map((p: { student_id: string }) => p.student_id)))
+      const { data: profs } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', studentIds)
+      const nameMap = new Map<string, string | null>((profs ?? []).map((p: { id: string; full_name: string | null }) => [p.id, p.full_name]))
+
+      const opts: PlanOption[] = data.map((p: { id: string; name: string; student_id: string }) => ({
+        id: p.id,
+        name: p.name,
+        student_name: nameMap.get(p.student_id) ?? null,
+      }))
+      setPlans(opts)
+      if (opts.length > 0 && opts[0]) setPlanId(opts[0].id)
+      setLoadingPlans(false)
+    }
+    loadPlans()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const factor = grams / 100
+  const previewKcal = Math.round(food.kcal_per_100g * factor)
+  const previewProt = Math.round(food.protein_per_100g * factor * 10) / 10
+
+  async function handleSave() {
+    if (!planId) { toast.error('Selecione um plano.'); return }
+    setSaving(true)
+    try {
+      const { count } = await supabase
+        .from('meal_plan_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('plan_id', planId)
+        .eq('meal_type', mealType)
+
+      const { error } = await supabase.from('meal_plan_items').insert({
+        plan_id: planId,
+        food_item_id: food.id,
+        recipe_id: null,
+        meal_type: mealType,
+        order_index: count ?? 0,
+        servings: 1,
+        grams,
+        notes: notes || null,
+      })
+
+      if (error) throw error
+      toast.success('Adicionado ao plano!')
+      onSaved()
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? 'Erro ao adicionar.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }}
+        className="glass w-full max-w-md rounded-2xl p-6 space-y-4 border border-border/60 max-h-[90vh] overflow-y-auto"
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-display font-bold text-sm">Adicionar a uma refeição</h3>
+            <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[260px]">{food.name}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface-200 transition-all text-muted-foreground">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Plano alimentar</label>
+          {loadingPlans ? (
+            <div className="field text-sm flex items-center gap-2 text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Carregando planos...</div>
+          ) : plans.length === 0 ? (
+            <div className="field text-sm text-muted-foreground">Você não tem planos ativos.</div>
+          ) : (
+            <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="field text-sm">
+              {plans.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}{p.student_name ? ` — ${p.student_name}` : ''}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Refeição</label>
+          <div className="flex flex-wrap gap-2">
+            {MEAL_TYPES.map((m) => {
+              const active = mealType === m
+              const color = MEAL_TYPE_COLORS[m] ?? '#6366F1'
+              return (
+                <button key={m} type="button" onClick={() => setMealType(m)}
+                  className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-all', active ? 'text-white' : 'text-muted-foreground hover:text-foreground')}
+                  style={active ? { background: color, borderColor: color } : { borderColor: 'hsl(var(--border) / 0.6)' }}>
+                  {MEAL_TYPE_EMOJI[m]} {MEAL_TYPE_LABELS[m]}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Quantidade (g)</label>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setGrams((g) => Math.max(5, g - 25))} className="w-8 h-8 rounded-lg border border-border/60 flex items-center justify-center text-sm font-bold hover:bg-surface-100 transition-all">−</button>
+            <input
+              type="number"
+              inputMode="numeric"
+              value={grams}
+              onChange={(e) => setGrams(Math.max(1, parseInt(e.target.value) || 0))}
+              className="flex-1 text-center font-bold text-lg bg-transparent border-0 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+            <button onClick={() => setGrams((g) => g + 25)} className="w-8 h-8 rounded-lg border border-border/60 flex items-center justify-center text-sm font-bold hover:bg-surface-100 transition-all">+</button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-center">
+          <div className="rounded-xl bg-surface-100 p-2">
+            <p className="font-bold text-sm text-[#F97316]">{previewKcal}</p>
+            <p className="text-[10px] text-muted-foreground">kcal</p>
+          </div>
+          <div className="rounded-xl bg-surface-100 p-2">
+            <p className="font-bold text-sm text-[#EC4899]">{previewProt}g</p>
+            <p className="text-[10px] text-muted-foreground">proteína</p>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Observação <span className="normal-case text-[10px]">(opcional)</span></label>
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="field text-sm resize-none" />
+        </div>
+
+        <div className="flex gap-3 pt-1">
+          <button onClick={onClose} className="flex-1 btn-secondary py-2.5 rounded-xl text-sm">Cancelar</button>
+          <button onClick={handleSave} disabled={saving || loadingPlans || plans.length === 0} className="flex-1 btn-primary py-2.5 rounded-xl text-sm">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Adicionar'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 function RecipeDetailModal({ recipe, onClose }: { recipe: Recipe; onClose: () => void }) {
   return (
     <motion.div
@@ -578,6 +756,7 @@ function ReceitasContent() {
   const [planName, setPlanName] = useState('')
   const [pending, setPending] = useState<Recipe | null>(null)
   const [pendingFood, setPendingFood] = useState<FoodItem | null>(null)
+  const [quickAdd, setQuickAdd] = useState<FoodItem | null>(null)
   const [detail, setDetail] = useState<Recipe | null>(null)
 
   useEffect(() => {
@@ -917,6 +1096,14 @@ function ReceitasContent() {
                       {isAddingThis ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : isAdded ? <><Check className="w-3.5 h-3.5" /> Adicionado</> : <><Plus className="w-3.5 h-3.5" /> Adicionar</>}
                     </button>
                   )}
+                  {!addTo && isPersonal && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setQuickAdd(f) }}
+                      className="w-full mt-3 py-2 rounded-xl text-xs font-semibold bg-brand-500/15 text-brand-400 border border-brand-500/20 hover:bg-brand-500/25 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Adicionar à refeição
+                    </button>
+                  )}
                 </div>
               </motion.div>
             )
@@ -957,6 +1144,9 @@ function ReceitasContent() {
         )}
         {pendingFood && (
           <AddFoodToPlanModal food={pendingFood} mealLabel={mealLabel} saving={adding === pendingFood.id} onClose={() => setPendingFood(null)} onConfirm={(cfg) => handleAddFoodToPlan(pendingFood, cfg)} />
+        )}
+        {quickAdd && (
+          <QuickAddFoodModal food={quickAdd} onClose={() => setQuickAdd(null)} onSaved={() => setQuickAdd(null)} />
         )}
         {detail && !addTo && <RecipeDetailModal recipe={detail} onClose={() => setDetail(null)} />}
       </AnimatePresence>

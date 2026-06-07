@@ -229,6 +229,9 @@ async function logFreeWorkout() {
   }, [currentAcademy, currentRole])
 
   // ── Owner data ──────────────────────────────────────────────
+  // 1 roundtrip via RPC get_owner_dashboard (migration 056).
+  // Substitui as ~14 queries que existiam aqui antes — ver
+  // CLAUDE.md → "Otimização do dashboard".
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async function loadOwnerData(sb: any, aid: string) {
     const now = new Date()
@@ -236,100 +239,67 @@ async function logFreeWorkout() {
     const twoWeeksAgo = new Date(now); twoWeeksAgo.setDate(now.getDate() - 14)
     const monthAgo    = new Date(now); monthAgo.setDate(now.getDate() - 30)
 
-    const [
-      { count: totalStudents },
-      { count: activePersonals },
-      { data: weeklyLogs },
-      { count: workoutsLastWeek },
-      { count: newThisMonth },
-      { data: recentMembersRaw },
-      { data: recentWorkoutsRaw },
-      { data: allStudentsRaw },
-      { data: personaisRaw },
-    ] = await Promise.all([
-      sb.from('academy_members').select('id', { count: 'exact', head: true }).eq('academy_id', aid).eq('role', 'student').eq('is_active', true),
-      sb.from('academy_members').select('id', { count: 'exact', head: true }).eq('academy_id', aid).eq('role', 'personal').eq('is_active', true),
-      sb.from('workout_logs').select('student_id').eq('academy_id', aid).gte('created_at', weekAgo.toISOString()),
-      sb.from('workout_logs').select('id', { count: 'exact', head: true }).eq('academy_id', aid).gte('created_at', twoWeeksAgo.toISOString()).lt('created_at', weekAgo.toISOString()),
-      sb.from('academy_members').select('id', { count: 'exact', head: true }).eq('academy_id', aid).eq('role', 'student').gte('joined_at', monthAgo.toISOString()),
-      sb.from('academy_members').select('id, joined_at, user_id').eq('academy_id', aid).eq('role', 'student').eq('is_active', true).order('joined_at', { ascending: false }).limit(5),
-      sb.from('workout_logs').select('id, created_at, student_id, duration_seconds, sheet_id').eq('academy_id', aid).order('created_at', { ascending: false }).limit(8),
-      sb.from('academy_members').select('user_id').eq('academy_id', aid).eq('role', 'student').eq('is_active', true).limit(100),
-      sb.from('academy_members').select('user_id').eq('academy_id', aid).eq('role', 'personal').eq('is_active', true),
-    ])
-
-    const activeSet = new Set((weeklyLogs ?? []).map((l: { student_id: string }) => l.student_id))
-    const total     = totalStudents ?? 0
-    const allStudentIds: string[] = (allStudentsRaw ?? []).map((m: { user_id: string }) => m.user_id)
-    const inactiveIds = allStudentIds.filter(id => !activeSet.has(id))
-    const personaisIds: string[] = (personaisRaw ?? []).map((p: { user_id: string }) => p.user_id)
-
-    const memberUserIds = (recentMembersRaw ?? []).map((m: { user_id: string }) => m.user_id) as string[]
-    const workoutsRaw   = (recentWorkoutsRaw ?? []) as Array<{ student_id: string; sheet_id: string }>
-    const wStudentIds   = [...new Set(workoutsRaw.map(w => w.student_id))]
-    const sheetIds      = workoutsRaw.map(w => w.sheet_id).filter(Boolean) as string[]
-    const allUserIds    = [...new Set([...memberUserIds, ...wStudentIds, ...inactiveIds, ...personaisIds])]
-
-    const [{ data: profiles }, { data: sheets }, { data: activeSheetsData }, { data: personalSheets }] = await Promise.all([
-      allUserIds.length > 0 ? sb.from('profiles').select('id, full_name').in('id', allUserIds) : { data: [] },
-      sheetIds.length   > 0 ? sb.from('workout_sheets').select('id, name').in('id', sheetIds)  : { data: [] },
-      sb.from('workout_sheets').select('student_id').eq('academy_id', aid).eq('is_active', true),
-      personaisIds.length > 0 ? sb.from('workout_sheets').select('personal_id, student_id').eq('academy_id', aid).eq('is_active', true).in('personal_id', personaisIds) : { data: [] },
-    ])
-
-    type ProfileRow = { id: string; full_name: string }
-    type SheetRow   = { id: string; name: string }
-    const profileMap = new Map((profiles ?? []).map((p: ProfileRow) => [p.id, p.full_name]))
-    const sheetMap   = new Map((sheets ?? []).map((s: SheetRow) => [s.id, s.name]))
-    const withSheets = new Set((activeSheetsData ?? []).map((s: { student_id: string }) => s.student_id))
-    const noSheets   = allStudentIds.filter(id => !withSheets.has(id)).length
-
-    setOwnerMetrics({
-      totalStudents: total,
-      activePersonals: activePersonals ?? 0,
-      activeThisWeek: activeSet.size,
-      inactiveCount: Math.max(0, total - activeSet.size),
-      workoutsThisWeek: weeklyLogs?.length ?? 0,
-      workoutsLastWeek: workoutsLastWeek ?? 0,
-      newThisMonth: newThisMonth ?? 0,
-      studentsWithoutSheets: noSheets,
+    const { data, error } = await sb.rpc('get_owner_dashboard', {
+      p_academy_id:    aid,
+      p_week_ago:      weekAgo.toISOString(),
+      p_two_weeks_ago: twoWeeksAgo.toISOString(),
+      p_month_ago:     monthAgo.toISOString(),
     })
 
-    setRecentMembers((recentMembersRaw ?? []).map((m: { id: string; user_id: string; joined_at: string }) => ({
+    if (error || !data) {
+      console.error('get_owner_dashboard failed', error)
+      return
+    }
+
+    const d = data as {
+      total_students: number
+      active_personals: number
+      workouts_this_week: number
+      workouts_last_week: number
+      new_this_month: number
+      active_this_week: number
+      inactive_count: number
+      students_without_sheets: number
+      recent_students: Array<{ id: string; user_id: string; joined_at: string; full_name: string | null }>
+      recent_workouts: Array<{ id: string; created_at: string; student_id: string; sheet_id: string | null; duration_seconds: number | null; student_name: string | null; sheet_name: string | null }>
+      inactive_students: Array<{ user_id: string; full_name: string | null; last_workout_at: string | null }>
+      personais_perf: Array<{ user_id: string; full_name: string | null; student_count: number }>
+    }
+
+    setOwnerMetrics({
+      totalStudents:         d.total_students,
+      activePersonals:       d.active_personals,
+      activeThisWeek:        d.active_this_week,
+      inactiveCount:         d.inactive_count,
+      workoutsThisWeek:      d.workouts_this_week,
+      workoutsLastWeek:      d.workouts_last_week,
+      newThisMonth:          d.new_this_month,
+      studentsWithoutSheets: d.students_without_sheets,
+    })
+
+    setRecentMembers(d.recent_students.map((m) => ({
       id: m.id, userId: m.user_id, joinedAt: m.joined_at,
-      fullName: (profileMap.get(m.user_id) as string | undefined) ?? 'Usuário',
+      fullName: m.full_name ?? 'Usuário',
     })))
 
-    setRecentWorkouts((recentWorkoutsRaw ?? []).map((w: { id: string; created_at: string; student_id: string; sheet_id: string; duration_seconds: number | null }) => ({
+    setRecentWorkouts(d.recent_workouts.map((w) => ({
       id: w.id, createdAt: w.created_at,
-      studentName: (profileMap.get(w.student_id) as string | undefined) ?? 'Aluno',
-      sheetName: (sheetMap.get(w.sheet_id) as string | undefined) ?? 'Treino',
+      studentName: w.student_name ?? 'Aluno',
+      sheetName:   w.sheet_name   ?? 'Treino',
       durationSeconds: w.duration_seconds,
     })))
 
-    // Personal performance
-    const pStudentMap = new Map<string, Set<string>>()
-    for (const s of (personalSheets ?? [])) {
-      if (!pStudentMap.has(s.personal_id)) pStudentMap.set(s.personal_id, new Set())
-      pStudentMap.get(s.personal_id)!.add(s.student_id)
-    }
-    setPersonaisPerf(personaisIds.map(id => ({
-      userId: id,
-      fullName: (profileMap.get(id) as string | undefined) ?? 'Personal',
-      studentCount: pStudentMap.get(id)?.size ?? 0,
+    setPersonaisPerf(d.personais_perf.map((p) => ({
+      userId:       p.user_id,
+      fullName:     p.full_name ?? 'Personal',
+      studentCount: p.student_count,
     })))
 
-    // Inactive with last workout
-    if (inactiveIds.length > 0) {
-      const { data: lastLogs } = await sb.from('workout_logs').select('student_id, created_at').eq('academy_id', aid).in('student_id', inactiveIds).order('created_at', { ascending: false })
-      const lastMap = new Map<string, string>()
-      for (const log of (lastLogs ?? [])) { if (!lastMap.has(log.student_id)) lastMap.set(log.student_id, log.created_at) }
-      setInactiveStudents(inactiveIds.slice(0, 8).map(id => ({
-        userId: id,
-        fullName: (profileMap.get(id) as string | undefined) ?? 'Aluno',
-        lastWorkoutAt: lastMap.get(id) ?? null,
-      })))
-    }
+    setInactiveStudents(d.inactive_students.map((i) => ({
+      userId:        i.user_id,
+      fullName:      i.full_name ?? 'Aluno',
+      lastWorkoutAt: i.last_workout_at,
+    })))
   }
 
   // ── Personal data ───────────────────────────────────────────

@@ -1444,6 +1444,15 @@ export type Database = {
         Returns: string
       }
       generate_academy_slug: { Args: { name: string }; Returns: string }
+      get_owner_dashboard: {
+        Args: {
+          p_academy_id: string
+          p_month_ago: string
+          p_two_weeks_ago: string
+          p_week_ago: string
+        }
+        Returns: Json
+      }
       get_user_academy_ids: { Args: never; Returns: string[] }
       get_user_role_in_academy: {
         Args: { p_academy_id: string }
