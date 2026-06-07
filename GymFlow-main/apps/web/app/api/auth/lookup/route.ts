@@ -64,17 +64,19 @@ export async function POST(request: Request) {
         if (user?.email) return NextResponse.json({ email: user.email })
       }
 
-      // Fallback: cadastros antigos podem ter o CNPJ apenas em raw_user_meta_data
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: fallback } = await (admin as any)
-        .schema('auth')
-        .from('users')
-        .select('email')
-        .filter('raw_user_meta_data->>document', 'eq', clean)
-        .filter('raw_user_meta_data->>account_type', 'eq', 'owner')
-        .single()
-
-      if (fallback?.email) return NextResponse.json({ email: fallback.email })
+      // Fallback: dono cadastrado que ainda não criou academia — CNPJ está só nos
+      // metadados do auth.users. auth schema não fica exposto via PostgREST, então
+      // usamos o Admin API para varrer os usuários.
+      try {
+        const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const fallback = (list?.users ?? []).find((u: any) => {
+          const meta = u.user_metadata ?? {}
+          if (meta.account_type !== 'owner') return false
+          return (String(meta.document ?? '')).replace(/\D/g, '') === clean
+        })
+        if (fallback?.email) return NextResponse.json({ email: fallback.email })
+      } catch { /* Admin API indisponível — cai no erro genérico */ }
 
       return NextResponse.json({ error: GENERIC_ERROR }, { status: 401 })
     }

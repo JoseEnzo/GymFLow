@@ -96,7 +96,9 @@ export function useAuth() {
   async function signIn(email: string, password: string, redirectTo?: string, intendedRole?: 'owner' | 'personal' | 'student') {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
-    reset()
+    // Não chama reset() aqui: o SIGNED_IN event já dispara loadUserData() de forma
+    // concorrente, e reset() causaria uma janela de estado inválido entre as duas
+    // chamadas. loadUserData() sobrescreve todo o estado relevante diretamente.
     await loadUserData()
     if (intendedRole) {
       const { academies: loaded } = useAuthStore.getState()
