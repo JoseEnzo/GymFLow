@@ -83,6 +83,11 @@ export async function POST(request: Request) {
 
   // Plano pago → gera checkout URL na mesma request (evita segundo roundtrip com RLS)
   if (!skipStripe && (plan === 'starter' || plan === 'pro' || plan === 'personal')) {
+    const priceId = process.env[`STRIPE_PRICE_${plan.toUpperCase()}_MONTHLY`]
+    if (!priceId) {
+      console.error(`[academy] STRIPE_PRICE_${plan.toUpperCase()}_MONTHLY não configurado`)
+      return NextResponse.json({ academy, stripeError: 'Plano não configurado no servidor' })
+    }
     try {
       const session = await createCheckoutSession({
         academyId: academy.id,

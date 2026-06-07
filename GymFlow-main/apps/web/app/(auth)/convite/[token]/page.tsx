@@ -43,6 +43,10 @@ export default function ConvitePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
       })
+      if (res.status === 403) {
+        const err = await res.json() as { error?: string }
+        throw new Error(err.error ?? 'Seu perfil não é compatível com este convite')
+      }
       if (!res.ok) {
         const err = await res.json() as { error?: string }
         throw new Error(err.error ?? 'Erro ao aceitar convite')

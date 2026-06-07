@@ -45,6 +45,34 @@ export async function POST(request: Request) {
 
   if (!token) return NextResponse.json({ error: 'Token obrigatório' }, { status: 400 })
 
+  // Valida account_type do usuário contra o role do convite antes de chamar a RPC.
+  // Impede que um personal aceite convite de aluno (e vice-versa).
+  const { data: { user: fullUser } } = await admin.auth.admin.getUserById(user.id)
+  const accountType = fullUser?.user_metadata?.['account_type'] as string | undefined
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: inviteRow } = await (admin as any)
+    .from('invites')
+    .select('role')
+    .eq('token', token)
+    .eq('is_active', true)
+    .single()
+
+  if (inviteRow) {
+    const inviteRole = inviteRow.role as string
+    const accountMatchesRole =
+      (accountType === 'student'  && inviteRole === 'student') ||
+      (accountType === 'personal' && inviteRole === 'personal')
+
+    if (!accountMatchesRole) {
+      const roleLabel = inviteRole === 'personal' ? 'personal trainer' : 'aluno'
+      return NextResponse.json(
+        { error: `Este convite é para ${roleLabel}. Sua conta tem um perfil diferente e não pode aceitar este convite.` },
+        { status: 403 },
+      )
+    }
+  }
+
   // RPC atômica: lock no invite, idempotência por (academy, user), incremento
   // condicional do uses_count. Resolve race condition + TOCTOU do código antigo.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
