@@ -33,10 +33,11 @@ O produto foi rebrandado para **MeuTrein** mas o repositório, pacotes npm, stor
 
 - **Pacotes npm do monorepo:** `@gymflow/web`, `@gymflow/database`, `@gymflow/ui`, `@gymflow/eslint-config`, `@gymflow/typescript-config`. Mudar exige refactor de todos os imports e republicação.
 - **Workspace paths:** `tsconfig.json` paths apontam pra `@gymflow/*`.
-- **Storage keys** (mudar **desloga todo mundo / apaga rascunhos** em prod):
+- **Storage keys** (mudar **desloga todo mundo / apaga rascunhos / perde treinos offline** em prod):
   - `gymflow-auth` em `stores/auth-store.ts` (Zustand persist — sessão).
   - `gymflow_notifications` em `app/(dashboard)/configuracoes/page.tsx` (preferências de notificação).
   - `gymflow_draft_${userId}_${sheetId}[_d${day}]` em `app/(dashboard)/treinos/executar/[id]/page.tsx` (rascunho de treino em andamento).
+  - `meutrein-offline` (IndexedDB database, **única key nova com prefixo MeuTrein** — pre-rebrand não existia). Stores: `sheets` (snapshots de ficha pra hidratar offline) e `pendingWorkouts` (queue de treinos finalizados aguardando sync). Definido em `apps/web/lib/offline-store.ts`. Renomear apaga todos os treinos offline pendentes.
 - **Domínio `gymflow.app`** em `app/layout.tsx` (`metadataBase`, `openGraph.url`), `app/sitemap.ts`, `app/robots.ts`, `app/opengraph-image.tsx` (pill bottom). Mudar exige novo domínio comprado + DNS/Vercel/SSL configurados antes.
 - **E-mails do projeto:** `contato@gymflow.app`, `privacidade@gymflow.app`, `@gymflow` (twitter creator) — dependem do domínio.
 - **Projeto Doppler:** `gymflow-s-org` em `.doppler.yaml`.
@@ -397,7 +398,9 @@ Setup PWA completo via `@ducanh2912/next-pwa` (configurado em `apps/web/next.con
 2. `apple-touch-icon.png` (180x180) em `apps/web/public/`.
 3. Testar em produção com Lighthouse PWA audit (precisa HTTPS — Vercel já dá).
 
-**O que NÃO está cacheado offline ainda:** execução de treino. Pra prometer "funciona sem internet" na copy, precisaria estratégia adicional (cache do shell + IndexedDB pra set_logs pendentes + sync ao reconectar).
+**Offline da execução de treino (out/2026):** funcional. Arquitetura em 3 camadas — ver seção "Execução de treino" abaixo. Resumo: shell HTML cacheado via Workbox `NetworkFirst` em `/treinos/executar/*`, snapshot da ficha em IndexedDB (`meutrein-offline.sheets`) gravado em todo load online, fila `pendingWorkouts` drenada pelo `useOnlineSync` no `online` event. Supabase **continua `NetworkOnly`** — nenhum dado de tenant é servido do cache (segurança multi-tenant intacta).
+
+**O que NÃO está cacheado offline ainda:** páginas Histórico, Evolução, Frequência. Aluno offline só consegue executar treino (caso prometido pela landing); navegação no resto do app exige conexão.
 
 ---
 
@@ -414,9 +417,31 @@ Link /convite/[code] → valida código (não expirado, não usado) → cria use
 ```
 
 ### Execução de treino
+
+Fluxo feliz online:
 ```
-Cria workout_log → para cada série confirmada, cria set_log → ao finalizar, seta finished_at no workout_log
+Cria workout_log → para cada série confirmada, cria set_log → ao finalizar, RPC complete_workout (atômico)
 ```
+
+**Suporte offline (out/2026):** o aluno na academia com sinal fraco precisa abrir, executar e finalizar a ficha sem internet. Implementado em 3 camadas em cima da RPC idempotente:
+
+1. **Shell HTML cacheado** — `next.config.ts` tem `NetworkFirst` (timeout 3s) pra `/treinos/executar/*`. Aluno consegue navegar pra rota mesmo offline; HTML é estático (Supabase fetch acontece client-side só, sem leakage cross-tenant).
+
+2. **Snapshot da ficha em IndexedDB** — `apps/web/lib/offline-store.ts`. Quando o load Supabase retorna OK, o page grava `{userId, sheetId, day, exercises, prMaxWeights}` no store `sheets`. Key composta `[userId, sheetId, day]` evita troca entre usuários no mesmo device. Se o load falha (offline ou Supabase down), tenta `getCachedSheet()` — achou snapshot do mesmo userId+sheetId+day, hidrata.
+
+3. **Queue de set_logs em IndexedDB** — store `pendingWorkouts` com chave `clientId` (UUID). Quando aluno finaliza:
+   - `navigator.onLine` true: chama RPC `complete_workout` direto (caminho normal).
+   - `navigator.onLine` false **ou** RPC falha: `queueWorkout()` em vez de mostrar erro. Aluno vê toast "Treino salvo localmente".
+   - Hook `useOnlineSync` (`apps/web/hooks/use-online-sync.ts`) escuta `window.online` + drena na montagem se já estiver online. Pra cada item, refaz a RPC com o mesmo `clientId` — idempotência da migration 028 garante que retry não duplica.
+
+**UI de status:** `apps/web/components/layout/offline-sync-provider.tsx` monta banner topo no `(dashboard)/layout.tsx`. Âmbar quando offline, indigo quando há queue mas online (sincronizando), some quando tudo OK.
+
+**Limitações conhecidas:**
+- Aluno que **nunca** abriu a ficha online vê "Ficha não encontrada" quando tenta offline. Snapshot só cobre fichas já visitadas.
+- Se o personal edita a ficha enquanto aluno está offline, aluno usa a versão velha até reabrir online (atualiza no próximo load OK).
+- Sem Background Sync API (escolha consciente — `online` event listener cobre 95% dos casos e é simpler).
+
+**Como NÃO quebrar:** qualquer mudança na RPC `complete_workout` precisa **preservar a idempotência por `client_id`** — sem isso a queue duplica workout_log no retry. Qualquer novo campo na ficha que execução precisa ler precisa entrar no `SheetSnapshot` em `lib/offline-store.ts`, senão a hidratação offline mostra estado parcial.
 
 Esses três fluxos são o coração do produto. Qualquer mudança neles precisa de atenção redobrada.
 
@@ -585,6 +610,26 @@ Rodar da **raiz do monorepo** (`GymFlow-main/`), não de `apps/web/`:
 - `pnpm db:push` / `pnpm db:reset` / `pnpm db:types` — migrations e tipos
 - Smoke test: `PORT=3333 bash .claude/skills/run-gymflow/smoke.sh`
 - Rotinas integradas: skill `.claude/skills/run-gymflow/SKILL.md`
+
+---
+
+## Pendente — Notificações via Resend
+
+Aba "Notificações" em `apps/web/app/(dashboard)/configuracoes/page.tsx` mostra 5 toggles (novo aluno, relatório semanal, treino concluído, lembrete, alerta novo aluno). **Estado vai pra `localStorage` (`gymflow_notifications`), nada é enviado.** Resend já tá no Doppler como `RESEND_API_KEY`, falta o disparo.
+
+Foi prometido em copy da landing como feature do Pro ("Notificações de inatividade") até 2026-06-05, **foi removido** porque vender o que não existe quebra a régua de tom do produto. Re-adicionar à landing só depois de implementar.
+
+**Implementação esperada:**
+
+1. **Migrar `localStorage` → tabela `notification_preferences`** (`user_id, academy_id, key, channel, enabled`). RLS por user/academy. O localStorage atual fica como fallback offline.
+2. **Job recorrente** — Vercel Cron (`vercel.json` → `crons[]`) que dispara API route `/api/cron/notifications/inactivity` a cada segunda 09:00. A route faz query `academy_members LEFT JOIN workout_logs` pra achar alunos sem treino nos últimos 7d e dispara e-mail via Resend pra cada owner/personal com a preferência ligada.
+3. **Eventos transacionais** (novo aluno, treino concluído) — disparados inline na própria API route que cria o recurso, sem cron. `await sendNotification(...)` no fim do POST.
+4. **Templates Resend** — criar 3 templates iniciais (boas-vindas owner, novo aluno chegou, resumo semanal). Versionar em `apps/web/lib/email-templates/`.
+5. **Limite de envio** — Resend free tier é 100 e-mails/dia. Pra Pro a galera vai além disso facilmente. Plano: assinar Resend pago ANTES de ativar disparo em prod. Sentry alert quando 80% da quota.
+6. **Idempotência** — tabela `sent_notifications (user_id, kind, target_date)` com UNIQUE constraint pra cron retry não duplicar e-mail.
+7. **Re-adicionar à landing:** depois que rodar 1 semana em prod sem bug, voltar "Notificações de inatividade" na lista do plano Pro em `app/page.tsx` (seção `plans[2].features`).
+
+Pegadinha conhecida: Vercel Cron só roda em prod (não em preview/dev). Pra testar local, hit manual `curl -X POST http://localhost:3000/api/cron/notifications/inactivity` com header `Authorization: Bearer $CRON_SECRET`.
 
 ---
 

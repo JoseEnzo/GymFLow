@@ -16,6 +16,7 @@ import { useInterval } from '@/hooks/use-debounce'
 import { ProgressRing } from '@/components/ui/progress-ring'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
+import { cacheSheet, getCachedSheet, queueWorkout, type SheetSnapshot } from '@/lib/offline-store'
 
 interface ExerciseSlot {
   sheetExerciseId: string
@@ -96,7 +97,17 @@ export default function ExecutarTreinoPage() {
         .eq('academy_id', currentAcademy.id)
         .single()
 
+      // Sem internet (ou Supabase fora do ar): tenta cache local da ficha.
+      // O cache foi gravado num load anterior com sucesso, então só funciona
+      // se o aluno abriu a ficha pelo menos uma vez online.
       if (error || !data) {
+        const cached = profile?.id
+          ? await getCachedSheet(profile.id, id, selectedDay)
+          : null
+        if (cached) {
+          await hydrateFromSnapshot(cached)
+          return
+        }
         toast.error('Ficha não encontrada.')
         router.push('/treinos')
         return
@@ -149,6 +160,7 @@ export default function ExecutarTreinoPage() {
 
       // Carrega recordes históricos (máximo por exercício) para detectar PRs
       const { data: { user } } = await supabase.auth.getUser()
+      const maxes: Record<string, number> = {}
       if (user) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: prData } = await (supabase as any)
@@ -158,7 +170,6 @@ export default function ExecutarTreinoPage() {
           .eq('workout_logs.academy_id', currentAcademy.id)
           .in('exercise_id', slots.map((s) => s.exerciseId))
           .not('weight_kg', 'is', null)
-        const maxes: Record<string, number> = {}
         for (const row of (prData ?? [])) {
           if (maxes[row.exercise_id] === undefined || row.weight_kg > maxes[row.exercise_id]!) {
             maxes[row.exercise_id] = row.weight_kg
@@ -202,8 +213,71 @@ export default function ExecutarTreinoPage() {
       }
       if (!restored) setSetData(defaultSetData)
 
+      // Snapshot pra hidratar offline em futuras execuções da mesma ficha+dia.
+      if (user) {
+        const snapshot: SheetSnapshot = {
+          userId: user.id,
+          sheetId: id,
+          day: sheetSchedule === 'weekly' ? selectedDay : 0,
+          sheetName: data.name,
+          scheduleType: sheetSchedule,
+          availableDays:
+            sheetSchedule === 'weekly'
+              ? ([...new Set(allRows.map((r) => r.day_index).filter((d) => d !== null && d !== undefined))] as number[]).sort((a, b) => a - b)
+              : [],
+          exercises: slots,
+          prMaxWeights: maxes,
+          cachedAt: Date.now(),
+        }
+        cacheSheet(snapshot)
+      }
+
       setLoading(false)
     }
+
+    async function hydrateFromSnapshot(snap: SheetSnapshot) {
+      setScheduleType(snap.scheduleType)
+      setSheetName(snap.sheetName)
+      setAvailableDays(snap.availableDays)
+      setExercises(snap.exercises)
+      setPrMaxWeights(snap.prMaxWeights)
+
+      const defaults: Record<string, SetData[]> = Object.fromEntries(
+        snap.exercises.map((ex) => [
+          ex.sheetExerciseId,
+          Array.from({ length: ex.sets }, () => ({
+            weight: ex.weightSuggestion ?? ('' as number | ''),
+            reps: '' as number | '',
+            done: false,
+          })),
+        ]),
+      )
+
+      const dKey = profile?.id
+        ? `gymflow_draft_${profile.id}_${id}${snap.scheduleType === 'weekly' ? `_d${selectedDay}` : ''}`
+        : null
+      let restored = false
+      if (dKey) {
+        try {
+          const raw = localStorage.getItem(dKey)
+          if (raw) {
+            const draft = JSON.parse(raw) as { setData: Record<string, SetData[]>; timer: number; exerciseIdx: number }
+            if (snap.exercises.every((s) => draft.setData[s.sheetExerciseId] !== undefined)) {
+              setSetData(draft.setData)
+              setTimer(draft.timer)
+              setExerciseIdx(Math.min(draft.exerciseIdx, snap.exercises.length - 1))
+              setHasRestoredDraft(true)
+              restored = true
+            }
+          }
+        } catch { /* ignore */ }
+      }
+      if (!restored) setSetData(defaults)
+
+      toast.info('Modo offline — usando ficha salva localmente.')
+      setLoading(false)
+    }
+
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, currentAcademy, selectedDay])
@@ -390,16 +464,43 @@ export default function ExecutarTreinoPage() {
 
       const clientId = ensureClientId()
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any).rpc('complete_workout', {
+      const rpcParams = {
         p_sheet_id: id,
         p_academy_id: currentAcademy.id,
         p_duration_seconds: timer,
         p_set_logs: setLogsPayload,
         p_client_id: clientId,
-      })
+      }
 
-      if (error) throw error
+      // Se offline, nem tenta a RPC — vai direto pra queue.
+      const isOnline = typeof navigator === 'undefined' ? true : navigator.onLine
+      let queuedOffline = false
+
+      if (isOnline) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (supabase as any).rpc('complete_workout', rpcParams)
+        if (error) {
+          // Network fail / timeout: cai pra queue. Erro de RLS/validation também
+          // cai pra queue — sync hook tenta de novo depois e dá toast se persistir.
+          queuedOffline = true
+        }
+      } else {
+        queuedOffline = true
+      }
+
+      if (queuedOffline) {
+        const { data: { user } } = await supabase.auth.getUser()
+        await queueWorkout({
+          clientId,
+          userId: user?.id ?? '',
+          sheetId: id,
+          academyId: currentAcademy.id,
+          durationSeconds: timer,
+          setLogs: setLogsPayload,
+          queuedAt: Date.now(),
+        })
+        toast.success('Treino salvo localmente — sincroniza quando voltar a internet.')
+      }
 
       if (draftKey) localStorage.removeItem(draftKey)
       setIsCompleted(true)

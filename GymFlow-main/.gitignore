@@ -18,6 +18,7 @@ out/
 
 # Build artifacts
 dist/
+*.tsbuildinfo
 
 # Vercel
 .vercel/

@@ -202,6 +202,8 @@ export default function TreinosPage() {
   const isOwner    = currentRole === 'owner'
   const isPersonal = currentRole === 'personal'
   const isStudent  = currentRole === 'student'
+  // Owner tem as MESMAS capacidades de personal pra fichas (criar, atribuir, deletar).
+  const canManage = isOwner || isPersonal
 
   useEffect(() => {
     async function load() {
@@ -209,10 +211,10 @@ export default function TreinosPage() {
 
       const { data: { user } } = await supabase.auth.getUser()
 
-      // Para personal: precisa saber se tem aluno antes de oferecer "Nova ficha".
-      // Personal sem aluno cai num form que nunca pode ser submetido (precisa selectionar
-      // aluno mas não tem opção). Pré-detectar evita esse beco sem saída.
-      if (isPersonal) {
+      // Owner e personal precisam saber se tem aluno antes de oferecer "Nova ficha".
+      // Sem aluno cai num form que nunca pode ser submetido (precisa selecionar
+      // aluno mas a lista está vazia). Pré-detectar evita esse beco sem saída.
+      if (canManage) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { count, error: countError } = await (supabase as any)
           .from('academy_members')
@@ -248,8 +250,8 @@ export default function TreinosPage() {
         exercise_count: s.sheet_exercises?.length ?? 0,
       }))
 
-      // For personal: resolve student names
-      if (isPersonal && mapped.length > 0) {
+      // Pra quem gerencia (owner/personal): resolve nomes dos alunos pra mostrar no card.
+      if (canManage && mapped.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const studentIds = [...new Set<string>(mapped.map((s: any) => s.student_id).filter(Boolean))]
         if (studentIds.length > 0) {
@@ -299,13 +301,13 @@ export default function TreinosPage() {
             {loading ? 'Carregando...' : `${sheets.length} ${sheets.length === 1 ? 'ficha' : 'fichas'} · ${sheets.filter((s) => s.is_active).length} ativas`}
           </p>
         </div>
-        {isPersonal && hasStudents && (
+        {canManage && hasStudents && (
           <Link href="/treinos/novo" className="btn-primary text-sm py-2.5 px-5 rounded-xl">
             <Plus className="w-4 h-4" />
             Nova ficha
           </Link>
         )}
-        {isPersonal && !hasStudents && !loading && (
+        {canManage && !hasStudents && !loading && (
           <Link href="/alunos" className="btn-primary text-sm py-2.5 px-5 rounded-xl">
             <UserPlus className="w-4 h-4" />
             Convidar aluno
@@ -355,7 +357,7 @@ export default function TreinosPage() {
       {!loading && filtered.length > 0 && (
         <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtered.map((sheet) => (
-            <SheetCard key={sheet.id} sheet={sheet} isPersonal={isPersonal} isStudent={isStudent} readOnly={isOwner} onDelete={handleDelete} />
+            <SheetCard key={sheet.id} sheet={sheet} isPersonal={canManage} isStudent={isStudent} readOnly={!canManage} onDelete={handleDelete} />
           ))}
         </motion.div>
       )}
@@ -364,33 +366,29 @@ export default function TreinosPage() {
       {!loading && sheets.length === 0 && (
         <motion.div variants={fadeUp} className="text-center py-20">
           <div className="w-14 h-14 rounded-2xl bg-surface-200 flex items-center justify-center mx-auto mb-4">
-            {isPersonal && !hasStudents
+            {canManage && !hasStudents
               ? <Users className="w-7 h-7 text-muted-foreground/40" />
               : <ClipboardList className="w-7 h-7 text-muted-foreground/40" />}
           </div>
           <p className="font-semibold text-muted-foreground">
-            {isOwner
-              ? 'Nenhuma ficha cadastrada'
-              : isPersonal
+            {canManage
               ? (hasStudents ? 'Nenhuma ficha criada ainda' : 'Convide alunos para começar')
               : 'Nenhuma ficha atribuída a você'}
           </p>
           <p className="text-sm text-muted-foreground/60 mt-1">
-            {isOwner
-              ? 'Os personais ainda não criaram fichas para os alunos.'
-              : isPersonal
+            {canManage
               ? (hasStudents
-                  ? 'Crie fichas de treino e atribua aos seus alunos.'
+                  ? 'Crie fichas de treino e atribua aos alunos da academia.'
                   : 'Você precisa ter pelo menos 1 aluno antes de criar fichas de treino.')
               : 'Aguarde seu personal trainer criar uma ficha para você.'}
           </p>
-          {isPersonal && hasStudents && (
+          {canManage && hasStudents && (
             <Link href="/treinos/novo" className="btn-primary text-sm py-2 px-4 rounded-xl mt-4 inline-flex items-center gap-1.5">
               <Plus className="w-3.5 h-3.5" />
               Criar primeira ficha
             </Link>
           )}
-          {isPersonal && !hasStudents && (
+          {canManage && !hasStudents && (
             <Link href="/alunos" className="btn-primary text-sm py-2 px-4 rounded-xl mt-4 inline-flex items-center gap-1.5">
               <UserPlus className="w-3.5 h-3.5" />
               Convidar primeiro aluno

@@ -1044,7 +1044,7 @@ export default function AlunosPage() {
                       <StudentCard
                         key={student.id}
                         student={student}
-                        isPersonal={currentRole === 'personal'}
+                        isPersonal={currentRole === 'personal' || currentRole === 'owner'}
                         onExpel={(s) => { setExpulsionTarget(s); setExpulsionReason('') }}
                       />
                     ))}

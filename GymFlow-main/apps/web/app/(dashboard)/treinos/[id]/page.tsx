@@ -395,7 +395,8 @@ export default function WorkoutSheetDetailPage() {
             <Play className="w-4 h-4" /> Executar treino
           </Link>
         )}
-        {currentRole === 'personal' && (
+        {/* Owner também pode adicionar exercício à ficha — mesma regra do personal */}
+        {isPersonal && (
           <Link
             href={sheet.schedule_type === 'daily' ? `/exercicios?addTo=${sheet.id}` : `/exercicios?addTo=${sheet.id}&day=${selectedDay}&type=${sheet.schedule_type}`}
             className="flex-1 btn-secondary py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"

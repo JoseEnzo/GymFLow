@@ -272,7 +272,8 @@ function ExerciciosContent() {
   const { currentAcademy, currentRole } = useAuthStore()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = createClient() as any
-  const isPersonal = currentRole === 'personal'
+  // Owner tem as mesmas capacidades de personal (criar exercícios na biblioteca).
+  const isPersonal = currentRole === 'personal' || currentRole === 'owner'
 
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [loading, setLoading] = useState(true)

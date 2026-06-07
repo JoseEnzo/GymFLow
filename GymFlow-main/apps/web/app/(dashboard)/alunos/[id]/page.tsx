@@ -339,7 +339,7 @@ export default function StudentDetailPage() {
       <motion.div custom={6} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-display font-bold text-sm">Planos alimentares ({mealPlans.length})</h3>
-          {isPersonal && (
+          {(isOwner || isPersonal) && (
             <Link
               href={`/dietas/novo?studentId=${id}`}
               className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1"
@@ -355,7 +355,7 @@ export default function StudentDetailPage() {
               <Salad className="w-4.5 h-4.5 text-muted-foreground/40" />
             </div>
             <p className="text-sm text-muted-foreground">Nenhum plano atribuído</p>
-            {isPersonal && (
+            {(isOwner || isPersonal) && (
               <Link
                 href={`/dietas/novo?studentId=${id}`}
                 className="btn-primary text-xs py-2 px-4 rounded-xl mt-3 inline-flex items-center gap-1.5"

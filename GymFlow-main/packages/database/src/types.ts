@@ -652,6 +652,56 @@ export type Database = {
           },
         ]
       }
+      food_items: {
+        Row: {
+          academy_id: string | null
+          carbs_per_100g: number
+          category: string | null
+          created_at: string
+          created_by: string | null
+          fat_per_100g: number
+          id: string
+          is_global: boolean
+          kcal_per_100g: number
+          name: string
+          protein_per_100g: number
+        }
+        Insert: {
+          academy_id?: string | null
+          carbs_per_100g?: number
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          fat_per_100g?: number
+          id?: string
+          is_global?: boolean
+          kcal_per_100g?: number
+          name: string
+          protein_per_100g?: number
+        }
+        Update: {
+          academy_id?: string | null
+          carbs_per_100g?: number
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          fat_per_100g?: number
+          id?: string
+          is_global?: boolean
+          kcal_per_100g?: number
+          name?: string
+          protein_per_100g?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "food_items_academy_id_fkey"
+            columns: ["academy_id"]
+            isOneToOne: false
+            referencedRelation: "academies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invites: {
         Row: {
           academy_id: string
@@ -709,37 +759,50 @@ export type Database = {
         Row: {
           created_at: string
           day_index: number | null
+          food_item_id: string | null
+          grams: number | null
           id: string
           meal_type: Database["public"]["Enums"]["meal_type"]
           notes: string | null
           order_index: number
           plan_id: string
-          recipe_id: string
+          recipe_id: string | null
           servings: number
         }
         Insert: {
           created_at?: string
           day_index?: number | null
+          food_item_id?: string | null
+          grams?: number | null
           id?: string
           meal_type: Database["public"]["Enums"]["meal_type"]
           notes?: string | null
           order_index?: number
           plan_id: string
-          recipe_id: string
+          recipe_id?: string | null
           servings?: number
         }
         Update: {
           created_at?: string
           day_index?: number | null
+          food_item_id?: string | null
+          grams?: number | null
           id?: string
           meal_type?: Database["public"]["Enums"]["meal_type"]
           notes?: string | null
           order_index?: number
           plan_id?: string
-          recipe_id?: string
+          recipe_id?: string | null
           servings?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "meal_plan_items_food_item_id_fkey"
+            columns: ["food_item_id"]
+            isOneToOne: false
+            referencedRelation: "food_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "meal_plan_items_plan_id_fkey"
             columns: ["plan_id"]
@@ -953,6 +1016,7 @@ export type Database = {
           name: string
           prep_minutes: number
           protein_g: number
+          serving_grams: number | null
           servings: number
           tags: string[]
         }
@@ -974,6 +1038,7 @@ export type Database = {
           name: string
           prep_minutes?: number
           protein_g?: number
+          serving_grams?: number | null
           servings?: number
           tags?: string[]
         }
@@ -995,6 +1060,7 @@ export type Database = {
           name?: string
           prep_minutes?: number
           protein_g?: number
+          serving_grams?: number | null
           servings?: number
           tags?: string[]
         }

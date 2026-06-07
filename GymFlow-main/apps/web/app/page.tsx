@@ -7,7 +7,7 @@ import {
   Dumbbell, Users, TrendingUp, Shield, Zap, BarChart2,
   ChevronRight, Check, Star, ArrowRight, Play, Menu, X,
   Smartphone, Clock, Award, Target, Activity, Lock,
-  ChevronDown, Quote,
+  ChevronDown, Quote, Salad, Scale,
 } from 'lucide-react'
 
 import { BrandLogo } from '@/components/layout/brand-logo'
@@ -543,9 +543,9 @@ function Hero() {
 const features = [
   {
     icon: Shield,
-    title: 'Multi-tenant com RLS',
+    title: 'Dados isolados por academia',
     description:
-      'Cada academia é um tenant isolado com Row Level Security no PostgreSQL. Os dados nunca se misturam.',
+      'Os dados da sua academia ficam separados. Nenhuma outra academia vê seus alunos, fichas ou métricas.',
     color: '#6366F1',
     gradient: 'from-brand-500/20 to-transparent',
   },
@@ -558,12 +558,28 @@ const features = [
     gradient: 'from-cyan-500/20 to-transparent',
   },
   {
+    icon: Salad,
+    title: 'Plano alimentar por aluno',
+    description:
+      'Monte planos com objetivo, calorias diárias e refeições. Cada aluno tem o cardápio dele dentro do app.',
+    color: '#84CC16',
+    gradient: 'from-lime-500/20 to-transparent',
+  },
+  {
     icon: TrendingUp,
     title: 'Evolução em gráficos',
     description:
       'Acompanhe a progressão de carga de cada exercício com gráficos interativos e histórico completo.',
     color: '#10B981',
     gradient: 'from-emerald-500/20 to-transparent',
+  },
+  {
+    icon: Scale,
+    title: 'Bioimpedância e composição',
+    description:
+      'Registre peso, % de gordura, massa muscular e mais. Histórico por aluno com cobertura da academia.',
+    color: '#22D3EE',
+    gradient: 'from-cyan-400/20 to-transparent',
   },
   {
     icon: Users,
@@ -575,33 +591,33 @@ const features = [
   },
   {
     icon: Smartphone,
-    title: 'PWA — mobile nativo',
+    title: 'App instalável no celular',
     description:
-      'Experiência de app instalável no celular. Registre séries e consulte fichas mesmo offline.',
+      'Aluno instala como aplicativo. Consulta a ficha e registra séries mesmo com sinal fraco.',
     color: '#8B5CF6',
     gradient: 'from-violet-500/20 to-transparent',
   },
   {
     icon: Zap,
-    title: 'Execução em tempo real',
+    title: 'Registro durante o treino',
     description:
-      'Registre cada série, peso e repetição ao vivo com cronômetro de descanso integrado.',
+      'Aluno registra peso, repetições e descanso a cada série, com cronômetro integrado.',
     color: '#F97316',
     gradient: 'from-orange-500/20 to-transparent',
   },
   {
     icon: BarChart2,
-    title: 'Dashboard analítico',
+    title: 'Painel com os números',
     description:
-      'Frequência semanal, mapa de calor, exercícios mais populares e métricas de retenção.',
+      'Frequência semanal, mapa de calor, exercícios mais usados e quem está sumindo.',
     color: '#EC4899',
     gradient: 'from-pink-500/20 to-transparent',
   },
   {
     icon: Lock,
-    title: 'Planos e assinatura',
+    title: 'Assinatura sem dor de cabeça',
     description:
-      'Free, Starter e Pro com Stripe. Webhook processado na edge para upgrades instantâneos.',
+      'Personal, Starter ou Pro. Cobrança automática via Stripe, upgrade na hora, cancela quando quiser.',
     color: '#14B8A6',
     gradient: 'from-teal-500/20 to-transparent',
   },
@@ -944,11 +960,13 @@ const plans = [
     description: 'Para personal trainers independentes',
     features: [
       'Até 20 alunos',
-      'Fichas ilimitadas',
-      'Biblioteca de exercícios',
-      'Histórico de treinos',
-      'Convites por link',
-      '14 dias grátis',
+      'Fichas de treino ilimitadas',
+      'Biblioteca de 600+ exercícios',
+      'Plano alimentar por aluno',
+      'Bioimpedância e composição',
+      'App mobile com modo offline',
+      'Histórico e gráficos de evolução',
+      '14 dias grátis sem cartão',
     ],
     cta: 'Começar grátis',
     href: '/cadastro?plan=personal',
@@ -964,10 +982,12 @@ const plans = [
     features: [
       'Até 50 alunos',
       'Até 3 personais',
-      'Fichas ilimitadas',
-      'Dashboard analítico',
-      'Convites por código',
-      '30 dias grátis',
+      'Tudo do Personal incluído',
+      'Dashboard com frequência',
+      'Mapa de calor da academia',
+      'Convites por link e código',
+      'Painel de alunos inativos',
+      '30 dias grátis sem cartão',
     ],
     cta: 'Começar grátis por 30 dias',
     href: '/cadastro?plan=starter',
@@ -983,10 +1003,12 @@ const plans = [
     features: [
       'Alunos ilimitados',
       'Personais ilimitados',
+      'Tudo do Starter incluído',
       'Relatórios avançados',
-      'Exportar dados (CSV)',
-      'Notificações de inatividade',
-      'Suporte prioritário',
+      'Exportar dados em CSV',
+      'Histórico de faturas e gestão de cobrança',
+      'Suporte por e-mail',
+      'Sem fidelidade — cancele quando quiser',
     ],
     cta: 'Assinar Pro',
     href: '/cadastro?plan=pro',

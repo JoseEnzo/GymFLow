@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   Search, Plus, X, Loader2, Check, ArrowLeft, UtensilsCrossed,
-  Flame, Beef, Wheat, Droplet, Clock,
+  Flame, Beef, Wheat, Droplet, Clock, Apple,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { MEAL_TYPES, MEAL_TYPE_LABELS, MEAL_TYPE_EMOJI } from '@gymflow/database'
@@ -37,6 +37,7 @@ interface Recipe {
   fat_g: number
   prep_minutes: number
   servings: number
+  serving_grams: number | null
   difficulty: Difficulty
   ingredients: string[]
   tags: string[]
@@ -45,7 +46,40 @@ interface Recipe {
   academy_id: string | null
 }
 
-const RECIPE_COLS = 'id, name, description, meal_types, calories, protein_g, carbs_g, fat_g, prep_minutes, servings, difficulty, ingredients, tags, is_global, created_by, academy_id'
+const RECIPE_COLS = 'id, name, description, meal_types, calories, protein_g, carbs_g, fat_g, prep_minutes, servings, serving_grams, difficulty, ingredients, tags, is_global, created_by, academy_id'
+
+interface FoodItem {
+  id: string
+  name: string
+  kcal_per_100g: number
+  protein_per_100g: number
+  carbs_per_100g: number
+  fat_per_100g: number
+  category: string | null
+  is_global: boolean
+}
+
+const FOOD_COLS = 'id, name, kcal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, category, is_global'
+
+const CATEGORY_LABELS: Record<string, string> = {
+  proteina: 'Proteína',
+  laticinio: 'Laticínio',
+  carboidrato: 'Carboidrato',
+  fruta: 'Fruta',
+  vegetal: 'Vegetal',
+  gordura: 'Gordura',
+  suplemento: 'Suplemento',
+}
+
+const CATEGORY_COLORS: Record<string, string> = {
+  proteina: '#EC4899',
+  laticinio: '#A78BFA',
+  carboidrato: '#6366F1',
+  fruta: '#F97316',
+  vegetal: '#10B981',
+  gordura: '#F59E0B',
+  suplemento: '#14B8A6',
+}
 
 interface RecipeForm {
   name: string
@@ -227,7 +261,7 @@ function NewRecipeModal({ onClose, onCreated }: { onClose: () => void; onCreated
   )
 }
 
-interface AddConfig { servings: number; notes: string }
+interface AddConfig { servings: number; grams: number | null; notes: string }
 
 function AddToPlanModal({ recipe, mealLabel, onClose, onConfirm, saving }: {
   recipe: Recipe
@@ -236,8 +270,28 @@ function AddToPlanModal({ recipe, mealLabel, onClose, onConfirm, saving }: {
   onConfirm: (cfg: AddConfig) => void
   saving: boolean
 }) {
+  const canUseGrams = recipe.serving_grams != null && recipe.serving_grams > 0
+  const [mode, setMode] = useState<'servings' | 'grams'>('servings')
   const [servings, setServings] = useState(1)
+  const [grams, setGrams] = useState<number>(recipe.serving_grams ?? 100)
+
   const [notes, setNotes] = useState('')
+
+  // Multiplicador efetivo pra preview de macros
+  const multiplier = mode === 'grams' && canUseGrams
+    ? grams / (recipe.serving_grams as number)
+    : servings
+
+  const previewKcal = Math.round(recipe.calories * multiplier)
+  const previewProt = Math.round(recipe.protein_g * multiplier * 10) / 10
+
+  function handleConfirm() {
+    if (mode === 'grams' && canUseGrams) {
+      onConfirm({ servings: 1, grams, notes })
+    } else {
+      onConfirm({ servings, grams: null, notes })
+    }
+  }
 
   return (
     <motion.div
@@ -259,12 +313,64 @@ function AddToPlanModal({ recipe, mealLabel, onClose, onConfirm, saving }: {
           </button>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Porções</label>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setServings((s) => Math.max(0.5, s - 0.5))} className="w-8 h-8 rounded-lg border border-border/60 flex items-center justify-center text-sm font-bold hover:bg-surface-100 transition-all">−</button>
-            <span className="flex-1 text-center font-bold text-lg">{servings}</span>
-            <button onClick={() => setServings((s) => Math.min(10, s + 0.5))} className="w-8 h-8 rounded-lg border border-border/60 flex items-center justify-center text-sm font-bold hover:bg-surface-100 transition-all">+</button>
+        {canUseGrams && (
+          <div className="inline-flex p-1 rounded-xl bg-surface-100 border border-border/60 w-full">
+            <button
+              type="button"
+              onClick={() => setMode('servings')}
+              className={cn('flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
+                mode === 'servings' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+            >
+              Porções
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('grams')}
+              className={cn('flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
+                mode === 'grams' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+            >
+              Gramas
+            </button>
+          </div>
+        )}
+
+        {mode === 'servings' || !canUseGrams ? (
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Porções</label>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setServings((s) => Math.max(0.5, s - 0.5))} className="w-8 h-8 rounded-lg border border-border/60 flex items-center justify-center text-sm font-bold hover:bg-surface-100 transition-all">−</button>
+              <span className="flex-1 text-center font-bold text-lg">{servings}</span>
+              <button onClick={() => setServings((s) => Math.min(10, s + 0.5))} className="w-8 h-8 rounded-lg border border-border/60 flex items-center justify-center text-sm font-bold hover:bg-surface-100 transition-all">+</button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Quantidade (g)</label>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setGrams((g) => Math.max(10, g - 25))} className="w-8 h-8 rounded-lg border border-border/60 flex items-center justify-center text-sm font-bold hover:bg-surface-100 transition-all">−</button>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={grams}
+                onChange={(e) => setGrams(Math.max(1, parseInt(e.target.value) || 0))}
+                className="flex-1 text-center font-bold text-lg bg-transparent border-0 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+              <button onClick={() => setGrams((g) => g + 25)} className="w-8 h-8 rounded-lg border border-border/60 flex items-center justify-center text-sm font-bold hover:bg-surface-100 transition-all">+</button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              1 porção ≈ {recipe.serving_grams}g
+            </p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-2 text-center">
+          <div className="rounded-xl bg-surface-100 p-2">
+            <p className="font-bold text-sm text-[#F97316]">{previewKcal}</p>
+            <p className="text-[10px] text-muted-foreground">kcal</p>
+          </div>
+          <div className="rounded-xl bg-surface-100 p-2">
+            <p className="font-bold text-sm text-[#EC4899]">{previewProt}g</p>
+            <p className="text-[10px] text-muted-foreground">proteína</p>
           </div>
         </div>
 
@@ -275,7 +381,95 @@ function AddToPlanModal({ recipe, mealLabel, onClose, onConfirm, saving }: {
 
         <div className="flex gap-3 pt-1">
           <button onClick={onClose} className="flex-1 btn-secondary py-2.5 rounded-xl text-sm">Cancelar</button>
-          <button onClick={() => onConfirm({ servings, notes })} disabled={saving} className="flex-1 btn-primary py-2.5 rounded-xl text-sm">
+          <button onClick={handleConfirm} disabled={saving} className="flex-1 btn-primary py-2.5 rounded-xl text-sm">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Adicionar'}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+interface AddFoodConfig { grams: number; notes: string }
+
+function AddFoodToPlanModal({ food, mealLabel, onClose, onConfirm, saving }: {
+  food: FoodItem
+  mealLabel: string
+  onClose: () => void
+  onConfirm: (cfg: AddFoodConfig) => void
+  saving: boolean
+}) {
+  const [grams, setGrams] = useState(100)
+  const [notes, setNotes] = useState('')
+
+  const factor = grams / 100
+  const previewKcal = Math.round(food.kcal_per_100g * factor)
+  const previewProt = Math.round(food.protein_per_100g * factor * 10) / 10
+  const previewCarb = Math.round(food.carbs_per_100g * factor * 10) / 10
+  const previewFat = Math.round(food.fat_per_100g * factor * 10) / 10
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }}
+        className="glass w-full max-w-sm rounded-2xl p-6 space-y-5 border border-border/60"
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-display font-bold text-sm">Adicionar à {mealLabel}</h3>
+            <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[220px]">{food.name}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface-200 transition-all text-muted-foreground">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Quantidade (g)</label>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setGrams((g) => Math.max(5, g - 25))} className="w-8 h-8 rounded-lg border border-border/60 flex items-center justify-center text-sm font-bold hover:bg-surface-100 transition-all">−</button>
+            <input
+              type="number"
+              inputMode="numeric"
+              value={grams}
+              onChange={(e) => setGrams(Math.max(1, parseInt(e.target.value) || 0))}
+              className="flex-1 text-center font-bold text-lg bg-transparent border-0 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+            <button onClick={() => setGrams((g) => g + 25)} className="w-8 h-8 rounded-lg border border-border/60 flex items-center justify-center text-sm font-bold hover:bg-surface-100 transition-all">+</button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-2 text-center">
+          <div className="rounded-xl bg-surface-100 p-2">
+            <p className="font-bold text-sm text-[#F97316]">{previewKcal}</p>
+            <p className="text-[10px] text-muted-foreground">kcal</p>
+          </div>
+          <div className="rounded-xl bg-surface-100 p-2">
+            <p className="font-bold text-sm text-[#EC4899]">{previewProt}g</p>
+            <p className="text-[10px] text-muted-foreground">prot</p>
+          </div>
+          <div className="rounded-xl bg-surface-100 p-2">
+            <p className="font-bold text-sm text-[#6366F1]">{previewCarb}g</p>
+            <p className="text-[10px] text-muted-foreground">carb</p>
+          </div>
+          <div className="rounded-xl bg-surface-100 p-2">
+            <p className="font-bold text-sm text-[#10B981]">{previewFat}g</p>
+            <p className="text-[10px] text-muted-foreground">gord</p>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Observação <span className="normal-case text-[10px]">(opcional)</span></label>
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ex: cozido sem sal, temperar com limão..." rows={2} className="field text-sm resize-none" />
+        </div>
+
+        <div className="flex gap-3 pt-1">
+          <button onClick={onClose} className="flex-1 btn-secondary py-2.5 rounded-xl text-sm">Cancelar</button>
+          <button onClick={() => onConfirm({ grams, notes })} disabled={saving} className="flex-1 btn-primary py-2.5 rounded-xl text-sm">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Adicionar'}
           </button>
         </div>
@@ -367,7 +561,8 @@ function ReceitasContent() {
   const { currentAcademy, currentRole } = useAuthStore()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const supabase = createClient() as any
-  const isPersonal = currentRole === 'personal'
+  // Owner tem as mesmas capacidades de personal (criar e atribuir receitas).
+  const isPersonal = currentRole === 'personal' || currentRole === 'owner'
 
   const [recipes, setRecipes] = useState<Recipe[]>([])
   const [loading, setLoading] = useState(true)
@@ -420,6 +615,7 @@ function ReceitasContent() {
         meal_type: mealParam,
         order_index: count ?? 0,
         servings: cfg.servings,
+        grams: cfg.grams,
         notes: cfg.notes || null,
         ...(dayIndex !== null ? { day_index: dayIndex } : {}),
       })

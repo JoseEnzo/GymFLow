@@ -99,13 +99,16 @@ export default function DietasPage() {
   const isOwner = currentRole === 'owner'
   const isPersonal = currentRole === 'personal'
   const isStudent = currentRole === 'student'
+  // Owner tem as MESMAS capacidades de personal (criar, atribuir, deletar planos).
+  // Essa é a regra geral do produto: owner manda + personal manda, student só vê o seu.
+  const canManage = isOwner || isPersonal
 
   useEffect(() => {
     async function load() {
       if (!currentAcademy) { setLoading(false); return }
       const { data: { user } } = await supabase.auth.getUser()
 
-      if (isPersonal) {
+      if (canManage) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { count } = await (supabase as any)
           .from('academy_members')
@@ -131,7 +134,7 @@ export default function DietasPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mapped = (data ?? []).map((p: any) => ({ ...p, item_count: p.meal_plan_items?.length ?? 0 }))
 
-      if (isPersonal && mapped.length > 0) {
+      if (canManage && mapped.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const studentIds = [...new Set<string>(mapped.map((p: any) => p.student_id).filter(Boolean))]
         if (studentIds.length > 0) {
@@ -172,22 +175,15 @@ export default function DietasPage() {
             {loading ? 'Carregando...' : `${plans.length} ${plans.length === 1 ? 'plano' : 'planos'} · ${plans.filter((p) => p.is_active).length} ativos`}
           </p>
         </div>
-        {isPersonal && hasStudents && (
+        {canManage && hasStudents && (
           <Link href="/dietas/novo" className="btn-primary text-sm py-2.5 px-5 rounded-xl inline-flex items-center gap-2">
             <Plus className="w-4 h-4" /> Novo plano
           </Link>
         )}
       </motion.div>
 
-      {/* Owner aviso: só visualização */}
-      {isOwner && (
-        <motion.div variants={fadeUp} className="glass rounded-2xl p-4 border border-amber-500/20 bg-amber-500/5 text-xs text-amber-300/90">
-          Como proprietário, você acompanha os planos alimentares da academia. A atribuição a alunos é feita pelos personais.
-        </motion.div>
-      )}
-
-      {/* Personal sem alunos */}
-      {isPersonal && !hasStudents && !loading && (
+      {/* Owner/personal sem alunos: empty state apontando pra convidar */}
+      {canManage && !hasStudents && !loading && (
         <motion.div variants={fadeUp} className="glass rounded-2xl p-6 border border-border/60 text-center">
           <div className="w-12 h-12 rounded-2xl bg-surface-200 flex items-center justify-center mx-auto mb-3">
             <UserPlus className="w-5 h-5 text-muted-foreground/50" />
@@ -215,12 +211,12 @@ export default function DietasPage() {
       {!loading && (
         <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((p) => (
-            <PlanCard key={p.id} plan={p} isPersonal={isPersonal} readOnly={isOwner} onDelete={handleDelete} />
+            <PlanCard key={p.id} plan={p} isPersonal={canManage} readOnly={!canManage} onDelete={handleDelete} />
           ))}
         </motion.div>
       )}
 
-      {!loading && filtered.length === 0 && plans.length === 0 && !(isPersonal && !hasStudents) && (
+      {!loading && filtered.length === 0 && plans.length === 0 && !(canManage && !hasStudents) && (
         <motion.div variants={fadeUp} className="text-center py-20">
           <div className="w-14 h-14 rounded-2xl bg-surface-200 flex items-center justify-center mx-auto mb-4">
             <Salad className="w-7 h-7 text-muted-foreground/40" />
@@ -228,7 +224,7 @@ export default function DietasPage() {
           <p className="font-semibold text-muted-foreground">
             {isStudent ? 'Nenhum plano atribuído ainda' : 'Nenhum plano alimentar criado'}
           </p>
-          {isPersonal && hasStudents && (
+          {canManage && hasStudents && (
             <Link href="/dietas/novo" className="btn-primary text-sm py-2 px-4 rounded-xl mt-4 inline-flex items-center gap-1.5">
               <Plus className="w-4 h-4" /> Criar plano
             </Link>

@@ -26,6 +26,7 @@ interface PlanItem {
   meal_type: MealType
   order_index: number
   servings: number
+  grams: number | null
   notes: string | null
   recipe: {
     id: string
@@ -34,7 +35,15 @@ interface PlanItem {
     protein_g: number
     carbs_g: number
     fat_g: number
+    serving_grams: number | null
   }
+}
+
+function itemMultiplier(it: PlanItem): number {
+  if (it.grams != null && it.recipe.serving_grams && it.recipe.serving_grams > 0) {
+    return it.grams / it.recipe.serving_grams
+  }
+  return it.servings
 }
 
 interface MealPlan {
@@ -75,8 +84,8 @@ export default function PlanoDetailPage() {
       .select(`
         id, name, goal, description, daily_calories, is_active, student_id,
         meal_plan_items (
-          id, meal_type, order_index, servings, notes,
-          recipe:recipes ( id, name, calories, protein_g, carbs_g, fat_g )
+          id, meal_type, order_index, servings, grams, notes,
+          recipe:recipes ( id, name, calories, protein_g, carbs_g, fat_g, serving_grams )
         )
       `)
       .eq('id', id)
@@ -125,12 +134,15 @@ export default function PlanoDetailPage() {
 
   // Totais diários
   const totals = plan.items.reduce(
-    (acc, it) => ({
-      kcal: acc.kcal + it.recipe.calories * it.servings,
-      prot: acc.prot + it.recipe.protein_g * it.servings,
-      carb: acc.carb + it.recipe.carbs_g * it.servings,
-      fat: acc.fat + it.recipe.fat_g * it.servings,
-    }),
+    (acc, it) => {
+      const m = itemMultiplier(it)
+      return {
+      kcal: acc.kcal + it.recipe.calories * m,
+      prot: acc.prot + it.recipe.protein_g * m,
+      carb: acc.carb + it.recipe.carbs_g * m,
+      fat: acc.fat + it.recipe.fat_g * m,
+      }
+    },
     { kcal: 0, prot: 0, carb: 0, fat: 0 }
   )
 
@@ -186,7 +198,7 @@ export default function PlanoDetailPage() {
       {mealsToShow.map((meal, idx) => {
         const items = plan.items.filter((i) => i.meal_type === meal).sort((a, b) => a.order_index - b.order_index)
         const mealColor = MEAL_TYPE_COLORS[meal] ?? '#6366F1'
-        const mealKcal = items.reduce((s, it) => s + it.recipe.calories * it.servings, 0)
+        const mealKcal = items.reduce((s, it) => s + it.recipe.calories * itemMultiplier(it), 0)
         if (!canEdit && items.length === 0) return null
         return (
           <motion.div key={meal} custom={2 + idx * 0.3} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5">
@@ -207,7 +219,10 @@ export default function PlanoDetailPage() {
               <p className="text-xs text-muted-foreground py-2">Nenhuma receita nesta refeição.</p>
             ) : (
               <div className="space-y-2">
-                {items.map((it) => (
+                {items.map((it) => {
+                  const m = itemMultiplier(it)
+                  const qtyLabel = it.grams != null ? `${it.grams}g` : (it.servings !== 1 ? `×${it.servings}` : null)
+                  return (
                   <div key={it.id} className="flex items-center gap-3 p-3 rounded-xl bg-surface-100 group">
                     <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${mealColor}15` }}>
                       <Salad className="w-4 h-4" style={{ color: mealColor }} />
@@ -215,11 +230,11 @@ export default function PlanoDetailPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate">{it.recipe.name}</p>
                       <div className="flex items-center gap-2.5 mt-0.5 flex-wrap">
-                        <MacroBadge icon={Flame} value={it.recipe.calories * it.servings} color="#F97316" />
-                        <MacroBadge icon={Beef} value={it.recipe.protein_g * it.servings} color="#EC4899" />
-                        <MacroBadge icon={Wheat} value={it.recipe.carbs_g * it.servings} color="#6366F1" />
-                        <MacroBadge icon={Droplet} value={it.recipe.fat_g * it.servings} color="#10B981" />
-                        {it.servings !== 1 && <span className="text-[11px] text-muted-foreground">×{it.servings}</span>}
+                        <MacroBadge icon={Flame} value={it.recipe.calories * m} color="#F97316" />
+                        <MacroBadge icon={Beef} value={it.recipe.protein_g * m} color="#EC4899" />
+                        <MacroBadge icon={Wheat} value={it.recipe.carbs_g * m} color="#6366F1" />
+                        <MacroBadge icon={Droplet} value={it.recipe.fat_g * m} color="#10B981" />
+                        {qtyLabel && <span className="text-[11px] text-muted-foreground font-medium">{qtyLabel}</span>}
                       </div>
                       {it.notes && <p className="text-[11px] text-muted-foreground mt-0.5 italic">{it.notes}</p>}
                     </div>
@@ -229,7 +244,8 @@ export default function PlanoDetailPage() {
                       </button>
                     )}
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </motion.div>

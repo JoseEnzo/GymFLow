@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
 import { BottomNav } from '@/components/layout/bottom-nav'
+import { OfflineSyncProvider } from '@/components/layout/offline-sync-provider'
 export const metadata: Metadata = {
   title: 'Dashboard',
 }
@@ -9,6 +10,7 @@ export const metadata: Metadata = {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen bg-background overflow-hidden">
+      <OfflineSyncProvider />
       <Sidebar />
 
       {/* Main content area — shifts with sidebar */}

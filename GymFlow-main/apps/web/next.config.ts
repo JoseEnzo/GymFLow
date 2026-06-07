@@ -32,6 +32,30 @@ const withPWA = withPWAInit({
         handler: 'StaleWhileRevalidate',
         options: { cacheName: 'static-assets' },
       },
+      // Shell HTML da execução de treino — pra abrir offline.
+      // Os DADOS da ficha ficam em IndexedDB (lib/offline-store.ts); o HTML
+      // aqui só serve o esqueleto 'use client' que hidrata de lá. Sem risco
+      // de leakage cross-tenant: o HTML é o mesmo pra todo aluno, dados vêm
+      // do client após auth + RLS.
+      {
+        urlPattern: /\/treinos\/executar\/.+/i,
+        handler: 'NetworkFirst',
+        options: {
+          cacheName: 'workout-shell',
+          networkTimeoutSeconds: 3,
+          expiration: { maxEntries: 12, maxAgeSeconds: 7 * 24 * 60 * 60 },
+        },
+      },
+      // Lista de treinos também útil offline pra navegar pra ficha cacheada.
+      {
+        urlPattern: /\/treinos$/i,
+        handler: 'NetworkFirst',
+        options: {
+          cacheName: 'workout-shell',
+          networkTimeoutSeconds: 3,
+          expiration: { maxEntries: 2, maxAgeSeconds: 7 * 24 * 60 * 60 },
+        },
+      },
     ],
   },
 })

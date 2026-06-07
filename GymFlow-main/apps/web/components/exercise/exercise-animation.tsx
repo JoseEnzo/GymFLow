@@ -138,7 +138,10 @@ export function ExerciseAnimation({
 
   return (
     <div className={className}>
-      <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      {/* CSS é constante literal definida acima — sem user input. Mantemos
+          inline pra escopo: o seletor `.bnc[data-p="..."]` só hidrata quando
+          este componente monta. React 18+ permite o style raw sem dangerously. */}
+      <style>{CSS}</style>
       <svg className="bnc" data-p={p} viewBox="0 0 200 250" role="img"
         aria-label={`Demonstração do movimento: ${PATTERN_LABEL[p]}`}>
         <g className="fig">
