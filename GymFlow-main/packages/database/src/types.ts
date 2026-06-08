@@ -1453,6 +1453,30 @@ export type Database = {
         }
         Returns: Json
       }
+      get_personal_dashboard: {
+        Args: {
+          p_academy_id: string
+          p_personal_id: string
+          p_today_start: string
+          p_week_ago: string
+        }
+        Returns: Json
+      }
+      get_student_dashboard: {
+        Args: {
+          p_academy_id: string
+          p_student_id: string
+          p_today_date: string
+          p_today_index: number
+          p_today_start: string
+          p_week_ago: string
+        }
+        Returns: Json
+      }
+      get_student_evolution_summary: {
+        Args: { p_academy_id: string; p_since: string; p_student_id: string }
+        Returns: Json
+      }
       get_user_academy_ids: { Args: never; Returns: string[] }
       get_user_role_in_academy: {
         Args: { p_academy_id: string }

@@ -542,14 +542,6 @@ function Hero() {
 // ──────────────────────────────────────────────
 const features = [
   {
-    icon: Shield,
-    title: 'Dados isolados por academia',
-    description:
-      'Os dados da sua academia ficam separados. Nenhuma outra academia vê seus alunos, fichas ou métricas.',
-    color: '#6366F1',
-    gradient: 'from-brand-500/20 to-transparent',
-  },
-  {
     icon: Dumbbell,
     title: 'Fichas de treino completas',
     description:
@@ -612,14 +604,6 @@ const features = [
       'Frequência semanal, mapa de calor, exercícios mais usados e quem está sumindo.',
     color: '#EC4899',
     gradient: 'from-pink-500/20 to-transparent',
-  },
-  {
-    icon: Lock,
-    title: 'Assinatura sem dor de cabeça',
-    description:
-      'Personal, Starter ou Pro. Cobrança automática via Stripe, upgrade na hora, cancela quando quiser.',
-    color: '#14B8A6',
-    gradient: 'from-teal-500/20 to-transparent',
   },
 ]
 

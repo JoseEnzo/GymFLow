@@ -9,6 +9,7 @@ import { MUSCLE_GROUPS } from '@gymflow/database'
 
 import { cn, MUSCLE_GROUP_COLORS } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { getCached, setCached, CACHE_TTL } from '@/lib/global-cache'
 import { useAuthStore } from '@/stores/auth-store'
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } }
@@ -287,8 +288,18 @@ function ExerciciosContent() {
   const [sheetName, setSheetName] = useState('')
   const [pendingExercise, setPendingExercise] = useState<Exercise | null>(null)
 
+  const exercisesCacheKey = `exercises_${currentAcademy?.id ?? 'global'}`
+
   useEffect(() => {
     async function load() {
+      // Hit cache antes de query (ver lib/global-cache.ts).
+      const cached = getCached<Exercise[]>(exercisesCacheKey, CACHE_TTL.GLOBAL_LIST)
+      if (cached) {
+        setExercises(cached)
+        setLoading(false)
+        return
+      }
+
       let query = supabase
         .from('exercises')
         .select('id, name_pt, muscle_groups, equipment, difficulty, is_global, created_by, academy_id')
@@ -302,7 +313,9 @@ function ExerciciosContent() {
 
       const { data, error } = await query
       if (error) { toast.error('Erro ao carregar exercícios.'); setLoading(false); return }
-      setExercises((data ?? []) as Exercise[])
+      const list = (data ?? []) as Exercise[]
+      setExercises(list)
+      setCached(exercisesCacheKey, list)
       setLoading(false)
     }
     load()
@@ -601,7 +614,12 @@ function ExerciciosContent() {
         {showModal && (
           <NewExerciseModal
             onClose={() => setShowModal(false)}
-            onCreated={(ex) => { setExercises((prev) => [ex, ...prev]); setShowModal(false) }}
+            onCreated={(ex) => {
+              const updated = [ex, ...exercises]
+              setExercises(updated)
+              setCached(exercisesCacheKey, updated)
+              setShowModal(false)
+            }}
           />
         )}
         {pendingExercise && (

@@ -171,6 +171,30 @@ function CadastroInner() {
     setIsLoading(true)
     setServerError(null)
     try {
+      // Pre-check: CNPJ/CREF já em uso? Evita criar auth.user órfão.
+      // CPF (student) pula esse check — student loga com email, não CPF.
+      if (accountType === 'owner' || accountType === 'personal') {
+        const checkRes = await fetch('/api/check-document', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            document,
+            type: accountType === 'owner' ? 'cnpj' : 'cref',
+          }),
+        })
+        const checkJson = await checkRes.json() as { exists?: boolean; masked_email?: string | null }
+        if (checkJson.exists) {
+          const label = accountType === 'owner' ? 'CNPJ' : 'CREF'
+          setDocumentError(
+            checkJson.masked_email
+              ? `Já existe conta com esse ${label} (${checkJson.masked_email}). Faça login.`
+              : `Já existe conta com esse ${label}. Faça login.`
+          )
+          setIsLoading(false)
+          return
+        }
+      }
+
       const redirectTo = inviteToken ? `/convite/${inviteToken}` : undefined
       await signUp(data.email, data.password, data.fullName, accountType, redirectTo, document)
     } catch (err: unknown) {

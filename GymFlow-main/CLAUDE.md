@@ -196,11 +196,22 @@ Para **limpeza retroativa**: ataque por categoria (queries → casts inline → 
 - `next/dynamic` em FrequencyHeatmap + StudentBioView (carregam só quando renderizam).
 - `memo` nos 4 cards repetidos.
 - `MotionConfig reducedMotion='always'` em dev.
-- **RPC `get_owner_dashboard` (migration 056, out/2026):** consolida counts (students, personals, workouts week/last week, new this month, active this week, inactive, sem ficha) + arrays (recent_students, recent_workouts com profiles+sheet name embedded, inactive_students com last_workout_at, personais_perf com student_count). 14 → 1 roundtrip. Permission check `owner` embutido (`RAISE EXCEPTION OWNER_ONLY`). SECURITY INVOKER, GRANT EXECUTE pra `authenticated`. Aplicado em prod sem fallback — se a RPC falhar, dashboard fica vazio até reload (log em `console.error('get_owner_dashboard failed', ...)`).
+- **RPC `get_owner_dashboard` (migration 056, out/2026):** consolida counts (students, personals, workouts week/last week, new this month, active this week, inactive, sem ficha) + arrays (recent_students, recent_workouts com profiles+sheet name embedded, inactive_students com last_workout_at, personais_perf com student_count). 14 → 1 roundtrip. Permission check `owner` embutido (`RAISE EXCEPTION OWNER_ONLY`).
+- **RPC `get_personal_dashboard` (migration 057, out/2026):** trained_today_count, active_sheets_count, inactive_count, my_students[] (com last_workout_at + trained_today + active_sheets flag), recent_workouts[] (8 com student_name + sheet_name). 7 → 1 roundtrip. Check `p_personal_id = auth.uid()` + role in `personal`/`owner`.
+- **RPC `get_student_dashboard` (migration 058, out/2026):** total/week_workouts, active_sheets, log_dates[] (cliente computa streak/heatmap/monthly localmente), last_workout, today_workout (com already_done de agenda_completions), next_workout (próximo dia futuro com ficha agendada). 9 → 1 roundtrip. Check `p_student_id = auth.uid()`.
 
-**Como NÃO quebrar:** qualquer novo campo que o dashboard renderiza precisa **vir da RPC** — adicionar uma query Supabase paralela no `loadOwnerData` reintroduz o problema. Alterar a RPC exige nova migration (não editar 056), regen de types e ajustar o cast `as { ... }` em `loadOwnerData`.
+Todas as 3 são SECURITY INVOKER, GRANT EXECUTE pra `authenticated`. Aplicadas em prod sem fallback — se uma falhar, dashboard daquele papel fica vazio até reload (log em `console.error('get_<role>_dashboard failed', ...)`).
 
-Os paths `loadPersonalData` e `loadStudentData` continuam usando queries diretas (volumes menores; otimizar só se virarem gargalo).
+**Como NÃO quebrar:** qualquer novo campo que o dashboard renderiza precisa **vir da RPC correspondente** — adicionar uma query Supabase paralela em `loadOwnerData`/`loadPersonalData`/`loadStudentData` reintroduz o problema. Alterar uma RPC exige nova migration (não editar 056/057/058), regen de types e ajustar o cast `as { ... }` no load.
+
+#### Cache de listas globais
+
+`apps/web/lib/global-cache.ts` (out/2026) — helper TTL via `localStorage` usado em `/receitas` (`recipes` + `food_items`) e `/exercicios` (`exercises`). TTL padrão 5min via `CACHE_TTL.GLOBAL_LIST`. Skip total da query quando cache fresco — economia direta de conexão Supabase.
+
+- **Chaves incluem `academy_id`** (ex: `recipes_<academy_id>`) pra evitar leakage cross-tenant. Catálogos com `is_global=true` aparecem na lista mas o cache é por-academia mesmo assim.
+- **Após escrita local** (callback `onCreated` em `NewRecipeModal`/`NewExerciseModal`), chamar `setCached(key, updatedArray)` junto com `setState(updatedArray)`. Não usar `setState((prev) => [...prev, x])` aqui — o cache não vê o setter funcional.
+- **Bump `CACHE_VERSION`** em `global-cache.ts` quando o shape dos dados mudar (campos novos em migration) pra invalidar payloads velhos sem precisar limpar localStorage manualmente.
+- **NÃO cachear dados variáveis por tenant** (alunos, treinos, planos, set_logs) — staleness aí é vazamento de UX (aluno não vê próprio treino que acabou de logar).
 
 ### Zustand
 - Store global apenas para: usuário logado, `academy_id` ativo e `role`
@@ -393,6 +404,14 @@ Setup PWA completo via `@ducanh2912/next-pwa` (configurado em `apps/web/next.con
 CNPJ → ReceitaWS → preenche dados → Google Places → confirma → cria academia + membro owner
 ```
 
+**Pegadinha resolvida (out/2026):** o fluxo `/cadastro` → `signUp` → `/onboarding` → `/api/academy` deixa **auth.user órfão** se a criação da academia falha (ex: CNPJ duplicado). O user fica zombiado com CNPJ no metadata mas sem academia, bloqueando todas as tentativas futuras com o mesmo CNPJ. Fix em 3 camadas:
+
+1. **Pre-check no `/cadastro`** chama `POST /api/check-document` ANTES do signUp. Bloqueia se CNPJ/CREF já tem conta, mostra email mascarado e sugere login.
+2. **Cleanup automático em `/api/academy`** — quando insert da academia bate em 23505 cnpj, chama `admin.auth.admin.deleteUser()` ANTES de retornar 409. Remove o auth.user que acabou de ser criado.
+3. **`/api/check-document`** (rota pública na allowlist do middleware): rate-limited, sem Turnstile, retorna `{exists, masked_email?}`. Reusa lógica de varredura academias.cnpj + fallback auth.users.metadata do `/api/auth/lookup`.
+
+Se vir auth.users com `account_type='owner'` E sem academia vinculada, é órfão de uma versão antiga. Migration `063_cleanup_orphan_owner.sql` faz limpeza idempotente (safety: só toca em users com mais de 1h de idade pra não pisar em signup ativo).
+
 ### Entrada do aluno
 ```
 Link /convite/[code] → valida código (não expirado, não usado) → cria user → cria academy_member → marca convite como usado
@@ -437,6 +456,9 @@ Operações que precisam de atomicidade vivem em RPCs Postgres, não em código 
 - **`list_academy_students(p_academy_id, p_search, p_status, p_limit, p_offset)`** — `029_list_academy_students_rpc.sql`. Consolida `academy_members + profiles + workout_logs(agg) + workout_sheets(agg)` numa query só, com search via `extensions.unaccent + ILIKE`, paginação e `total_count`. Permission check owner/personal embutido. Substitui o N+1 + mentira-de-UI antigo.
 - **`accept_invite(p_token, p_user_id)`** — `030_accept_invite_rpc.sql`. `FOR UPDATE` lock + check de `uses_limit` pré-incremento + idempotência por `(academy, user)`. Erros nomeados: `INVITE_UNAVAILABLE`, `EXPIRED`, `EXHAUSTED`, `INVALID_ROLE`. **GRANT só para `service_role`** — chamada exclusivamente do API route, nunca do client.
 - **`get_owner_dashboard(p_academy_id, p_week_ago, p_two_weeks_ago, p_month_ago)`** — `056_get_owner_dashboard_rpc.sql`. Retorna jsonb com todas as métricas + arrays do dashboard do owner. Permission check `'owner'` no início (`RAISE EXCEPTION OWNER_ONLY`). GRANT EXECUTE pra `authenticated` (RLS aplicada via `SECURITY INVOKER`).
+- **`get_personal_dashboard(p_academy_id, p_personal_id, p_week_ago, p_today_start)`** — `057_get_personal_dashboard_rpc.sql`. Personal vê só os alunos que ele convidou (filtro `invited_by`). Permission: `p_personal_id = auth.uid()` AND role in (personal, owner).
+- **`get_student_dashboard(p_academy_id, p_student_id, p_week_ago, p_today_start, p_today_date, p_today_index)`** — `058_get_student_dashboard_rpc.sql`. Aluno vê só os próprios dados. Permission: `p_student_id = auth.uid()`. `p_today_date` (date) é separado pra evitar timezone drift em `agenda_completions.completed_on`.
+- **`get_student_evolution_summary(p_academy_id, p_student_id, p_since)`** — `059_get_student_evolution_summary_rpc.sql`. Load inicial de `/evolucao` em 1 roundtrip: `weekly_logs` (workouts completos + set_logs aninhados pra cálculo client-side de volume semanal) + `exercises` distintos com peso > 0 pra picker. Permission `p_student_id = auth.uid()`. Bucketização semanal fica no cliente (timezone-safe).
 
 Webhook Stripe (`apps/web/app/api/webhooks/stripe/route.ts`) usa claim atômico via `upsert ON CONFLICT DO NOTHING RETURNING` em `processed_events` + rollback do registro no `catch` (Stripe retenta evento se o handler subir).
 

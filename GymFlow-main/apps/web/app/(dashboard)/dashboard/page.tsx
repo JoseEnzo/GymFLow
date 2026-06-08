@@ -247,7 +247,9 @@ async function logFreeWorkout() {
     })
 
     if (error || !data) {
-      console.error('get_owner_dashboard failed', error)
+      console.error('get_owner_dashboard failed', {
+        message: error?.message, code: error?.code, details: error?.details, hint: error?.hint,
+      })
       return
     }
 
@@ -303,6 +305,7 @@ async function logFreeWorkout() {
   }
 
   // ── Personal data ───────────────────────────────────────────
+  // 1 roundtrip via RPC get_personal_dashboard (migration 057).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async function loadPersonalData(sb: any, aid: string) {
     const { data: { user } } = await supabase.auth.getUser()
@@ -311,149 +314,137 @@ async function logFreeWorkout() {
     const weekAgo    = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
 
-    // "Meus alunos" do personal = alunos que ELE convidou (academy_members.invited_by,
-    // gravado pelo accept_invite). Não depende de fichas criadas — um personal novo
-    // que convida um aluno já o vê aqui, e não vê alunos de outros personais.
-    const { data: studentMembers } = await sb
-      .from('academy_members')
-      .select('user_id')
-      .eq('academy_id', aid).eq('role', 'student').eq('is_active', true)
-      .eq('invited_by', user.id)
-    const myStudentIds = [...new Set((studentMembers ?? []).map((m: { user_id: string }) => m.user_id))] as string[]
+    const { data, error } = await sb.rpc('get_personal_dashboard', {
+      p_academy_id:  aid,
+      p_personal_id: user.id,
+      p_week_ago:    weekAgo.toISOString(),
+      p_today_start: todayStart.toISOString(),
+    })
 
-    if (myStudentIds.length === 0) {
-      setPersonalMetrics({ myStudentsCount: 0, trainedTodayCount: 0, activeSheetsCount: 0, inactiveCount: 0 })
+    if (error || !data) {
+      console.error('get_personal_dashboard failed', {
+        message: error?.message, code: error?.code, details: error?.details, hint: error?.hint,
+      })
       return
     }
 
-    // Alunos com alguma ficha ativa (de qualquer personal).
-    const { data: activeSheetRows } = await sb
-      .from('workout_sheets')
-      .select('student_id')
-      .eq('academy_id', aid).eq('is_active', true).in('student_id', myStudentIds)
-    const activeSheetStudents = new Set((activeSheetRows ?? []).map((s: { student_id: string }) => s.student_id))
-
-    const [{ data: recentLogs }, { data: todayLogs }, { data: profiles }, { data: myRecentRaw }, { data: mySheetNames }] = await Promise.all([
-      sb.from('workout_logs').select('student_id, created_at').eq('academy_id', aid).in('student_id', myStudentIds).gte('created_at', weekAgo.toISOString()),
-      sb.from('workout_logs').select('student_id').eq('academy_id', aid).in('student_id', myStudentIds).gte('created_at', todayStart.toISOString()),
-      sb.from('profiles').select('id, full_name').in('id', myStudentIds),
-      sb.from('workout_logs').select('id, created_at, student_id, duration_seconds, sheet_id').eq('academy_id', aid).in('student_id', myStudentIds).order('created_at', { ascending: false }).limit(8),
-      sb.from('workout_sheets').select('id, name').eq('academy_id', aid).in('student_id', myStudentIds),
-    ])
-
-    type ProfileRow   = { id: string; full_name: string }
-    type SheetNameRow = { id: string; name: string }
-    const profileMap  = new Map((profiles ?? []).map((p: ProfileRow) => [p.id, p.full_name]))
-    const sheetNameMap= new Map((mySheetNames ?? []).map((s: SheetNameRow) => [s.id, s.name]))
-    const recentSet   = new Set((recentLogs ?? []).map((l: { student_id: string }) => l.student_id))
-    const todaySet    = new Set((todayLogs ?? []).map((l: { student_id: string }) => l.student_id))
-
-    const lastMap = new Map<string, string>()
-    for (const log of (recentLogs ?? [])) { if (!lastMap.has(log.student_id)) lastMap.set(log.student_id, log.created_at) }
+    const d = data as {
+      my_students_count: number
+      trained_today_count: number
+      active_sheets_count: number
+      inactive_count: number
+      my_students: Array<{ user_id: string; full_name: string | null; last_workout_at: string | null; active_sheets: number; trained_today: boolean }>
+      recent_workouts: Array<{ id: string; created_at: string; student_id: string; student_name: string | null; sheet_id: string | null; sheet_name: string | null; duration_seconds: number | null }>
+    }
 
     setPersonalMetrics({
-      myStudentsCount: myStudentIds.length,
-      trainedTodayCount: todaySet.size,
-      activeSheetsCount: activeSheetStudents.size,
-      inactiveCount: myStudentIds.filter(id => !recentSet.has(id)).length,
+      myStudentsCount:   d.my_students_count,
+      trainedTodayCount: d.trained_today_count,
+      activeSheetsCount: d.active_sheets_count,
+      inactiveCount:     d.inactive_count,
     })
 
-    setMyStudents(myStudentIds.map(id => ({
-      userId: id,
-      fullName: (profileMap.get(id) as string | undefined) ?? 'Aluno',
-      lastWorkoutAt: lastMap.get(id) ?? null,
-      activeSheets: activeSheetStudents.has(id) ? 1 : 0,
-      trainedToday: todaySet.has(id),
+    setMyStudents(d.my_students.map((s) => ({
+      userId:        s.user_id,
+      fullName:      s.full_name ?? 'Aluno',
+      lastWorkoutAt: s.last_workout_at,
+      activeSheets:  s.active_sheets,
+      trainedToday:  s.trained_today,
     })).sort((a, b) => (b.trainedToday ? 1 : 0) - (a.trainedToday ? 1 : 0)))
 
-    setPersonalRecentWorkouts((myRecentRaw ?? []).map((w: { id: string; created_at: string; student_id: string; sheet_id: string; duration_seconds: number | null }) => ({
+    setPersonalRecentWorkouts(d.recent_workouts.map((w) => ({
       id: w.id, createdAt: w.created_at,
-      studentName: (profileMap.get(w.student_id) as string | undefined) ?? 'Aluno',
-      sheetName: (sheetNameMap.get(w.sheet_id) as string | undefined) ?? 'Treino',
+      studentName: w.student_name ?? 'Aluno',
+      sheetName:   w.sheet_name   ?? 'Treino',
       durationSeconds: w.duration_seconds,
     })))
   }
 
   // ── Student data ────────────────────────────────────────────
+  // 1 roundtrip via RPC get_student_dashboard (migration 058).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async function loadStudentData(sb: any, aid: string) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const weekAgo    = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
-    const todayIndex = new Date().getDay()
-    const todayStr   = dateKey(new Date())
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+    const now        = new Date()
+    const weekAgo    = new Date(now); weekAgo.setDate(now.getDate() - 7)
+    const todayIndex = now.getDay()
+    const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0)
+    const todayDate  = dateKey(now)  // YYYY-MM-DD
 
-    const [{ count: total }, { count: week }, { count: sheets }, { data: logDates }, { data: lastLogRaw }, { count: freeTodayCount }] = await Promise.all([
-      sb.from('workout_logs').select('id', { count: 'exact', head: true }).eq('student_id', user.id).eq('academy_id', aid),
-      sb.from('workout_logs').select('id', { count: 'exact', head: true }).eq('student_id', user.id).eq('academy_id', aid).gte('created_at', weekAgo.toISOString()),
-      sb.from('workout_sheets').select('id', { count: 'exact', head: true }).eq('student_id', user.id).eq('academy_id', aid).eq('is_active', true),
-      sb.from('workout_logs').select('created_at').eq('student_id', user.id).eq('academy_id', aid),
-      sb.from('workout_logs').select('id, created_at, duration_seconds, sheet_id').eq('student_id', user.id).eq('academy_id', aid).order('created_at', { ascending: false }).limit(1),
-      sb.from('workout_logs').select('id', { count: 'exact', head: true }).eq('student_id', user.id).eq('academy_id', aid).is('sheet_id', null).gte('created_at', todayStart.toISOString()),
-    ])
+    const { data, error } = await sb.rpc('get_student_dashboard', {
+      p_academy_id:  aid,
+      p_student_id:  user.id,
+      p_week_ago:    weekAgo.toISOString(),
+      p_today_start: todayStart.toISOString(),
+      p_today_date:  todayDate,
+      p_today_index: todayIndex,
+    })
 
-    const streak = computeStreak((logDates ?? []).map((r: { created_at: string }) => r.created_at))
-    setStudentStats({ totalWorkouts: total ?? 0, weekWorkouts: week ?? 0, streak, activeSheets: sheets ?? 0, weekGoal: 3 })
-    setFreeLoggedToday((freeTodayCount ?? 0) > 0)
+    if (error || !data) {
+      console.error('get_student_dashboard failed', {
+        message: error?.message, code: error?.code, details: error?.details, hint: error?.hint,
+      })
+      return
+    }
 
-    const daySet = new Set((logDates ?? []).map((r: { created_at: string }) => dateKey(new Date(r.created_at))))
+    const d = data as {
+      total_workouts: number
+      week_workouts: number
+      active_sheets: number
+      free_logged_today: boolean
+      log_dates: string[]
+      last_workout: { id: string; created_at: string; duration_seconds: number | null; sheet_id: string | null; sheet_name: string | null } | null
+      today_workout: { id: string; name: string; goal: string | null; exercise_count: number; already_done: boolean } | null
+      next_workout: { id: string; name: string; goal: string | null; exercise_count: number; scheduled_day: number } | null
+    }
+
+    const logDates = d.log_dates ?? []
+    const streak = computeStreak(logDates)
+    setStudentStats({ totalWorkouts: d.total_workouts, weekWorkouts: d.week_workouts, streak, activeSheets: d.active_sheets, weekGoal: 3 })
+    setFreeLoggedToday(d.free_logged_today)
+
+    const daySet = new Set(logDates.map((iso) => dateKey(new Date(iso))))
     setWeekActivity(Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(); d.setDate(d.getDate() - (6 - i))
-      return daySet.has(dateKey(d))
+      const d2 = new Date(); d2.setDate(d2.getDate() - (6 - i))
+      return daySet.has(dateKey(d2))
     }))
 
     const months: MonthlyWorkout[] = []
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(); d.setMonth(d.getMonth() - i)
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      const label = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')
-      const count = (logDates ?? []).filter((r: { created_at: string }) => r.created_at.startsWith(key)).length
+      const d2 = new Date(); d2.setMonth(d2.getMonth() - i)
+      const key = `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, '0')}`
+      const label = d2.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')
+      const count = logDates.filter((iso) => iso.startsWith(key)).length
       months.push({ month: label, count })
     }
     setMonthlyWorkouts(months)
 
-    // Last workout
-    if (lastLogRaw?.[0]) {
-      const last = lastLogRaw[0]
-      const { data: sheetData } = await sb.from('workout_sheets').select('name').eq('id', last.sheet_id).maybeSingle()
-      setLastWorkout({ sheetName: sheetData?.name ?? 'Treino', durationSeconds: last.duration_seconds, createdAt: last.created_at })
+    if (d.last_workout) {
+      setLastWorkout({
+        sheetName: d.last_workout.sheet_name ?? 'Treino',
+        durationSeconds: d.last_workout.duration_seconds,
+        createdAt: d.last_workout.created_at,
+      })
     }
 
-    // Today's workout
-    const { data: todaySheet } = await sb.from('workout_sheets')
-      .select('id, name, goal, scheduled_days, sheet_exercises(id)')
-      .eq('student_id', user.id).eq('academy_id', aid).eq('is_active', true)
-      .contains('scheduled_days', [todayIndex]).limit(1).maybeSingle()
-
-    let hasTodayWorkout = false
-    if (todaySheet) {
-      const { data: completion } = await sb.from('agenda_completions').select('id')
-        .eq('sheet_id', todaySheet.id).eq('student_id', user.id).eq('completed_on', todayStr).maybeSingle()
-      setTodayWorkout({ id: todaySheet.id, name: todaySheet.name, goal: todaySheet.goal, exerciseCount: todaySheet.sheet_exercises?.length ?? 0, alreadyDone: !!completion })
-      hasTodayWorkout = true
-    }
-
-    // Next workout (find next scheduled day if nothing today)
-    if (!hasTodayWorkout) {
-      const { data: allSheets } = await sb.from('workout_sheets')
-        .select('id, name, goal, scheduled_days, sheet_exercises(id)')
-        .eq('student_id', user.id).eq('academy_id', aid).eq('is_active', true)
-      const sheetByDay = new Map<number, { id: string; name: string; goal: string | null; sheet_exercises: { id: string }[] }>()
-      for (const s of (allSheets ?? [])) {
-        for (const day of (s.scheduled_days ?? [])) {
-          if (!sheetByDay.has(day)) sheetByDay.set(day, s)
-        }
-      }
-      for (let i = 1; i <= 7; i++) {
-        const nextDay = (todayIndex + i) % 7
-        if (sheetByDay.has(nextDay)) {
-          const s = sheetByDay.get(nextDay)!
-          setNextWorkout({ id: s.id, name: s.name, goal: s.goal, exerciseCount: s.sheet_exercises?.length ?? 0, dayLabel: DAY_LABELS[nextDay] ?? '' })
-          break
-        }
-      }
+    if (d.today_workout) {
+      setTodayWorkout({
+        id: d.today_workout.id,
+        name: d.today_workout.name,
+        goal: d.today_workout.goal,
+        exerciseCount: d.today_workout.exercise_count,
+        alreadyDone: d.today_workout.already_done,
+      })
+    } else if (d.next_workout) {
+      setNextWorkout({
+        id: d.next_workout.id,
+        name: d.next_workout.name,
+        goal: d.next_workout.goal,
+        exerciseCount: d.next_workout.exercise_count,
+        dayLabel: DAY_LABELS[d.next_workout.scheduled_day] ?? '',
+      })
     }
   }
 

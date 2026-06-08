@@ -92,28 +92,33 @@ export default function EvolucaoPage() {
   const loadWeekly = useCallback(async () => {
     if (!currentAcademy || !profile) { setLoadingWeekly(false); return }
 
+    // 1 roundtrip via RPC get_student_evolution_summary (migration 059).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any)
-      .from('workout_logs')
-      .select(`
-        id, created_at,
-        set_logs ( reps_done, weight_kg )
-      `)
-      .eq('academy_id', currentAcademy.id)
-      .eq('student_id', profile.id)
-      .not('completed_at', 'is', null)
-      .gte('created_at', new Date(Date.now() - 56 * 86400000).toISOString()) // 8 weeks
-      .order('created_at', { ascending: true })
+    const { data, error } = await (supabase as any).rpc('get_student_evolution_summary', {
+      p_academy_id: currentAcademy.id,
+      p_student_id: profile.id,
+      p_since: new Date(Date.now() - 56 * 86400000).toISOString(), // 8 weeks
+    })
 
-    if (error) { toast.error('Erro ao carregar evolução.'); setLoadingWeekly(false); return }
+    if (error || !data) {
+      console.error('get_student_evolution_summary failed', error)
+      toast.error('Erro ao carregar evolução.')
+      setLoadingWeekly(false)
+      return
+    }
 
-    // Group by week
+    const d = data as {
+      weekly_logs: Array<{ id: string; created_at: string; set_logs: Array<{ reps_done: number | null; weight_kg: number | null }> }>
+      exercises: Array<{ id: string; name: string }>
+    }
+
+    // Bucketização semanal (mantida client-side por causa de timezone/dia-da-semana)
     const byWeek: Record<string, { treinos: number; volume: number }> = {}
-    for (const row of (data ?? [])) {
+    for (const row of d.weekly_logs) {
       const label = getWeekLabel(new Date(row.created_at))
       if (!byWeek[label]) byWeek[label] = { treinos: 0, volume: 0 }
       byWeek[label].treinos++
-      for (const s of (row.set_logs ?? [])) {
+      for (const s of row.set_logs) {
         byWeek[label].volume += (s.weight_kg ?? 0) * (s.reps_done ?? 0)
       }
     }
@@ -126,45 +131,14 @@ export default function EvolucaoPage() {
       }))
     )
 
-    // Load exercises that this student has done
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: exData } = await (supabase as any)
-      .from('set_logs')
-      .select('exercises ( id, name_pt )')
-      .eq('workout_logs.student_id', profile.id)
-      .not('weight_kg', 'is', null)
-      .gt('weight_kg', 0)
-      .limit(100)
-
-    // De-duplicate exercises from set_logs via workout_logs
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: exData2 } = await (supabase as any)
-      .from('set_logs')
-      .select(`
-        exercise_id,
-        exercises ( id, name_pt ),
-        workout_logs!inner ( student_id, academy_id )
-      `)
-      .eq('workout_logs.student_id', profile.id)
-      .eq('workout_logs.academy_id', currentAcademy.id)
-      .not('weight_kg', 'is', null)
-      .gt('weight_kg', 0)
-
-    const seen = new Set<string>()
-    const exOptions: ExerciseOption[] = []
-    for (const row of (exData2 ?? [])) {
-      const ex = row.exercises
-      if (ex && !seen.has(ex.id)) {
-        seen.add(ex.id)
-        exOptions.push({ id: ex.id, name: ex.name_pt })
-      }
-    }
-    setExercises(exOptions)
-    if (exOptions.length > 0 && !selectedExercise) {
-      setSelectedExercise(exOptions[0]!.id)
+    setExercises(d.exercises)
+    if (d.exercises.length > 0 && !selectedExercise) {
+      setSelectedExercise(d.exercises[0]!.id)
     }
 
     setLoadingWeekly(false)
+  // selectedExercise é lido só pra inicializar o picker; refetch só quando user/academy muda
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentAcademy, profile])
 
   const loadExerciseEvolution = useCallback(async (exerciseId: string) => {

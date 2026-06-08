@@ -554,6 +554,16 @@ export default function AlunosPage() {
     const { data: { user } } = await supabase.auth.getUser()
     const personalUserId = currentRole === 'personal' ? (user?.id ?? '__none__') : null
 
+    // Invites é independente do load de students — dispara em paralelo, awaita no fim.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const invitesPromise = (supabase as any)
+      .from('invites')
+      .select('id, code, token, created_at, expires_at, uses_count, uses_limit, is_active')
+      .eq('academy_id', currentAcademy.id)
+      .eq('role', 'student')
+      .order('created_at', { ascending: false })
+      .limit(100)
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let studentRows: any = null
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -605,22 +615,28 @@ export default function AlunosPage() {
         setTotalStudents(totalCount ?? 0)
 
         if (userIds.length > 0) {
+          // profiles + sheets em paralelo (eram serializados)
+          const [profileRes, sheetRes] = await Promise.all([
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (supabase as any)
+              .from('profiles')
+              .select('id, full_name, goal')
+              .in('id', userIds),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (supabase as any)
+              .from('workout_sheets')
+              .select('student_id')
+              .eq('academy_id', currentAcademy.id)
+              .in('student_id', userIds),
+          ])
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { data: profileData, error: profileError } = await (supabase as any)
-            .from('profiles')
-            .select('id, full_name, goal')
-            .in('id', userIds)
+          const { data: profileData, error: profileError } = profileRes as any
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: sheetData, error: sheetError } = sheetRes as any
 
           if (profileError) console.warn('[alunos] profiles enrichment falhou:', profileError?.message ?? profileError)
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const profileMap = new Map<string, any>((profileData ?? []).map((p: any) => [p.id, p]))
-
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { data: sheetData, error: sheetError } = await (supabase as any)
-            .from('workout_sheets')
-            .select('student_id')
-            .eq('academy_id', currentAcademy.id)
-            .in('student_id', userIds)
 
           if (sheetError) console.warn('[alunos] sheet counts falharam:', sheetError?.message ?? sheetError)
 
@@ -672,15 +688,9 @@ export default function AlunosPage() {
       setTotalStudents(Number(rows[0]?.total_count ?? 0))
     }
 
-    // Invites: query separada com limit defensivo.
+    // Invites: já disparada no início, awaita aqui.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: inviteData, error: inviteError } = await (supabase as any)
-      .from('invites')
-      .select('id, code, token, created_at, expires_at, uses_count, uses_limit, is_active')
-      .eq('academy_id', currentAcademy.id)
-      .eq('role', 'student')
-      .order('created_at', { ascending: false })
-      .limit(100)
+    const { data: inviteData, error: inviteError } = await invitesPromise as any
 
     if (inviteError) console.warn('[alunos] invites query falhou:', inviteError?.message ?? inviteError)
 

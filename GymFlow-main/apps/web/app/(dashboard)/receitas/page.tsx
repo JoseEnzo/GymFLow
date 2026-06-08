@@ -12,6 +12,7 @@ import { MEAL_TYPES, MEAL_TYPE_LABELS, MEAL_TYPE_EMOJI } from '@gymflow/database
 
 import { cn, MEAL_TYPE_COLORS } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { getCached, setCached, CACHE_TTL } from '@/lib/global-cache'
 import { useAuthStore } from '@/stores/auth-store'
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } }
@@ -759,8 +760,22 @@ function ReceitasContent() {
   const [quickAdd, setQuickAdd] = useState<FoodItem | null>(null)
   const [detail, setDetail] = useState<Recipe | null>(null)
 
+  const recipesCacheKey = `recipes_${currentAcademy?.id ?? 'global'}`
+  const foodsCacheKey   = `food_items_${currentAcademy?.id ?? 'global'}`
+
   useEffect(() => {
     async function load() {
+      // 1) Hit cache: se ainda fresh, renderiza instant e pula network.
+      const cachedRecipes = getCached<Recipe[]>(recipesCacheKey, CACHE_TTL.GLOBAL_LIST)
+      const cachedFoods   = getCached<FoodItem[]>(foodsCacheKey,  CACHE_TTL.GLOBAL_LIST)
+      if (cachedRecipes && cachedFoods) {
+        setRecipes(cachedRecipes)
+        setFoods(cachedFoods)
+        setLoading(false)
+        return
+      }
+
+      // 2) Cache miss → query e persiste.
       let rq = supabase.from('recipes').select(RECIPE_COLS).order('name')
       let fq = supabase.from('food_items').select(FOOD_COLS).order('name')
       if (currentAcademy) {
@@ -772,10 +787,20 @@ function ReceitasContent() {
       }
 
       const [rRes, fRes] = await Promise.all([rq, fq])
-      if (rRes.error) toast.error('Erro ao carregar receitas.')
-      else setRecipes((rRes.data ?? []) as Recipe[])
-      if (fRes.error) toast.error('Erro ao carregar ingredientes.')
-      else setFoods((fRes.data ?? []) as FoodItem[])
+      if (rRes.error) {
+        toast.error('Erro ao carregar receitas.')
+      } else {
+        const list = (rRes.data ?? []) as Recipe[]
+        setRecipes(list)
+        setCached(recipesCacheKey, list)
+      }
+      if (fRes.error) {
+        toast.error('Erro ao carregar ingredientes.')
+      } else {
+        const list = (fRes.data ?? []) as FoodItem[]
+        setFoods(list)
+        setCached(foodsCacheKey, list)
+      }
       setLoading(false)
     }
     load()
@@ -1137,7 +1162,12 @@ function ReceitasContent() {
 
       <AnimatePresence>
         {showModal && (
-          <NewRecipeModal onClose={() => setShowModal(false)} onCreated={(r) => { setRecipes((prev) => [r, ...prev]); setShowModal(false) }} />
+          <NewRecipeModal onClose={() => setShowModal(false)} onCreated={(r) => {
+            const updated = [r, ...recipes]
+            setRecipes(updated)
+            setCached(recipesCacheKey, updated)
+            setShowModal(false)
+          }} />
         )}
         {pending && (
           <AddToPlanModal recipe={pending} mealLabel={mealLabel} saving={adding === pending.id} onClose={() => setPending(null)} onConfirm={(cfg) => handleAddToPlan(pending, cfg)} />

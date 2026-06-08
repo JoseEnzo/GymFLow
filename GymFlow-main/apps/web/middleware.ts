@@ -12,6 +12,7 @@ const PUBLIC_API_ROUTES = [
   '/api/turnstile',        // verificação CAPTCHA pré-login
   '/api/invites/lookup',   // preview público de convite
   '/api/webhooks/stripe',  // assinatura Stripe verifica autenticidade
+  '/api/check-document',   // cadastro: pre-check de CNPJ/CREF já existente
 ]
 
 const PUBLIC_PREFIXES = [

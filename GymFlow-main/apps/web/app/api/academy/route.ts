@@ -52,8 +52,17 @@ export async function POST(request: Request) {
   if (academyError) {
     console.error('[academy] insert error:', academyError)
     if (academyError.code === '23505' && academyError.message.includes('cnpj')) {
+      // Cleanup: deleta o auth.user que acabou de tentar criar academia.
+      // Sem isso, o user fica órfão (CNPJ no metadata mas sem academia),
+      // bloqueando todas as tentativas seguintes com o mesmo CNPJ.
+      // O onboarding faz signOut depois disso — sessão dele já vai expirar.
+      try {
+        await admin.auth.admin.deleteUser(user.id)
+      } catch (cleanupErr) {
+        console.error('[academy] cleanup auth user falhou:', cleanupErr)
+      }
       return NextResponse.json(
-        { error: 'Este CNPJ já está cadastrado em outra academia. Verifique seus dados ou entre em contato com o suporte.' },
+        { error: 'Este CNPJ já está cadastrado em outra academia. Faça login com o e-mail dessa conta.' },
         { status: 409 }
       )
     }
