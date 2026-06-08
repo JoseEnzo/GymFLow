@@ -1058,7 +1058,7 @@ function PricingSection() {
                 </div>
                 <div className="flex items-end gap-1">
                   <span className="text-4xl font-display font-extrabold">
-                    {plan.price === 0 ? 'Grátis' : `R$ ${plan.price}`}
+                    {plan.price === 0 ? 'Grátis' : `R$ ${plan.price}`}
                   </span>
                   {plan.price > 0 && (
                     <span className="text-muted-foreground text-sm mb-1">{plan.period}</span>

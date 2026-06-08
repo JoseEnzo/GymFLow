@@ -128,16 +128,20 @@ const nextConfig: NextConfig = {
 // Em dev: pula o wrapper do Sentry (source maps + webpack plugin) — webpack fica
 // significativamente mais rápido. Runtime ainda importa Sentry via sentry.{client,server,edge}.config.ts,
 // mas com guard de DSN válido (placeholder não dispara init).
+// Em build local fora de CI: pula upload de sourcemap pra evitar "Project not found"
+// quando as credenciais do Doppler local não batem com algum projeto Sentry.
+// CI=true em Vercel/GH Actions → upload normal.
 const finalConfig = withPWA(nextConfig)
+const isCI = !!process.env['CI']
 
-export default isDev
+export default isDev || !isCI
   ? finalConfig
   : withSentryConfig(finalConfig, {
       org: process.env['SENTRY_ORG'],
       project: process.env['SENTRY_PROJECT'],
       silent: !process.env['CI'],
       widenClientFileUpload: true,
-      hideSourceMaps: true,
+      sourcemaps: { deleteSourcemapsAfterUpload: true },
       disableLogger: true,
       automaticVercelMonitors: true,
     })

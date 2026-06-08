@@ -151,7 +151,7 @@ export default function PerfilPage() {
 
     // streak: consecutive days with at least one workout (descending)
     let streak = 0
-    let cursor = new Date(); cursor.setHours(0, 0, 0, 0)
+    const cursor = new Date(); cursor.setHours(0, 0, 0, 0)
     const daySet = new Set(
       logs.map((l) => new Date(l.created_at).toLocaleDateString('pt-BR'))
     )

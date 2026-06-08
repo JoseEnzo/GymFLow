@@ -4,6 +4,7 @@ import { ImageResponse } from 'next/og'
 // Mantém paridade visual com /meutrein-logo-source.svg e o <BrandLogo>:
 // quadrado indigo CHEIO (sem rx — iOS aplica sua própria máscara de cantos)
 // com o Dumbbell branco centralizado.
+export const runtime = 'edge'
 export const size = { width: 180, height: 180 }
 export const contentType = 'image/png'
 

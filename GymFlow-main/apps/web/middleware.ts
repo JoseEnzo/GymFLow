@@ -73,6 +73,9 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|manifest.json|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml)$).*)',
+    // Exclui asset routes do Next.js file-convention (icon/apple-icon/opengraph-image
+     // são gerados por `app/{icon,apple-icon,opengraph-image}.tsx` e respondem em paths
+     // sem extensão; sem isso o middleware redireciona pra /login e quebra favicon/OG).
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|robots.txt|sitemap.xml|icon$|apple-icon$|opengraph-image$|twitter-image$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml)$).*)',
   ],
 }

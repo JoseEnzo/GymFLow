@@ -4,6 +4,7 @@ import { ImageResponse } from 'next/og'
 // IMPORTANTE: sem `borderRadius`. Google envolve o favicon no container redondo
 // dele — se o ícone já tiver cantos arredondados, vira "ícone dentro de ícone".
 // O quadrado preenche o canvas inteiro; quem arredonda é quem renderiza.
+export const runtime = 'edge'
 export const size = { width: 32, height: 32 }
 export const contentType = 'image/png'
 

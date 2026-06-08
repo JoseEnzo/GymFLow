@@ -70,6 +70,7 @@ export default function Image() {
         {/* Brand name */}
         <div
           style={{
+            display: 'flex',
             fontSize: 72,
             fontWeight: 800,
             letterSpacing: '-2px',
@@ -77,7 +78,8 @@ export default function Image() {
             marginBottom: 16,
           }}
         >
-          Meu<span style={{ color: '#818cf8' }}>Trein</span>
+          <span>Meu</span>
+          <span style={{ color: '#818cf8' }}>Trein</span>
         </div>
 
         {/* Tagline */}
