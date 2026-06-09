@@ -36,8 +36,14 @@ interface TurnstileProps {
   onToken?: (token: string) => void
   /** Chamado quando o token expira */
   onExpire?: () => void
-  /** 'managed' (padrão) — o Cloudflare decide se exibe o desafio */
-  appearance?: 'managed' | 'always' | 'interaction-only'
+  /**
+   * 'always' (padrão) — widget visível e resolve o desafio automaticamente ao
+   * renderizar, disparando o callback (token). 'interaction-only' esconde até
+   * exigir interação. NÃO use 'execute': ele adia o desafio até chamar
+   * window.turnstile.execute() — este componente nunca chama, então o callback
+   * jamais dispara e getToken() expira em 30s (login trava sem token).
+   */
+  appearance?: 'always' | 'execute' | 'interaction-only'
   className?: string
 }
 
@@ -45,7 +51,7 @@ const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ''
 const SCRIPT_ID = 'cf-turnstile-script'
 
 const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
-  ({ onToken, onExpire, appearance = 'managed', className }, ref) => {
+  ({ onToken, onExpire, appearance = 'always', className }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null)
     const widgetIdRef = useRef<string | null>(null)
     const tokenRef = useRef<string | null>(null)

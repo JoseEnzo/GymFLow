@@ -489,7 +489,7 @@ function LoginInner() {
           )}
         </motion.div>
 
-        <Turnstile ref={turnstileRef} appearance="managed" />
+        <Turnstile ref={turnstileRef} appearance="always" />
 
         <motion.div variants={fadeUp} custom={3}>
           <button
