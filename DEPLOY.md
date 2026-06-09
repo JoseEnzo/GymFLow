@@ -122,6 +122,60 @@ pnpm db:push
 
 ---
 
+## Capacidade e conexões simultâneas
+
+Como o app escala sob muitos usuários ao mesmo tempo e onde estão os limites.
+
+### Modelo de conexões (importante)
+
+O Next.js fala com o Postgres **via PostgREST/Supabase (HTTP)**, usando `supabase-js`
+— **não** abre conexões diretas ao Postgres por função serverless. Quem mantém o
+pool ao banco é o PostgREST gerenciado pela Supabase. Ou seja, escalar as funções
+da Vercel **não** estoura `max_connections` do Postgres pela operação normal do app.
+
+Conexões **diretas** ao Postgres (que consomem do limite) só acontecem em:
+- migrations / `pnpm db:push`;
+- qualquer serviço externo que use um driver Postgres direto (cron, ETL, etc.).
+
+**Regra:** toda conexão direta deve usar o **Supavisor em transaction mode**
+(string do pooler, porta `6543`), nunca a conexão direta (`5432`). Em serverless
+a conexão direta esgota o limite quase imediatamente sob concorrência.
+Pegar a string em: Supabase → Settings → Database → **Connection pooling**
+(modo `Transaction`).
+
+> O `[db.pooler]` em `supabase/config.toml` é só do `supabase start` (dev local).
+> Não afeta produção — em prod o pooling é do Supavisor gerenciado.
+
+### Alavancas de capacidade (em ordem de custo/benefício)
+
+1. **Auth fora do hot path (já feito):** o `middleware.ts` valida o JWT localmente
+   via `getClaims()` (JWKS) em vez de `getUser()`, eliminando 1 round-trip à Auth
+   (GoTrue) em *todo* request. Requer **JWT signing keys assimétricas** ligadas:
+   Supabase → Settings → Auth → **JWT Keys** → migrar de shared secret (HS256) para
+   chave assimétrica (ECC/RSA). Sem isso o `getClaims` ainda valida, mas de forma
+   remota (sem o ganho de latência). **Verificar esse toggle antes de um pico.**
+2. **RLS otimizada (já feito):** migration `066` envolve `auth.uid()`/`auth.role()`
+   em `(select …)` para avaliação única por query (InitPlan) — derruba a CPU de
+   banco por usuário ativo. Aplicar com `pnpm db:push`.
+3. **Compute add-on do Postgres:** o maior limitador de pico real. O tamanho do
+   compute define `max_connections`, CPU e RAM. Subir de Micro/Small para um tier
+   maior costuma ser o passo mais barato para o último trecho de capacidade.
+   Supabase → Settings → **Compute and Disk**.
+4. **Rate limiting distribuído:** garantir `UPSTASH_REDIS_REST_URL` +
+   `UPSTASH_REDIS_REST_TOKEN` em prod. Sem eles o limiter cai para in-memory, que
+   **não** escala horizontalmente entre as funções da Vercel (limite vira frouxo).
+
+### Checklist pré-pico
+
+- [ ] JWT signing keys assimétricas ligadas (alavanca 1).
+- [ ] Migration `066` aplicada em prod (`pnpm db:push`).
+- [ ] Upstash configurado em prod (não cair no fallback in-memory).
+- [ ] Compute do Postgres dimensionado para o alvo de usuários simultâneos.
+- [ ] Connection pooling (Transaction/6543) usado em qualquer conexão direta/CI.
+- [ ] Monitorar no painel: % de conexões em uso, CPU do banco e p95 de latência.
+
+---
+
 ## Troubleshooting
 
 | Sintoma no build/runtime | Causa provável | Correção |

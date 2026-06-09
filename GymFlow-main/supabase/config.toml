@@ -16,6 +16,9 @@ port = 54322
 shadow_port = 54320
 major_version = 15
 
+# Pooler LOCAL (supabase start). Em produção o pooling é do Supavisor gerenciado
+# pela Supabase — estes valores NÃO afetam prod (ver "Capacidade e conexões" no
+# DEPLOY.md). transaction mode é o correto para serverless/Vercel.
 [db.pooler]
 enabled = false
 port = 54329

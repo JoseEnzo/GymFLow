@@ -44,7 +44,15 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  // getClaims() valida o JWT localmente via JWKS (chaves de assinatura assimétricas),
+  // evitando um round-trip à Auth (GoTrue) em CADA request — o multiplicador direto
+  // de carga sob concorrência. Se o projeto ainda usar o segredo HS256 legado, o
+  // getClaims cai automaticamente para validação remota (mesma garantia do getUser).
+  // A fronteira real de autorização continua sendo o RLS no banco; aqui só decidimos
+  // redirect vs. 401. O getClaims passa por getSession() internamente, então o refresh
+  // de token e a regravação de cookies (setAll acima) seguem funcionando.
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const user = claimsData?.claims ?? null
 
   const isApi = path.startsWith('/api/')
   const isPublic =
