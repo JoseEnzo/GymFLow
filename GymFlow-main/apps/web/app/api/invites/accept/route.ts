@@ -6,7 +6,7 @@ import { limiters } from '@/lib/rate-limit'
 import { clientIp } from '@/lib/turnstile'
 
 const admin = createAdminClient(
-  process.env['NEXT_PUBLIC_SUPABASE_URL']!,
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env['SUPABASE_SERVICE_ROLE_KEY']!,
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
