@@ -93,9 +93,13 @@ export async function POST(request: Request) {
   // Plano pago → gera checkout URL na mesma request (evita segundo roundtrip com RLS)
   if (!skipStripe && (plan === 'starter' || plan === 'pro' || plan === 'personal')) {
     const priceId = process.env[`STRIPE_PRICE_${plan.toUpperCase()}_MONTHLY`]
+    if (!process.env['STRIPE_SECRET_KEY']) {
+      console.error('[academy] STRIPE_SECRET_KEY não configurada')
+      return NextResponse.json({ academy, stripeError: 'STRIPE_SECRET_KEY não configurada no servidor' })
+    }
     if (!priceId) {
       console.error(`[academy] STRIPE_PRICE_${plan.toUpperCase()}_MONTHLY não configurado`)
-      return NextResponse.json({ academy, stripeError: 'Plano não configurado no servidor' })
+      return NextResponse.json({ academy, stripeError: `STRIPE_PRICE_${plan.toUpperCase()}_MONTHLY não configurada no servidor` })
     }
     try {
       const session = await createCheckoutSession({
@@ -107,7 +111,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ academy, checkoutUrl: session.url })
     } catch (err) {
       console.error('[academy] stripe error:', err)
-      return NextResponse.json({ academy, stripeError: 'Erro ao criar sessão de pagamento' })
+      const detail = err instanceof Error ? err.message : 'Erro desconhecido'
+      return NextResponse.json({ academy, stripeError: 'Erro ao criar sessão de pagamento', stripeDetail: detail })
     }
   }
 

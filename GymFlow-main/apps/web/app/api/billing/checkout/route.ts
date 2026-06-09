@@ -30,6 +30,18 @@ export async function POST(request: Request) {
     .eq('id', academyId)
     .single()
 
+  // Pré-check de config: sem essas vars no servidor (Vercel Production), o Stripe
+  // quebra dentro do create() e o erro vira genérico. Avisar qual falta — mesmo
+  // padrão da rota /api/academy/upgrade.
+  const priceEnvKey =
+    planId === 'pro' ? 'STRIPE_PRICE_PRO_MONTHLY' : 'STRIPE_PRICE_STARTER_MONTHLY'
+  if (!process.env['STRIPE_SECRET_KEY']) {
+    return NextResponse.json({ error: 'Pagamento indisponível: STRIPE_SECRET_KEY não configurada no servidor.' }, { status: 500 })
+  }
+  if (!process.env[priceEnvKey]) {
+    return NextResponse.json({ error: `Pagamento indisponível: ${priceEnvKey} não configurada no servidor.` }, { status: 500 })
+  }
+
   const origin = request.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_URL ?? ''
 
   try {
@@ -43,6 +55,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ url: session.url })
   } catch (err: unknown) {
     console.error('[billing/checkout]', err)
-    return NextResponse.json({ error: 'Erro ao criar sessão de pagamento' }, { status: 500 })
+    // Mensagens de erro do Stripe são seguras (a API mascara a chave) e dizem a
+    // causa real: "No such price", "Invalid API Key", mismatch test/live, etc.
+    const detail = err instanceof Error ? err.message : 'Erro desconhecido'
+    return NextResponse.json({ error: 'Erro ao criar sessão de pagamento', detail }, { status: 500 })
   }
 }
