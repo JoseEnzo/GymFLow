@@ -80,6 +80,29 @@ function createUpstashLimiters() {
 // Sempre retorna um limiter válido — Upstash se configurado, in-memory se não.
 const upstash = createUpstashLimiters()
 
+// ── Upstash é OBRIGATÓRIO em produção ─────────────────────────────────────────
+// O fallback in-memory NÃO escala horizontalmente: cada instância serverless da
+// Vercel mantém seu próprio Map, então com N instâncias o limite efetivo vira N×
+// mais frouxo — exatamente sob pico, quando a proteção (brute-force, abuso) mais
+// importa. Em produção sem Upstash isso é uma misconfiguração.
+//
+// Escolha de design: NÃO derrubamos as rotas (throw no import quebraria login/
+// cadastro/convite por uma var ausente — pior que limite degradado). Em vez disso
+// emitimos um alerta FATAL no boot do módulo (Sentry + console.error), impossível
+// de passar despercebido, e seguimos com o in-memory até a config ser corrigida.
+if (!upstash && process.env.NODE_ENV === 'production') {
+  const msg =
+    'Rate limiter rodando SEM Upstash em produção: limites não escalam entre ' +
+    'instâncias serverless (proteção enfraquecida sob carga). Configure ' +
+    'UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN.'
+  // eslint-disable-next-line no-console
+  console.error(`[rate-limit] ${msg}`)
+  // captureMessage é no-op se o DSN do Sentry não estiver configurado.
+  void import('@sentry/nextjs')
+    .then((Sentry) => Sentry.captureMessage(msg, 'fatal'))
+    .catch(() => {})
+}
+
 export const limiters = upstash ?? {
   auth:   new InMemoryLimiter(5,  15 * 60 * 1000),  // 5/15min
   invite: new InMemoryLimiter(10,  5 * 60 * 1000),  // 10/5min
