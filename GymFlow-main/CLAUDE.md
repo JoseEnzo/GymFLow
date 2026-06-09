@@ -239,6 +239,22 @@ $$;
 
 `.env.example` lista as chaves esperadas mas usa **placeholders truthy** (ex: `https://...upstash.io`) para documentação. Código que confia em `!process.env.X` para detectar ausência **vai quebrar com esses placeholders** — sempre valide formato/conteúdo, não só presença (ver `lib/rate-limit.ts` → `hasValidUpstashEnv()`).
 
+### `NEXT_PUBLIC_*` — sempre notação de ponto (pegadinha do build Vercel)
+
+Variáveis `NEXT_PUBLIC_*` **devem** ser lidas como `process.env.NEXT_PUBLIC_X` (ponto), **nunca** `process.env['NEXT_PUBLIC_X']` (colchete). O Next.js faz o inlining estático no build só na forma com ponto; com colchete o valor **não é substituído** e fica `undefined` no browser e na **Edge middleware** em produção (no `next dev` funciona porque o Node lê `process.env` em runtime). Sintoma clássico: `Your project's URL and Key are required to create a Supabase client!` no `middleware.ts` só no deploy Vercel, nunca local.
+
+O `tsconfig` tem `noPropertyAccessFromIndexSignature: true`, que normalmente obrigaria colchete. Para liberar a notação de ponto, as chaves `NEXT_PUBLIC_*` estão declaradas como propriedades nomeadas em `ProcessEnv` no arquivo `apps/web/types/env.d.ts` — **adicione toda nova var `NEXT_PUBLIC_*` lá** antes de usá-la com ponto. Vars server-side (sem `NEXT_PUBLIC_`) continuam com colchete (rodam só no Node, onde `process.env` existe em runtime).
+
+```ts
+// ✅ certo (inlined no build → funciona no browser e na Edge)
+createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, ...)
+
+// ❌ errado (undefined em produção no browser/Edge)
+createServerClient(process.env['NEXT_PUBLIC_SUPABASE_URL']!, ...)
+```
+
+Pré-requisito de deploy: as `NEXT_PUBLIC_*` precisam estar setadas no painel da Vercel (Environment Variables → Production). Como são "assadas" no build, **qualquer alteração delas exige um novo deploy** — mudar a var e só dar reload não pega.
+
 Chaves principais:
 
 ```env

@@ -5,7 +5,7 @@ import { requireAuth } from '@/lib/api-guard'
 import { createCheckoutSession } from '@/lib/stripe'
 
 const admin = createClient(
-  process.env['NEXT_PUBLIC_SUPABASE_URL']!,
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env['SUPABASE_SERVICE_ROLE_KEY']!,
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 })
     }
-    const origin = request.headers.get('origin') ?? process.env['NEXT_PUBLIC_APP_URL'] ?? ''
+    const origin = request.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_URL ?? ''
     return NextResponse.json({ url: `${origin}/dashboard?plan_upgraded=1` })
   }
 
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Variável ${priceEnvKey} não configurada. Adicione o Price ID do Stripe no Doppler.` }, { status: 500 })
   }
 
-  const origin = request.headers.get('origin') ?? process.env['NEXT_PUBLIC_APP_URL'] ?? ''
+  const origin = request.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_URL ?? ''
   try {
     const session = await createCheckoutSession({
       academyId: academy.id,

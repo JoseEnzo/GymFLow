@@ -41,7 +41,7 @@ interface TurnstileProps {
   className?: string
 }
 
-const SITE_KEY = process.env['NEXT_PUBLIC_TURNSTILE_SITE_KEY'] ?? ''
+const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ''
 const SCRIPT_ID = 'cf-turnstile-script'
 
 const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(

@@ -6,7 +6,7 @@ import { createCheckoutSession, createFreeCheckoutSession } from '@/lib/stripe'
 
 // Admin client (service role — bypassa RLS)
 const admin = createClient(
-  process.env['NEXT_PUBLIC_SUPABASE_URL']!,
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env['SUPABASE_SERVICE_ROLE_KEY']!,
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: memberError.message }, { status: 500 })
   }
 
-  const origin = request.headers.get('origin') ?? process.env['NEXT_PUBLIC_APP_URL'] ?? ''
+  const origin = request.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_URL ?? ''
 
   // Bypass do Stripe em dev/test: cria academia, pula checkout e cai direto no /dashboard.
   // Ativa quando NODE_ENV !== 'production' OU env `SKIP_STRIPE_CHECKOUT=true` explicitamente.

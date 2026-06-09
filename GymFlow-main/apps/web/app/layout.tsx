@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   keywords: ['academia', 'treino', 'personal trainer', 'fitness', 'gestão de academia'],
   authors: [{ name: 'MeuTrein Team' }],
   creator: 'MeuTrein',
-  metadataBase: new URL(process.env['NEXT_PUBLIC_APP_URL'] ?? 'https://gymflow.app'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://gymflow.app'),
   openGraph: {
     type: 'website',
     locale: 'pt_BR',

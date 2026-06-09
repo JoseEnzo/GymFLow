@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     .eq('id', academyId)
     .single()
 
-  const origin = request.headers.get('origin') ?? process.env['NEXT_PUBLIC_APP_URL'] ?? ''
+  const origin = request.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_URL ?? ''
 
   try {
     const session = await createCheckoutSession({
