@@ -7,8 +7,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion } from 'framer-motion'
-import { Eye, EyeOff, Loader2, AlertCircle, Building2, Dumbbell, ArrowLeft, UserCheck, ChevronRight, Ticket, Check, ArrowRight } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { Eye, EyeOff, Loader2, AlertCircle, Building2, Dumbbell, ArrowLeft, UserCheck, ChevronRight } from 'lucide-react'
 import { maskCREF } from '@/lib/cnpj'
 
 import { useRouter } from 'next/navigation'
@@ -116,10 +115,7 @@ function LoginInner() {
   const roleParam = searchParams.get('role') as Role | null
 
   const [role, setRole] = useState<Role | null>(roleParam)
-  const [step, setStep] = useState<'role' | 'invite' | 'form'>(roleParam ? 'form' : 'role')
-  const [hasInvite, setHasInvite] = useState<boolean | null>(null)
-  const [inviteCode, setInviteCode] = useState('')
-  const [inviteSaving, setInviteSaving] = useState(false)
+  const [step, setStep] = useState<'role' | 'form'>(roleParam ? 'form' : 'role')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
@@ -141,10 +137,8 @@ function LoginInner() {
     setRole(r)
     setServerError(null)
     setIdentifier('')
-    setHasInvite(null)
-    setInviteCode('')
     reset()
-    setStep(r === 'personal' || r === 'student' ? 'invite' : 'form')
+    setStep('form')
   }
 
   function handleBack() {
@@ -152,36 +146,11 @@ function LoginInner() {
       router.back()
       return
     }
-    if (step === 'form' && (role === 'personal' || role === 'student')) {
-      setStep('invite')
-      return
-    }
     setRole(null)
     setStep('role')
     setServerError(null)
     setIdentifier('')
     reset()
-  }
-
-  async function redeemInvite() {
-    const trimmed = inviteCode.trim().toUpperCase()
-    if (!trimmed) return
-    setInviteSaving(true)
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('invites')
-        .select('token')
-        .eq('code', trimmed)
-        .eq('is_active', true)
-        .single()
-      if (error || !data) { toast.error('Código inválido ou expirado.'); return }
-      router.push(`/convite/${(data as { token: string }).token}`)
-    } catch {
-      toast.error('Erro ao verificar código. Tente novamente.')
-    } finally {
-      setInviteSaving(false)
-    }
   }
 
   function handleIdentifierChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -295,100 +264,7 @@ function LoginInner() {
     )
   }
 
-  /* ── Step 2: invite question (personal / student) ───────────────── */
-  if (step === 'invite' && role) {
-    const roleInfo = ROLES.find(r => r.key === role)!
-    return (
-      <motion.div initial="hidden" animate="show" className="space-y-7">
-        <motion.div variants={fadeUp} custom={0} className="space-y-3">
-          <button onClick={handleBack} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Voltar
-          </button>
-          <div className="flex items-center gap-3">
-            <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0', roleInfo.iconBg)}>
-              <roleInfo.icon className={cn('w-5 h-5', roleInfo.iconColor)} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-display font-bold">Você tem um convite? 🎯</h1>
-              <p className="text-xs text-muted-foreground">Entrando como {roleInfo.label}</p>
-            </div>
-          </div>
-        </motion.div>
-
-        <div className="space-y-3">
-          <button
-            type="button"
-            onClick={() => setHasInvite(true)}
-            className={cn('w-full flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-200',
-              hasInvite === true ? 'border-emerald-500/50 bg-emerald-500/8' : 'border-border/60 hover:border-border hover:bg-surface-100')}
-          >
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-500/15 flex-shrink-0">
-              <Ticket className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm">Sim, tenho um código de convite</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Usar código para entrar na academia</p>
-            </div>
-            {hasInvite === true && <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0"><Check className="w-3 h-3 text-white" /></div>}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setHasInvite(false)}
-            className={cn('w-full flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-200',
-              hasInvite === false ? `${roleInfo.border} ${roleInfo.bg}` : 'border-border/60 hover:border-border hover:bg-surface-100')}
-          >
-            <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', roleInfo.iconBg)}>
-              <roleInfo.icon className={cn('w-5 h-5', roleInfo.iconColor)} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm">Não, já tenho conta</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Fazer login com minhas credenciais</p>
-            </div>
-            {hasInvite === false && <div className="w-5 h-5 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0"><Check className="w-3 h-3 text-white" /></div>}
-          </button>
-        </div>
-
-        {hasInvite === true && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-3 overflow-hidden">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Código de convite</label>
-              <input
-                type="text"
-                value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
-                placeholder="ABC123"
-                maxLength={6}
-                autoComplete="off"
-                className="field tracking-widest font-mono"
-                onKeyDown={(e) => e.key === 'Enter' && inviteCode.length === 6 && redeemInvite()}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={redeemInvite}
-              disabled={inviteSaving || inviteCode.length !== 6}
-              className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
-            >
-              {inviteSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4" /> Entrar com convite</>}
-            </button>
-          </motion.div>
-        )}
-
-        {hasInvite === false && (
-          <button
-            type="button"
-            onClick={() => setStep('form')}
-            className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
-          >
-            Fazer login <ArrowRight className="w-4 h-4" />
-          </button>
-        )}
-      </motion.div>
-    )
-  }
-
-  /* ── Step 3: login form ─────────────────────────────────────────── */
+  /* ── Step 2: login form ─────────────────────────────────────────── */
   const roleInfo = ROLES.find(r => r.key === role)!
   const idLabel       = role === 'owner' ? 'CNPJ' : role === 'personal' ? 'CREF' : 'E-mail'
   const idPlaceholder = role === 'owner' ? '00.000.000/0001-00' : role === 'personal' ? '123456-G/SP' : 'seu@email.com'

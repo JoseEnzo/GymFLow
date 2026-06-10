@@ -116,7 +116,7 @@ export default function ConvitePage() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className="w-full glass rounded-3xl p-8 border border-border/60 shadow-glow"
+      className="w-full"
     >
       <AnimatePresence mode="wait">
 
@@ -210,16 +210,16 @@ export default function ConvitePage() {
               ) : (
                 <div className="space-y-2">
                   <button
-                    onClick={() => router.push(`/login?redirect=/convite/${token}&role=${invite.role}`)}
+                    onClick={acceptInvite}
                     className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm"
                   >
-                    Fazer login e aceitar convite
+                    Criar conta e aceitar convite
                   </button>
                   <button
-                    onClick={acceptInvite}
+                    onClick={() => router.push(`/login?redirect=/convite/${token}&role=${invite.role}`)}
                     className="w-full btn-secondary py-3.5 rounded-xl font-semibold text-sm"
                   >
-                    Criar conta nova
+                    Já tenho conta — fazer login
                   </button>
                 </div>
               )}

@@ -531,6 +531,7 @@ export default function PersonaisPage() {
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all')
 
   const isOwner = currentRole === 'owner'
+  const isPersonalPlan = currentAcademy?.plan === 'personal'
 
   const load = useCallback(async () => {
     if (!currentAcademy) { setLoading(false); return }
@@ -662,6 +663,21 @@ export default function PersonaisPage() {
         </div>
         <p className="font-semibold text-muted-foreground">Acesso restrito</p>
         <p className="text-sm text-muted-foreground/60 mt-1">Somente o proprietário pode gerenciar personais.</p>
+      </div>
+    )
+  }
+
+  // Plano Personal (R$97) é individual: o owner é o único personal, não convida outros.
+  if (isPersonalPlan) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-surface-200 flex items-center justify-center mb-4">
+          <ShieldOff className="w-7 h-7 text-muted-foreground/40" />
+        </div>
+        <p className="font-semibold text-muted-foreground">Indisponível no plano Personal</p>
+        <p className="text-sm text-muted-foreground/60 mt-1 max-w-xs">
+          O plano Personal é individual — você atende seus alunos diretamente, sem outros personais na conta.
+        </p>
       </div>
     )
   }

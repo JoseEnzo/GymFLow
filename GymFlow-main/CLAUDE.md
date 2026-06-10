@@ -331,7 +331,11 @@ O enum `academy_plan` (Postgres) aceita: `free | personal | starter | pro`. A mi
 - `role === 'personal'` → **sub-personal** que trabalha pra um owner em academia starter/pro.
 - `plan === 'personal'` → **personal trainer solo**, role no banco é `'owner'` (do próprio mini-tenant).
 
-**Dashboard / sidebar:** quando `plan === 'personal'`, esconder cards de "Personais ativos", "Convidar personal", item de sidebar `/personais` e `/relatorios`. Ver `apps/web/components/layout/sidebar.tsx` (`PERSONAL_PLAN_HIDDEN_HREFS`) e `apps/web/app/(dashboard)/dashboard/page.tsx` (`isPersonalPlan`).
+**Esconder "sub-personais" quando `plan === 'personal'`:** o personal solo é o único treinador, então tudo que pressupõe múltiplos personais some. Toda entrada pra `/personais` precisa do gate `currentAcademy?.plan !== 'personal'` — checar os 4 pontos ao mexer:
+- `apps/web/components/layout/sidebar.tsx` (`PERSONAL_PLAN_HIDDEN_HREFS` esconde `/personais` e `/relatorios`).
+- `apps/web/app/(dashboard)/dashboard/page.tsx` (`isPersonalPlan` esconde card "Personais ativos" + QuickAction "Convidar personal").
+- `apps/web/app/(dashboard)/alunos/page.tsx` (botão "Gerenciar personais" no header).
+- `apps/web/app/(dashboard)/personais/page.tsx` (guard `if (isPersonalPlan)` na própria página — rede de segurança pra acesso direto por URL).
 
 ### Bypass de Stripe em dev/test
 
