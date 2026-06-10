@@ -943,6 +943,24 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          email_weekly_report: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          email_weekly_report?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          email_weekly_report?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1073,6 +1091,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sent_notifications: {
+        Row: {
+          id: string
+          kind: string
+          sent_at: string
+          target_date: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          kind: string
+          sent_at?: string
+          target_date: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          kind?: string
+          sent_at?: string
+          target_date?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       set_logs: {
         Row: {
