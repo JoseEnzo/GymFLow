@@ -137,6 +137,9 @@ function CadastroInner() {
       if (!validateCNPJ(document)) { setDocumentError('CNPJ inválido'); return }
     } else if (accountType === 'personal') {
       if (!validateCREF(document)) { setDocumentError('CREF inválido (ex: 123456-G/SP)'); return }
+    } else if (accountType === 'student' && document.replace(/\D/g, '').length > 0) {
+      // CPF é opcional, mas se preenchido precisa ser um CPF válido (dígitos verificadores).
+      if (!validateCPF(document)) { setDocumentError('CPF inválido'); return }
     }
 
     setIsLoading(true)

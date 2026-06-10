@@ -15,6 +15,15 @@ export async function GET(request: Request) {
       // Para OAuth (Google), verifica se o usuário já tem academia
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
+        // Login social (Google) SEMPRE entra como aluno. Donos e personais passam
+        // pelo /cadastro (com CNPJ/CREF/pagamento) — nunca pelo OAuth. O signup por
+        // credenciais sempre grava account_type, então ausência aqui = 1º login social.
+        // Sem isso o usuário cairia no seletor de papel do /onboarding e poderia virar
+        // dono/personal sem academia configurada.
+        if (!user.user_metadata?.['account_type']) {
+          await supabase.auth.updateUser({ data: { account_type: 'student' } })
+        }
+
         const { data: members } = await supabase
           .from('academy_members')
           .select('id')
