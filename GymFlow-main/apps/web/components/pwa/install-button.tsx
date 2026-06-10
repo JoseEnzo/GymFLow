@@ -1,33 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Download, Share, Plus, X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
-
-// Tipo do evento beforeinstallprompt (não está nos types nativos do TS).
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
-}
-
-type Platform = 'android' | 'ios' | 'desktop' | 'unknown'
-
-function detectPlatform(): Platform {
-  if (typeof window === 'undefined') return 'unknown'
-  const ua = navigator.userAgent.toLowerCase()
-  if (/iphone|ipad|ipod/.test(ua)) return 'ios'
-  if (/android/.test(ua)) return 'android'
-  return 'desktop'
-}
-
-function isStandalone(): boolean {
-  if (typeof window === 'undefined') return false
-  // iOS expõe navigator.standalone; resto usa media query.
-  const iosStandalone = (window.navigator as Navigator & { standalone?: boolean }).standalone === true
-  const displayStandalone = window.matchMedia('(display-mode: standalone)').matches
-  return iosStandalone || displayStandalone
-}
+import { useInstallPrompt } from '@/hooks/use-install-prompt'
 
 interface InstallButtonProps {
   className?: string
@@ -35,41 +12,15 @@ interface InstallButtonProps {
 }
 
 export function InstallButton({ className, variant = 'secondary' }: InstallButtonProps) {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
-  const [platform, setPlatform] = useState<Platform>('unknown')
-  const [installed, setInstalled] = useState(false)
+  const { isIos, isStandalone, canPrompt, triggerPrompt } = useInstallPrompt()
   const [showIosSheet, setShowIosSheet] = useState(false)
 
-  useEffect(() => {
-    setPlatform(detectPlatform())
-    setInstalled(isStandalone())
-
-    const handler = (e: Event) => {
-      e.preventDefault()
-      setDeferredPrompt(e as BeforeInstallPromptEvent)
-    }
-    const installedHandler = () => {
-      setInstalled(true)
-      setDeferredPrompt(null)
-    }
-
-    window.addEventListener('beforeinstallprompt', handler)
-    window.addEventListener('appinstalled', installedHandler)
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handler)
-      window.removeEventListener('appinstalled', installedHandler)
-    }
-  }, [])
-
   // Já instalado: não renderiza nada.
-  if (installed) return null
-
-  // iOS Safari não dispara beforeinstallprompt — mostra instrução manual.
-  const isIos = platform === 'ios'
+  if (isStandalone) return null
 
   // Chrome/Edge/Android sem evento ainda: navegador não considera instalável.
   // Mantemos o botão mesmo assim em iOS (instrução manual) ou se houver prompt.
-  if (!deferredPrompt && !isIos) return null
+  if (!canPrompt && !isIos) return null
 
   const baseClass =
     variant === 'primary'
@@ -83,13 +34,7 @@ export function InstallButton({ className, variant = 'secondary' }: InstallButto
       setShowIosSheet(true)
       return
     }
-    if (!deferredPrompt) return
-    await deferredPrompt.prompt()
-    const choice = await deferredPrompt.userChoice
-    if (choice.outcome === 'accepted') {
-      setInstalled(true)
-    }
-    setDeferredPrompt(null)
+    await triggerPrompt()
   }
 
   return (

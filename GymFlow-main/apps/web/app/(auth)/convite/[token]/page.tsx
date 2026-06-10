@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, AlertCircle, CheckCircle2, Dumbbell } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { BrandLogo } from '@/components/layout/brand-logo'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 
@@ -113,19 +112,13 @@ export default function ConvitePage() {
   const roleLabel = invite?.role === 'personal' ? 'Personal Trainer' : 'Aluno'
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background bg-mesh">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-md glass rounded-3xl p-8 border border-border/60 shadow-glow"
-      >
-        {/* Logo (link smart) */}
-        <div className="text-center mb-8 inline-flex w-full justify-center">
-          <BrandLogo size="lg" />
-        </div>
-
-        <AnimatePresence mode="wait">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      className="w-full glass rounded-3xl p-8 border border-border/60 shadow-glow"
+    >
+      <AnimatePresence mode="wait">
 
           {/* Loading state */}
           {status === 'loading' && (
@@ -262,8 +255,7 @@ export default function ConvitePage() {
             </motion.div>
           )}
 
-        </AnimatePresence>
-      </motion.div>
-    </div>
+      </AnimatePresence>
+    </motion.div>
   )
 }

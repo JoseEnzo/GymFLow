@@ -1177,38 +1177,19 @@ function SobreSection() {
           className="glass rounded-3xl p-8 lg:p-12 max-w-4xl mx-auto"
           style={{ borderColor: 'rgba(99,102,241,0.2)' }}
         >
-          <div className="grid lg:grid-cols-2 gap-8 items-center">
-            <div className="space-y-4">
-              <span className="badge-primary text-xs">Nossa história</span>
-              <h3 className="text-2xl font-display font-bold leading-snug">
-                Uma startup brasileira,<br />com o coração na academia
-              </h3>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                Feito no Brasil, focado em academia pequena — daquelas onde o dono conhece cada aluno pelo nome.
-                Sem TI, sem time de implantação, sem contrato anual. Você assina, convida seus alunos e começa.
-              </p>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                A prioridade é o aluno usando o app no meio do treino: interface limpa, rápida, que funciona mesmo
-                com sinal fraco e com as mãos suadas.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { label: 'Fundado em', value: '2024', color: '#6366F1' },
-                { label: 'País', value: '🇧🇷 Brasil', color: '#10B981' },
-                { label: 'Stack', value: 'Next.js + Supabase', color: '#06B6D4' },
-                { label: 'Foco', value: 'Mobile-first', color: '#F59E0B' },
-              ].map(({ label, value, color }) => (
-                <div
-                  key={label}
-                  className="rounded-xl p-4"
-                  style={{ background: `${color}10`, border: `1px solid ${color}20` }}
-                >
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">{label}</p>
-                  <p className="font-display font-bold text-sm">{value}</p>
-                </div>
-              ))}
-            </div>
+          <div className="max-w-2xl mx-auto text-center space-y-4">
+            <span className="badge-primary text-xs">Nossa história</span>
+            <h3 className="text-2xl font-display font-bold leading-snug">
+              Uma startup brasileira,<br />com o coração na academia
+            </h3>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Feito no Brasil, focado em academia pequena — daquelas onde o dono conhece cada aluno pelo nome.
+              Sem TI, sem time de implantação, sem contrato anual. Você assina, convida seus alunos e começa.
+            </p>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              A prioridade é o aluno usando o app no meio do treino: interface limpa, rápida, que funciona mesmo
+              com sinal fraco e com as mãos suadas.
+            </p>
           </div>
         </motion.div>
       </div>

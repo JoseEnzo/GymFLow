@@ -515,6 +515,7 @@ function AcademiaTab() {
 const NOTIF_KEY = 'gymflow_notifications'
 
 function NotificacoesTab() {
+  const supabase = createClient()
   const [settings, setSettings] = useState(() => {
     try {
       const stored = localStorage.getItem(NOTIF_KEY)
@@ -530,12 +531,47 @@ function NotificacoesTab() {
     }
   })
 
+  // Hidrata `emailWeeklyReport` do banco (única preference que afeta servidor por enquanto).
+  // Demais toggles seguem só em localStorage até virar feature.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any)
+        .from('notification_preferences')
+        .select('email_weekly_report')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (cancelled || !data) return
+      setSettings((s: { emailWeeklyReport: boolean } & Record<string, boolean>) => {
+        const next = { ...s, emailWeeklyReport: !!data.email_weekly_report }
+        try { localStorage.setItem(NOTIF_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+        return next
+      })
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   type SettingKey = keyof typeof settings
 
   function toggle(key: SettingKey) {
     setSettings((s: typeof settings) => {
       const next = { ...s, [key]: !s[key] }
       try { localStorage.setItem(NOTIF_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+      // Sincroniza no banco só o toggle que o servidor consome (cron de inatividade).
+      if (key === 'emailWeeklyReport') {
+        void (async () => {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) return
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (supabase as any)
+            .from('notification_preferences')
+            .upsert({ user_id: user.id, email_weekly_report: next.emailWeeklyReport, updated_at: new Date().toISOString() })
+        })()
+      }
       return next
     })
   }

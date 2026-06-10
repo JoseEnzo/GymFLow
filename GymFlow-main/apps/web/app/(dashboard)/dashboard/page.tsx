@@ -58,6 +58,7 @@ interface TodayWorkout   { id: string; name: string; goal: string | null; exerci
 interface LastWorkoutSummary { sheetName: string; durationSeconds: number | null; createdAt: string }
 interface NextWorkout    { id: string; name: string; goal: string | null; exerciseCount: number; dayLabel: string }
 interface MonthlyWorkout { month: string; count: number }
+interface StudentRecord  { exerciseId: string; exerciseName: string; weightKg: number; createdAt: string }
 
 
 const OWNER_PLAN_INFO: Record<string, { name: string; color: string; emoji: string; price: string; trial?: boolean; features: string[] }> = {
@@ -197,6 +198,7 @@ async function logFreeWorkout() {
   const [freeLogging,     setFreeLogging]     = useState(false)
   const [freeLoggedToday, setFreeLoggedToday] = useState(false)
   const [weekActivity,    setWeekActivity]    = useState<boolean[]>(Array(7).fill(false))
+  const [studentRecords,  setStudentRecords]  = useState<StudentRecord[]>([])
   const [dataLoaded,      setDataLoaded]      = useState(false)
   const router = useRouter()
 
@@ -445,6 +447,34 @@ async function logFreeWorkout() {
         exerciseCount: d.next_workout.exercise_count,
         dayLabel: DAY_LABELS[d.next_workout.scheduled_day] ?? '',
       })
+    }
+
+    // PRs recentes — top 5 cargas máximas por exercício nos últimos 30d.
+    // Query simples client-side: pega séries pesadas ordenadas, agrupa por exercise_id.
+    // Não usa RPC ainda (MVP) — se virar gargalo, migrar pra get_student_records.
+    const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: setsData } = await (sb as any)
+      .from('set_logs')
+      .select('exercise_id, weight_kg, created_at, exercises!inner(name), workout_logs!inner(student_id)')
+      .eq('workout_logs.student_id', user.id)
+      .gt('weight_kg', 0)
+      .gte('created_at', thirtyDaysAgo.toISOString())
+      .order('weight_kg', { ascending: false })
+      .limit(100)
+
+    if (setsData) {
+      const maxByExercise = new Map<string, StudentRecord>()
+      for (const row of setsData as Array<{ exercise_id: string; weight_kg: number; created_at: string; exercises: { name: string } | null }>) {
+        if (!row.exercises || maxByExercise.has(row.exercise_id)) continue
+        maxByExercise.set(row.exercise_id, {
+          exerciseId: row.exercise_id,
+          exerciseName: row.exercises.name,
+          weightKg: row.weight_kg,
+          createdAt: row.created_at,
+        })
+      }
+      setStudentRecords(Array.from(maxByExercise.values()).slice(0, 5))
     }
   }
 
@@ -1057,6 +1087,46 @@ async function logFreeWorkout() {
               </motion.div>
             )
           })()}
+
+          {/* Seus recordes — top 5 PRs dos últimos 30d (motor de gamificação) */}
+          {studentRecords.length > 0 && (
+            <motion.div variants={fadeUp} className="glass rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/15 flex items-center justify-center">
+                    <Trophy className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-sm">Seus recordes</h3>
+                    <p className="text-[11px] text-muted-foreground">Maiores cargas dos últimos 30 dias</p>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {studentRecords.map((r, i) => (
+                  <motion.div
+                    key={r.exerciseId}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05, duration: 0.3 }}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-surface-100/50 border border-border/40"
+                  >
+                    <div className="w-7 h-7 rounded-full bg-amber-500/15 flex items-center justify-center text-amber-400 text-[11px] font-bold flex-shrink-0">
+                      #{i + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">{r.exerciseName}</p>
+                      <p className="text-[11px] text-muted-foreground">{formatTimeAgo(r.createdAt)}</p>
+                    </div>
+                    <p className="text-base font-display font-extrabold tabular-nums whitespace-nowrap">
+                      {r.weightKg.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}
+                      <span className="text-xs text-muted-foreground ml-1">kg</span>
+                    </p>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          )}
 
           {/* Meta semanal */}
           <motion.div variants={fadeUp} className="glass rounded-2xl p-5">

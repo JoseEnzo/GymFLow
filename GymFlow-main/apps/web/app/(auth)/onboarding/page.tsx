@@ -9,7 +9,6 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { BrandLogo } from '@/components/layout/brand-logo'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
 import { cn } from '@/lib/utils'
@@ -89,8 +88,10 @@ function OnboardingContent() {
           setRole('owner')
           setStep('academy')
         } else if (accountType === 'student') {
-          setRole('student')
-          setStep('invite')
+          // Aluno não tem decisão a tomar no onboarding — vai direto pro dashboard,
+          // que tem EmptyState com botão "Tenho um convite" pra quem precisa.
+          router.replace('/dashboard')
+          return
         } else if (accountType === 'owner') {
           setRole('owner')
           setStep('plan')
@@ -181,21 +182,15 @@ function OnboardingContent() {
   // ─────────────────────────────────────────────────────────
   if (!authChecked) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex items-center justify-center py-12">
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-      {/* Logo (link smart) */}
-      <div className="mb-10">
-        <BrandLogo size="lg" />
-      </div>
-
-      <div className="w-full max-w-lg">
-        <AnimatePresence mode="wait">
+    <div className="w-full">
+      <AnimatePresence mode="wait">
 
           {/* ── STEP: role picker ── */}
           {step === 'role' && (
@@ -642,15 +637,14 @@ function OnboardingContent() {
             </motion.div>
           )}
 
-        </AnimatePresence>
-      </div>
+      </AnimatePresence>
     </div>
   )
 }
 
 export default function OnboardingPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+    <Suspense fallback={null}>
       <OnboardingContent />
     </Suspense>
   )

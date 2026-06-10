@@ -7,12 +7,10 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Eye, EyeOff, Loader2, AlertCircle, Check, Building2, Dumbbell, ArrowLeft, ShieldCheck, UserCheck, ChevronRight, Ticket, CreditCard, ArrowRight } from 'lucide-react'
+import { Eye, EyeOff, Loader2, AlertCircle, Check, Building2, Dumbbell, ArrowLeft, ShieldCheck, UserCheck, ChevronRight } from 'lucide-react'
 
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
-import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { validateCPF, validateCNPJ, maskCPF, maskCNPJ, validateCREF, maskCREF } from '@/lib/cnpj'
 import { SocialButtons } from '@/components/auth/social-buttons'
@@ -99,12 +97,9 @@ function CadastroInner() {
   const inviteToken = searchParams.get('token')
 
   // If arriving via invite, skip type selection
-  const [step, setStep] = useState<0 | 'invite' | 1>(inviteToken ? 1 : 0)
+  const [step, setStep] = useState<0 | 1>(inviteToken ? 1 : 0)
   const [accountType, setAccountType] = useState<'owner' | 'personal' | 'student'>(inviteToken ? 'student' : 'owner')
   const [inviteRole, setInviteRole] = useState<'personal' | 'student' | null>(null)
-  const [hasInvite, setHasInvite] = useState<boolean | null>(null)
-  const [inviteCode, setInviteCode] = useState('')
-  const [inviteSaving, setInviteSaving] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -125,30 +120,6 @@ function CadastroInner() {
       })
       .catch(() => null)
   }, [inviteToken])
-
-  async function redeemInvite() {
-    const trimmed = inviteCode.trim().toUpperCase()
-    if (!trimmed) return
-    setInviteSaving(true)
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('invites')
-        .select('token')
-        .eq('code', trimmed)
-        .eq('is_active', true)
-        .limit(1)
-      if (error || !data || data.length === 0) {
-        toast.error('Código inválido ou expirado.')
-        return
-      }
-      router.push(`/convite/${(data[0] as { token: string } | undefined)!.token}`)
-    } catch {
-      toast.error('Erro ao verificar código. Tente novamente.')
-    } finally {
-      setInviteSaving(false)
-    }
-  }
 
   const {
     register,
@@ -240,7 +211,7 @@ function CadastroInner() {
                     type="button"
                     onClick={() => {
                       setAccountType(type.value)
-                      setStep(type.value === 'student' || type.value === 'personal' ? 'invite' : 1)
+                      setStep(1)
                     }}
                     className={cn(
                       'w-full flex items-center gap-4 p-5 rounded-2xl border-2 text-left transition-all duration-200 group',
@@ -283,125 +254,6 @@ function CadastroInner() {
           </motion.div>
         )}
 
-        {/* ── Etapa convite (aluno) ── */}
-        {step === 'invite' && (
-          <motion.div
-            key="step-invite"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="space-y-6"
-          >
-            <div className="space-y-1.5">
-              <button
-                type="button"
-                onClick={() => { setStep(0); setHasInvite(null); setInviteCode('') }}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-3"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" /> Voltar
-              </button>
-              <h1 className="text-2xl font-display font-bold">Você tem um convite? 🎯</h1>
-              <p className="text-sm text-muted-foreground">
-                Se seu professor ou academia enviou um código, use-o para entrar gratuitamente.
-              </p>
-            </div>
-
-            <div className="grid gap-3">
-              <button
-                type="button"
-                onClick={() => setHasInvite(true)}
-                className={cn(
-                  'flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-200',
-                  hasInvite === true
-                    ? 'border-emerald-500/50 bg-emerald-500/8'
-                    : 'border-border/60 hover:border-border hover:bg-surface-100'
-                )}
-              >
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-500/15 flex-shrink-0">
-                  <Ticket className="w-5 h-5 text-emerald-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm">Sim, tenho um código de convite</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Entro gratuitamente via convite do professor</p>
-                </div>
-                {hasInvite === true && (
-                  <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
-                    <Check className="w-3 h-3 text-white" />
-                  </div>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setHasInvite(false)}
-                className={cn(
-                  'flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-200',
-                  hasInvite === false
-                    ? 'border-indigo-500/50 bg-indigo-500/8'
-                    : 'border-border/60 hover:border-border hover:bg-surface-100'
-                )}
-              >
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-500/15 flex-shrink-0">
-                  <CreditCard className="w-5 h-5 text-indigo-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm">Não tenho convite</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Quero criar minha conta e usar o app</p>
-                </div>
-                {hasInvite === false && (
-                  <div className="w-5 h-5 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0">
-                    <Check className="w-3 h-3 text-white" />
-                  </div>
-                )}
-              </button>
-            </div>
-
-            <AnimatePresence>
-              {hasInvite === true && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="space-y-3 overflow-hidden"
-                >
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Código de convite</label>
-                    <input
-                      type="text"
-                      value={inviteCode}
-                      onChange={(e) => setInviteCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
-                      placeholder="ABC123"
-                      maxLength={6}
-                      autoComplete="off"
-                      className="field tracking-widest font-mono"
-                      onKeyDown={(e) => e.key === 'Enter' && inviteCode.length === 6 && redeemInvite()}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={redeemInvite}
-                    disabled={inviteSaving || inviteCode.length !== 6}
-                    className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
-                  >
-                    {inviteSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Check className="w-4 h-4" /> Entrar com convite</>}
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {hasInvite === false && (
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
-              >
-                Criar conta <ArrowRight className="w-4 h-4" />
-              </button>
-            )}
-          </motion.div>
-        )}
-
         {/* ── Etapa 1: formulário ── */}
         {step === 1 && (
           <motion.div
@@ -417,7 +269,7 @@ function CadastroInner() {
               {!inviteToken && (
                 <button
                   type="button"
-                  onClick={() => setStep(accountType === 'student' ? 'invite' : 0)}
+                  onClick={() => setStep(0)}
                   className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-3"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
@@ -640,6 +492,15 @@ function CadastroInner() {
                 Fazer login
               </Link>
             </p>
+
+            {!inviteToken && accountType !== 'owner' && (
+              <p className="text-center text-xs text-muted-foreground">
+                Tem código de convite?{' '}
+                <Link href="/codigo" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
+                  Entrar com código
+                </Link>
+              </p>
+            )}
           </motion.div>
         )}
 

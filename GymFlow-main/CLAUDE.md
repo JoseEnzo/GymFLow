@@ -634,23 +634,31 @@ Rodar da **raiz do monorepo** (`GymFlow-main/`), não de `apps/web/`:
 
 ---
 
-## Pendente — Notificações via Resend
+## Notificações via Resend
 
-Aba "Notificações" em `apps/web/app/(dashboard)/configuracoes/page.tsx` mostra 5 toggles (novo aluno, relatório semanal, treino concluído, lembrete, alerta novo aluno). **Estado vai pra `localStorage` (`gymflow_notifications`), nada é enviado.** Resend já tá no Doppler como `RESEND_API_KEY`, falta o disparo.
+**Email semanal de inatividade pro owner:** ✅ implementado (jun/2026).
+- Rota: `apps/web/app/api/cron/notifications/inactivity/route.ts` (GET, autorizada via `Bearer $CRON_SECRET`).
+- Cron Vercel: segunda 12h UTC (`vercel.json` → `crons[]`).
+- Helper Resend em `apps/web/lib/resend.ts`. Template HTML inline em `apps/web/lib/email-templates/weekly-inactivity.ts`.
+- FROM atual: sandbox `onboarding@resend.dev` (sem domínio validado). Trocar quando o domínio for verificado no Resend.
+- Idempotência: tabela `sent_notifications (user_id, kind, target_date)` com UNIQUE — segundo hit na mesma semana retorna `skipped`. Migration 067.
+- Opt-in: tabela `notification_preferences.email_weekly_report` (default `true`). Sincronizada do toggle em `/configuracoes` → aba Notificações. localStorage continua como cache local.
+- **Pegadinha:** Vercel Cron só roda em prod. Pra testar local, hit manual `curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/notifications/inactivity`.
 
-Foi prometido em copy da landing como feature do Pro ("Notificações de inatividade") até 2026-06-05, **foi removido** porque vender o que não existe quebra a régua de tom do produto. Re-adicionar à landing só depois de implementar.
+**Ainda pendente (não bloqueia o caso de uso acima):**
+1. **Eventos transacionais** (novo aluno, treino concluído) — disparados inline na própria API route que cria o recurso. Por ora não enviados.
+2. **Templates extras** — boas-vindas owner, novo aluno chegou. Mesmo padrão de `weekly-inactivity.ts`.
+3. **Outros toggles** em `gymflow_notifications` (push, novo aluno, treino concluído) ainda só em localStorage — não enviam nada.
+4. **Limite de envio** — Resend free tier 100/dia. Assinar plano pago ANTES de escalar. Sentry alert quando 80% da quota.
+5. **Re-adicionar à landing:** depois que rodar 1 mês em prod sem bug, voltar "Notificações de inatividade" na lista do plano Pro em `app/page.tsx`.
 
-**Implementação esperada:**
+## PWA install — prompt agressivo após 1º treino
 
-1. **Migrar `localStorage` → tabela `notification_preferences`** (`user_id, academy_id, key, channel, enabled`). RLS por user/academy. O localStorage atual fica como fallback offline.
-2. **Job recorrente** — Vercel Cron (`vercel.json` → `crons[]`) que dispara API route `/api/cron/notifications/inactivity` a cada segunda 09:00. A route faz query `academy_members LEFT JOIN workout_logs` pra achar alunos sem treino nos últimos 7d e dispara e-mail via Resend pra cada owner/personal com a preferência ligada.
-3. **Eventos transacionais** (novo aluno, treino concluído) — disparados inline na própria API route que cria o recurso, sem cron. `await sendNotification(...)` no fim do POST.
-4. **Templates Resend** — criar 3 templates iniciais (boas-vindas owner, novo aluno chegou, resumo semanal). Versionar em `apps/web/lib/email-templates/`.
-5. **Limite de envio** — Resend free tier é 100 e-mails/dia. Pra Pro a galera vai além disso facilmente. Plano: assinar Resend pago ANTES de ativar disparo em prod. Sentry alert quando 80% da quota.
-6. **Idempotência** — tabela `sent_notifications (user_id, kind, target_date)` com UNIQUE constraint pra cron retry não duplicar e-mail.
-7. **Re-adicionar à landing:** depois que rodar 1 semana em prod sem bug, voltar "Notificações de inatividade" na lista do plano Pro em `app/page.tsx` (seção `plans[2].features`).
+Implementado jun/2026: quando aluno conclui o **primeiro** treino, o `WorkoutComplete` (em `app/(dashboard)/treinos/executar/[id]/page.tsx`) mostra bottom sheet "Instale como app" depois de ~600ms. Anti-spam via `localStorage.meutrein_pwa_install_prompted` — só prompta 1x por device. Detecção do 1º treino: `select count from workout_logs where student_id = me` retorna 1 (o log atual já foi inserido).
 
-Pegadinha conhecida: Vercel Cron só roda em prod (não em preview/dev). Pra testar local, hit manual `curl -X POST http://localhost:3000/api/cron/notifications/inactivity` com header `Authorization: Bearer $CRON_SECRET`.
+Lógica de install extraída em hook reutilizável: `apps/web/hooks/use-install-prompt.ts`. `<InstallButton />` (que aparece em outras telas) consome o mesmo hook.
+
+**Bloqueio Android ainda válido**: sem os 4 PNGs em `public/icons/` + `apple-touch-icon.png`, Chrome **não dispara** `beforeinstallprompt`. O bottom sheet ainda aparece, mas botão "Instalar agora" cai pro fallback de instruções manuais (mesma estética do iOS). Pra desbloquear: gerar PNGs com realfavicongenerator.net usando o SVG do `<BrandLogo />`.
 
 ---
 

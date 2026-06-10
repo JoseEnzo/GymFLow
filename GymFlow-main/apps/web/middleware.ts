@@ -18,6 +18,7 @@ const PUBLIC_API_ROUTES = [
 const PUBLIC_PREFIXES = [
   '/convite/',       // página de aceite de convite (token na URL)
   '/auth/callback',  // OAuth callback do Supabase
+  '/api/cron/',      // Vercel Cron — autoriza via Bearer CRON_SECRET na própria rota
 ]
 
 export async function middleware(request: NextRequest) {

@@ -16,6 +16,7 @@ import { useInterval } from '@/hooks/use-debounce'
 import { ProgressRing } from '@/components/ui/progress-ring'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
+import { useInstallPrompt } from '@/hooks/use-install-prompt'
 import { cacheSheet, getCachedSheet, queueWorkout, type SheetSnapshot } from '@/lib/offline-store'
 
 interface ExerciseSlot {
@@ -77,6 +78,7 @@ export default function ExecutarTreinoPage() {
   const [showExitDialog, setShowExitDialog] = useState(false)
   const [prMaxWeights, setPrMaxWeights] = useState<Record<string, number>>({})
   const [lastPrKey, setLastPrKey] = useState<string | null>(null)
+  const [prCelebration, setPrCelebration] = useState<{ exerciseName: string; weight: number; previousMax: number } | null>(null)
   const wakeLockRef = useRef<WakeLockSentinel | null>(null)
 
   useEffect(() => {
@@ -393,6 +395,8 @@ export default function ExecutarTreinoPage() {
       const prKey = `${exercise.sheetExerciseId}-${setIdx}`
       setLastPrKey(prKey)
       setPrMaxWeights((prev) => ({ ...prev, [exercise.exerciseId]: weight }))
+      setPrCelebration({ exerciseName: exercise.name, weight, previousMax: historicalMax })
+      window.setTimeout(() => setPrCelebration(null), 1800)
       toast(`🏆 Novo recorde! ${weight} kg no ${exercise.name}`, {
         style: {
           background: 'rgba(120,53,15,0.9)',
@@ -848,9 +852,54 @@ export default function ExecutarTreinoPage() {
           </button>
         )}
       </div>
+
+      {/* Overlay full-screen quando bate PR — visceral, ~1.8s */}
+      <AnimatePresence>
+        {prCelebration && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none bg-black/40 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.6, y: 24 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 1.15, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 240, damping: 18 }}
+              className="bg-gradient-to-br from-amber-500/30 to-orange-600/30 backdrop-blur-xl border-2 border-amber-400/50 rounded-3xl px-10 py-8 text-center shadow-2xl max-w-[320px] mx-4"
+            >
+              <motion.div
+                initial={{ rotate: -25, scale: 0.4 }}
+                animate={{ rotate: 0, scale: 1 }}
+                transition={{ type: 'spring', stiffness: 200, damping: 12, delay: 0.1 }}
+                className="text-6xl mb-3"
+              >
+                🏆
+              </motion.div>
+              <p className="font-display font-extrabold text-xl text-amber-200 tracking-wide mb-2">
+                NOVO RECORDE!
+              </p>
+              <p className="text-sm text-amber-100/80 mb-4 line-clamp-1">{prCelebration.exerciseName}</p>
+              <p className="font-display font-extrabold text-5xl text-white tabular-nums">
+                {prCelebration.weight}
+                <span className="text-xl ml-1 text-amber-200/70">kg</span>
+              </p>
+              {prCelebration.previousMax > 0 && (
+                <p className="text-xs text-emerald-300 font-semibold mt-2">
+                  +{(prCelebration.weight - prCelebration.previousMax).toFixed(1)} kg do anterior
+                </p>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
+
+const PWA_PROMPT_KEY = 'meutrein_pwa_install_prompted'
 
 function WorkoutComplete({
   timer,
@@ -863,6 +912,59 @@ function WorkoutComplete({
   onViewProgress: () => void
   onExit: () => void
 }) {
+  const { canPrompt, isIos, isStandalone, triggerPrompt } = useInstallPrompt()
+  const [showPwaPrompt, setShowPwaPrompt] = useState(false)
+  const [iosInstructions, setIosInstructions] = useState(false)
+
+  // Detecta 1º treino e abre bottom sheet PWA após 400ms da animação spring.
+  // Anti-spam: localStorage cooldown — só prompta 1x por device.
+  useEffect(() => {
+    if (isStandalone) return
+    if (typeof window === 'undefined') return
+    if (window.localStorage.getItem(PWA_PROMPT_KEY)) return
+
+    let cancelled = false
+    void (async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || cancelled) return
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { count } = await (supabase as any)
+        .from('workout_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('student_id', user.id)
+      // O workout_log atual já foi inserido — count === 1 significa "este é o primeiro".
+      if (!cancelled && count === 1) {
+        window.setTimeout(() => setShowPwaPrompt(true), 600)
+      }
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStandalone])
+
+  function markPrompted() {
+    try { window.localStorage.setItem(PWA_PROMPT_KEY, String(Date.now())) } catch { /* ignore */ }
+  }
+
+  async function handleInstall() {
+    markPrompted()
+    if (isIos) {
+      setIosInstructions(true)
+      return
+    }
+    const outcome = await triggerPrompt()
+    if (outcome === 'unavailable' || outcome === 'ios-manual') {
+      setIosInstructions(true)
+      return
+    }
+    setShowPwaPrompt(false)
+  }
+
+  function dismissPrompt() {
+    markPrompted()
+    setShowPwaPrompt(false)
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
@@ -905,6 +1007,86 @@ function WorkoutComplete({
           Voltar para fichas
         </button>
       </div>
+
+      <AnimatePresence>
+        {showPwaPrompt && !iosInstructions && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={dismissPrompt}
+          >
+            <motion.div
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full sm:max-w-md bg-surface-100 border border-border rounded-t-3xl sm:rounded-3xl p-6 space-y-4 text-left"
+            >
+              <div className="text-5xl text-center">📱</div>
+              <div className="text-center space-y-1.5">
+                <h3 className="font-display font-extrabold text-xl">Instale como app</h3>
+                <p className="text-sm text-muted-foreground">
+                  Treinos sempre à mão, abre direto pelo ícone — e funciona até sem internet.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleInstall}
+                  className="btn-primary w-full py-3 rounded-xl font-semibold text-sm"
+                >
+                  {canPrompt || isIos ? 'Instalar agora' : 'Ver como instalar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={dismissPrompt}
+                  className="btn-ghost w-full py-2 text-xs"
+                >
+                  Agora não
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {iosInstructions && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => { setIosInstructions(false); setShowPwaPrompt(false) }}
+        >
+          <div
+            className="w-full sm:max-w-md bg-surface-100 border border-border rounded-t-2xl sm:rounded-2xl p-6 space-y-4 text-left"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold">Instalar MeuTrein no iPhone</h3>
+            <ol className="space-y-3 text-sm">
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-brand-500/20 text-brand-400 flex items-center justify-center text-xs font-semibold">1</span>
+                <span>Toque no ícone de compartilhar na barra do Safari</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-brand-500/20 text-brand-400 flex items-center justify-center text-xs font-semibold">2</span>
+                <span>Role e toque em <strong>Adicionar à Tela de Início</strong></span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-brand-500/20 text-brand-400 flex items-center justify-center text-xs font-semibold">3</span>
+                <span>Confirme em &ldquo;Adicionar&rdquo; — pronto.</span>
+              </li>
+            </ol>
+            <button
+              type="button"
+              onClick={() => { setIosInstructions(false); setShowPwaPrompt(false) }}
+              className="btn-secondary w-full py-2.5 rounded-xl text-sm"
+            >
+              Entendi
+            </button>
+          </div>
+        </div>
+      )}
     </motion.div>
   )
 }
