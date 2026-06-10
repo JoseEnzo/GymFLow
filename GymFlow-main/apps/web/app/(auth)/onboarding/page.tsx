@@ -98,6 +98,13 @@ function OnboardingContent() {
         } else if (accountType === 'personal') {
           setRole('personal')
           setStep('personal-invite')
+        } else {
+          // Sem account_type = entrou por login social (Google). Pelo produto, social
+          // só vira ALUNO — nunca mostramos o seletor com dono/personal aqui (donos e
+          // personais entram pelo /cadastro). Defesa caso o updateUser do callback falhe;
+          // normalmente account_type já chega como 'student' e cai no branch acima.
+          router.replace('/dashboard')
+          return
         }
         setAuthChecked(true)
       })
