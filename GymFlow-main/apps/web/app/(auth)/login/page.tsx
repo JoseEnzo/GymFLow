@@ -278,27 +278,14 @@ function LoginInner() {
           ))}
         </div>
 
-        <motion.div variants={fadeUp} custom={4} className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-border/60" />
-          </div>
-          <div className="relative flex justify-center text-xs">
-            <span className="bg-background px-3 text-muted-foreground">ou continue com</span>
-          </div>
-        </motion.div>
-
-        <motion.div variants={fadeUp} custom={5}>
-          <SocialButtons onLogin={signInWithProvider} />
-        </motion.div>
-
-        <motion.p variants={fadeUp} custom={6} className="text-center text-sm text-muted-foreground">
+        <motion.p variants={fadeUp} custom={4} className="text-center text-sm text-muted-foreground">
           Não tem uma conta?{' '}
           <Link href="/cadastro" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
             Criar conta grátis
           </Link>
         </motion.p>
 
-        <motion.p variants={fadeUp} custom={7} className="text-center text-sm text-muted-foreground">
+        <motion.p variants={fadeUp} custom={5} className="text-center text-sm text-muted-foreground">
           Recebeu um código de convite?{' '}
           <Link href="/codigo" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
             Entrar com código
@@ -501,6 +488,22 @@ function LoginInner() {
           </button>
         </motion.div>
       </form>
+
+      {role === 'student' && (
+        <>
+          <motion.div variants={fadeUp} custom={4} className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border/60" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-background px-3 text-muted-foreground">ou continue com</span>
+            </div>
+          </motion.div>
+          <motion.div variants={fadeUp} custom={5}>
+            <SocialButtons onLogin={signInWithProvider} />
+          </motion.div>
+        </>
+      )}
 
       {/* Footer links */}
       {role === 'student' && (

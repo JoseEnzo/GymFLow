@@ -1,11 +1,11 @@
 'use client'
 
 import React from 'react'
-import { Loader2, Github, Facebook, Gitlab, ChevronRight } from 'lucide-react'
+import { Loader2, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
-type Provider = 'google' | 'facebook' | 'github' | 'gitlab'
+type Provider = 'google'
 
 const PROVIDERS: { key: Provider; label: string; icon: React.ReactNode; btn: string; iconBg: string }[] = [
   {
@@ -22,9 +22,6 @@ const PROVIDERS: { key: Provider; label: string; icon: React.ReactNode; btn: str
       </svg>
     ),
   },
-  { key: 'facebook', label: 'Facebook', btn: 'bg-blue-500/5 border-blue-500/20 text-foreground hover:bg-blue-500/10 hover:border-blue-500/30',     iconBg: 'bg-blue-500/10',   icon: <Facebook className="w-5 h-5 text-[#1877F2]" /> },
-  { key: 'github',   label: 'GitHub',   btn: 'bg-surface-100 border-border/60 text-foreground hover:bg-surface-200 hover:border-border',              iconBg: 'bg-white/6',       icon: <Github   className="w-5 h-5 text-foreground" /> },
-  { key: 'gitlab',   label: 'GitLab',   btn: 'bg-orange-500/5 border-orange-500/20 text-foreground hover:bg-orange-500/10 hover:border-orange-500/30', iconBg: 'bg-orange-500/10', icon: <Gitlab   className="w-5 h-5 text-[#FC6D26]" /> },
 ]
 
 interface SocialButtonsProps {
