@@ -233,18 +233,6 @@ function CadastroInner() {
               })}
             </div>
 
-            {/* Divider */}
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border/60" />
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="bg-background px-3 text-muted-foreground">ou continue com</span>
-              </div>
-            </div>
-
-            <SocialButtons onLogin={signInWithProvider} />
-
             <p className="text-center text-sm text-muted-foreground">
               Já tem uma conta?{' '}
               <Link href="/login" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
@@ -485,6 +473,20 @@ function CadastroInner() {
                 </button>
               </motion.div>
             </motion.form>
+
+            {accountType === 'student' && !inviteToken && (
+              <>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-border/60" />
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="bg-background px-3 text-muted-foreground">ou continue com</span>
+                  </div>
+                </div>
+                <SocialButtons onLogin={signInWithProvider} />
+              </>
+            )}
 
             <p className="text-center text-sm text-muted-foreground">
               Já tem uma conta?{' '}
