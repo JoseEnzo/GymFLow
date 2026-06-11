@@ -5,9 +5,9 @@ import Link from 'next/link'
 import { useRef, useState, useEffect } from 'react'
 import {
   Dumbbell, Users, TrendingUp, Shield, Zap, BarChart2,
-  ChevronRight, Check, Star, ArrowRight, Play, Menu, X,
+  ChevronRight, Check, ArrowRight, Play, Menu, X,
   Smartphone, Clock, Award, Target, Activity, Lock,
-  ChevronDown, Quote, Salad, Scale,
+  ChevronDown, Salad, Scale,
 } from 'lucide-react'
 
 import { BrandLogo } from '@/components/layout/brand-logo'
@@ -245,7 +245,10 @@ function Nav() {
               </Link>
             ) : (
               <>
-                <Link href="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-4 py-2">
+                <Link href="/codigo" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2">
+                  Tenho código
+                </Link>
+                <Link href="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2">
                   Entrar
                 </Link>
                 <Link href="/cadastro" className="btn-primary text-sm px-5 py-2.5 rounded-xl">
@@ -296,10 +299,13 @@ function Nav() {
                   </Link>
                 ) : (
                   <>
-                    <Link href="/login" className="px-4 py-3 rounded-xl text-sm font-medium text-center text-muted-foreground hover:bg-surface-100 transition-all">
+                    <Link href="/codigo" onClick={() => setMenuOpen(false)} className="px-4 py-3 rounded-xl text-sm font-medium text-center text-brand-400 hover:bg-surface-100 transition-all">
+                      Tenho código de convite
+                    </Link>
+                    <Link href="/login" onClick={() => setMenuOpen(false)} className="px-4 py-3 rounded-xl text-sm font-medium text-center text-muted-foreground hover:bg-surface-100 transition-all">
                       Entrar
                     </Link>
-                    <Link href="/cadastro" className="btn-primary text-sm py-3 rounded-xl text-center">
+                    <Link href="/cadastro" onClick={() => setMenuOpen(false)} className="btn-primary text-sm py-3 rounded-xl text-center">
                       Começar grátis
                     </Link>
                   </>
@@ -329,19 +335,19 @@ function Hero() {
           <motion.div
             animate={{ scale: [1, 1.18, 1], opacity: [0.35, 0.65, 0.35] }}
             transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
-            className="absolute top-1/4 left-1/4 w-[640px] h-[640px] rounded-full"
+            className="absolute top-1/4 left-1/4 w-64 h-64 lg:w-[640px] lg:h-[640px] rounded-full"
             style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.10) 0%, transparent 70%)' }}
           />
           <motion.div
             animate={{ scale: [1, 1.2, 1], opacity: [0.25, 0.50, 0.25] }}
             transition={{ duration: 10, repeat: Infinity, delay: 2, ease: 'easeInOut' }}
-            className="absolute bottom-1/4 right-1/4 w-[520px] h-[520px] rounded-full"
+            className="absolute bottom-1/4 right-1/4 w-52 h-52 lg:w-[520px] lg:h-[520px] rounded-full"
             style={{ background: 'radial-gradient(circle, rgba(6,182,212,0.09) 0%, transparent 70%)' }}
           />
           <motion.div
             animate={{ scale: [1, 1.12, 1], opacity: [0.20, 0.40, 0.20] }}
             transition={{ duration: 13, repeat: Infinity, delay: 5, ease: 'easeInOut' }}
-            className="absolute top-3/4 left-1/2 w-[380px] h-[380px] rounded-full"
+            className="absolute top-3/4 left-1/2 w-44 h-44 lg:w-[380px] lg:h-[380px] rounded-full"
             style={{ background: 'radial-gradient(circle, rgba(245,158,11,0.07) 0%, transparent 70%)' }}
           />
         </>
@@ -406,17 +412,44 @@ function Hero() {
                 )}
               </motion.div>
 
+              {/* Caminho do aluno — quem foi convidado pra uma academia entra direto pelo código,
+                  sem passar pelo fluxo de cadastro de owner. Link discreto pra não roubar o destaque
+                  do CTA principal. */}
+              {!isAuthenticated && (
+                <motion.div variants={fadeUp} className="pt-1">
+                  <Link
+                    href="/codigo"
+                    className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Foi convidado para uma academia?
+                    <span className="text-brand-400 font-semibold underline-offset-4 hover:underline">
+                      Entrar com código →
+                    </span>
+                  </Link>
+                </motion.div>
+              )}
+
               {/* PWA install — só renderiza quando navegador aceita instalar. */}
               <motion.div variants={fadeUp}>
                 <InstallButton variant="ghost" />
               </motion.div>
 
-              {/* Social proof — texto honesto, sem avatares/estrelas fake */}
+              {/* Reassurance tripla — reduz fricção antes do CTA */}
               <motion.div variants={fadeUp} className="pt-2">
-                <p className="text-xs text-muted-foreground">
-                  Junte-se às primeiras academias no <span className="text-foreground font-semibold">MeuTrein</span>.
-                  Sem fidelidade, sem cartão de crédito agora.
-                </p>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    30 dias grátis
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    Sem cartão de crédito
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    Cancele com 1 clique
+                  </span>
+                </div>
               </motion.div>
             </motion.div>
 
@@ -439,16 +472,16 @@ function Hero() {
                 </div>
 
                 {/* Stats row */}
-                <div className="grid grid-cols-3 gap-3 mb-5">
+                <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-5">
                   {[
                     { label: 'Alunos', value: '247', color: '#6366F1', icon: Users },
                     { label: 'Treinos hoje', value: '38', color: '#10B981', icon: Activity },
                     { label: 'Freq. semanal', value: '91%', color: '#06B6D4', icon: TrendingUp },
                   ].map(({ label, value, color, icon: Icon }) => (
-                    <div key={label} className="rounded-xl p-3" style={{ background: `${color}10`, border: `1px solid ${color}25` }}>
-                      <Icon className="w-4 h-4 mb-2" style={{ color }} />
-                      <p className="font-display font-bold text-lg leading-none">{value}</p>
-                      <p className="text-[10px] text-muted-foreground mt-1">{label}</p>
+                    <div key={label} className="rounded-xl p-2 sm:p-3 min-w-0" style={{ background: `${color}10`, border: `1px solid ${color}25` }}>
+                      <Icon className="w-4 h-4 mb-1.5 sm:mb-2" style={{ color }} />
+                      <p className="font-display font-bold text-base sm:text-lg leading-none truncate">{value}</p>
+                      <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-1 truncate">{label}</p>
                     </div>
                   ))}
                 </div>
@@ -476,9 +509,9 @@ function Hero() {
                 </div>
               </div>
 
-              {/* Floating cards */}
+              {/* Floating cards — escondidos no mobile pra não cortar nas bordas */}
               <FloatingCard
-                className="absolute -left-12 top-8 w-52"
+                className="hidden md:block absolute -left-12 top-8 w-52"
                 delay={0.6}
               >
                 <div className="flex items-center gap-3">
@@ -494,7 +527,7 @@ function Hero() {
               </FloatingCard>
 
               <FloatingCard
-                className="absolute -right-6 bottom-12 w-56 animate-float-delayed"
+                className="hidden md:block absolute -right-6 bottom-12 w-56 animate-float-delayed"
                 delay={0.8}
               >
                 <p className="text-[10px] text-muted-foreground font-medium mb-2">Próximo treino</p>
@@ -599,9 +632,9 @@ const features = [
   },
   {
     icon: BarChart2,
-    title: 'Painel com os números',
+    title: 'Veja quem está sumindo',
     description:
-      'Frequência semanal, mapa de calor, exercícios mais usados e quem está sumindo.',
+      'Frequência semanal, mapa de calor e ranking de exercícios. Identifique o aluno inativo antes do cancelamento.',
     color: '#EC4899',
     gradient: 'from-pink-500/20 to-transparent',
   },
@@ -692,10 +725,10 @@ const personas = [
     features: [
       'Lista de alunos vinculados',
       'Criação de fichas personalizadas',
-      'Biblioteca com 40+ exercícios',
+      'Biblioteca com 600+ exercícios',
       'Séries, reps, descanso e notas',
       'Histórico de treinos do aluno',
-      'Sugestão de carga automática',
+      'Carga anterior visível ao logar série',
     ],
   },
   {
@@ -943,14 +976,14 @@ const plans = [
     period: '/mês',
     description: 'Para personal trainers independentes',
     features: [
-      'Até 20 alunos',
+      'Alunos ilimitados',
       'Fichas de treino ilimitadas',
       'Biblioteca de 600+ exercícios',
       'Plano alimentar por aluno',
       'Bioimpedância e composição',
       'App mobile com modo offline',
       'Histórico e gráficos de evolução',
-      '14 dias grátis sem cartão',
+      '30 dias grátis sem cartão',
     ],
     cta: 'Começar grátis',
     href: '/cadastro?plan=personal',
@@ -1020,7 +1053,7 @@ function PricingSection() {
             Simples e transparente
           </motion.h2>
           <motion.p variants={fadeUp} className="text-muted-foreground text-lg max-w-xl mx-auto">
-            14 dias de trial grátis nos planos pagos. Cancele quando quiser, sem fidelidade.
+            30 dias de trial grátis nos planos pagos. Cancele quando quiser, sem fidelidade.
           </motion.p>
         </motion.div>
 
@@ -1029,7 +1062,7 @@ function PricingSection() {
           initial="hidden"
           whileInView="show"
           viewport={{ once: true }}
-          className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto"
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto"
         >
           {plans.map((plan) => (
             <motion.div
@@ -1149,7 +1182,7 @@ function SobreSection() {
           initial="hidden"
           whileInView="show"
           viewport={{ once: true, margin: '-50px' }}
-          className="grid md:grid-cols-3 gap-6 mb-16"
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16"
         >
           {values.map((v) => (
             <motion.div
@@ -1241,6 +1274,17 @@ function CTASection() {
                   <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
                 </span>
               </Link>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-3 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5 text-emerald-400" /> 30 dias grátis
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5 text-emerald-400" /> Cancele com 1 clique
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5 text-emerald-400" /> Suporte humano em PT-BR
+              </span>
             </div>
           </div>
         </motion.div>
@@ -1334,7 +1378,7 @@ function Footer() {
 // ──────────────────────────────────────────────
 const STATS = [
   { label: 'Exercícios prontos',          end: 600,  suffix: '+',   color: '#6366F1' },
-  { label: 'Trial grátis',                end: 14,   suffix: ' dias', color: '#06B6D4' },
+  { label: 'Trial grátis',                end: 30,   suffix: ' dias', color: '#06B6D4' },
   { label: 'Pra criar uma ficha',         end: 5,    suffix: 'min', color: '#10B981' },
   { label: 'Suporte por e-mail',          end: 24,   suffix: 'h',   color: '#F59E0B' },
 ]
@@ -1360,152 +1404,6 @@ function StatsBar() {
                 <Counter end={end} suffix={suffix} />
               </p>
               <p className="text-sm text-muted-foreground mt-1 font-medium">{label}</p>
-            </motion.div>
-          ))}
-        </motion.div>
-      </div>
-    </section>
-  )
-}
-
-// ──────────────────────────────────────────────
-// Testimonials Section
-// ──────────────────────────────────────────────
-const testimonials = [
-  {
-    quote: 'Antes eu usava planilha para tudo. O MeuTrein substituiu 3 ferramentas de uma vez — e meus alunos adoram o app.',
-    name: 'Rodrigo Faria',
-    title: 'Proprietário · Academia Shape',
-    location: 'São Paulo, SP',
-    color: '#6366F1',
-    rating: 5,
-    initial: 'R',
-  },
-  {
-    quote: 'Consigo ver em tempo real quem treinou hoje, quem está sumindo e criar fichas em menos de 5 minutos. Simplesmente indispensável.',
-    name: 'Amanda Souza',
-    title: 'Personal Trainer',
-    location: 'Curitiba, PR',
-    color: '#06B6D4',
-    rating: 5,
-    initial: 'A',
-  },
-  {
-    quote: 'Minha streak chegou a 30 dias! A gamificação me mantém focada. Nunca fui tão consistente na academia.',
-    name: 'Letícia Nunes',
-    title: 'Aluna · SmartFit Morumbi',
-    location: 'São Paulo, SP',
-    color: '#10B981',
-    rating: 5,
-    initial: 'L',
-  },
-  {
-    quote: 'A integração de convites por QR code e código é genial. Todos os meus alunos entraram sem nenhum problema técnico.',
-    name: 'Carlos Mendes',
-    title: 'Proprietário · Studio Body Pro',
-    location: 'Belo Horizonte, MG',
-    color: '#F59E0B',
-    rating: 5,
-    initial: 'C',
-  },
-  {
-    quote: 'O dashboard analítico me ajudou a perceber que 40% dos alunos estavam inativos. Consegui reengajar 80% deles em um mês.',
-    name: 'Patricia Lima',
-    title: 'Gerente · Power Gym',
-    location: 'Rio de Janeiro, RJ',
-    color: '#8B5CF6',
-    rating: 5,
-    initial: 'P',
-  },
-  {
-    quote: 'Instalei como PWA no celular e funciona até sem internet na academia. Isso faz diferença no dia a dia de treino.',
-    name: 'Thiago Oliveira',
-    title: 'Aluno · CrossFit Vila Madalena',
-    location: 'São Paulo, SP',
-    color: '#EC4899',
-    rating: 5,
-    initial: 'T',
-  },
-]
-
-function TestimonialsSection() {
-  return (
-    <section className="relative py-24 lg:py-32 overflow-hidden">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true }}
-          className="text-center mb-16 space-y-4"
-        >
-          <motion.div variants={fadeUp}>
-            <span className="badge-success text-xs uppercase tracking-widest">Depoimentos</span>
-          </motion.div>
-          <motion.h2 variants={fadeUp} className="text-4xl lg:text-5xl font-display font-extrabold">
-            Quem usa, recomenda
-          </motion.h2>
-          <motion.p variants={fadeUp} className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            As primeiras academias do Brasil já trocaram a planilha e o caderno pelo MeuTrein.
-          </motion.p>
-
-          {/* Rating bar */}
-          <motion.div variants={fadeUp} className="flex items-center justify-center gap-3 pt-2">
-            <div className="flex items-center gap-1">
-              {[1,2,3,4,5].map((s) => (
-                <Star key={s} className="w-5 h-5 fill-amber-400 text-amber-400" />
-              ))}
-            </div>
-            <span className="font-display font-bold text-lg">4.9</span>
-            <span className="text-muted-foreground text-sm">· 99% de satisfação</span>
-          </motion.div>
-        </motion.div>
-
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: '-60px' }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
-        >
-          {testimonials.map((t) => (
-            <motion.div
-              key={t.name}
-              variants={scaleIn}
-              whileHover={{ y: -4, transition: { duration: 0.2 } }}
-              className="glass rounded-2xl p-6 flex flex-col gap-4 group cursor-default hover:border-brand-500/20 transition-all duration-300"
-            >
-              {/* Quote icon */}
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: `${t.color}15`, border: `1px solid ${t.color}25` }}>
-                <Quote className="w-4 h-4" style={{ color: t.color }} />
-              </div>
-
-              {/* Text */}
-              <p className="text-sm text-muted-foreground leading-relaxed flex-1">
-                &ldquo;{t.quote}&rdquo;
-              </p>
-
-              {/* Stars */}
-              <div className="flex items-center gap-0.5">
-                {Array.from({ length: t.rating }).map((_, i) => (
-                  <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                ))}
-              </div>
-
-              {/* Author */}
-              <div className="flex items-center gap-3 pt-1 border-t border-border/40">
-                <div
-                  className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm text-white flex-shrink-0"
-                  style={{ background: `linear-gradient(135deg, ${t.color}, ${t.color}99)` }}
-                >
-                  {t.initial}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold truncate">{t.name}</p>
-                  <p className="text-[11px] text-muted-foreground truncate">{t.title} · {t.location}</p>
-                </div>
-              </div>
             </motion.div>
           ))}
         </motion.div>
@@ -1679,8 +1577,6 @@ export default function LandingPage() {
         <SectionTransition />
         <HowItWorksSection />
         <PricingSection />
-        {/* TestimonialsSection removida — depoimentos atuais eram fictícios.
-            Reativar quando tivermos quotes reais de academias parceiras. */}
         <SobreSection />
         <FAQSection />
         <CTASection />

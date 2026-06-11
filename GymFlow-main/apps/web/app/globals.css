@@ -84,6 +84,12 @@
     background-attachment: fixed;
   }
 
+  /* Em mobile, fixed re-paint a cada scroll = lag.
+     Trocar pra scroll mantém o visual sem custo de frame. */
+  @media (max-width: 768px) {
+    body { background-attachment: scroll; }
+  }
+
   ::selection {
     background: rgba(99, 102, 241, 0.3);
     color: #f1f5f9;

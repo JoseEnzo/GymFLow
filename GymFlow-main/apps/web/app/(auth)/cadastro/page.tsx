@@ -87,6 +87,7 @@ const TYPES = [
     border: 'border-indigo-500/40',
     iconBg: 'bg-indigo-500/15',
     iconColor: 'text-indigo-400',
+    badge: 'Grátis',
   },
 ]
 
@@ -208,6 +209,7 @@ function CadastroInner() {
               {TYPES.map((type) => {
                 const Icon = type.icon
                 const selected = accountType === type.value
+                const badge = 'badge' in type ? type.badge : null
                 return (
                   <button
                     key={type.value}
@@ -217,12 +219,17 @@ function CadastroInner() {
                       setStep(1)
                     }}
                     className={cn(
-                      'w-full flex items-center gap-4 p-5 rounded-2xl border-2 text-left transition-all duration-200 group',
+                      'relative w-full flex items-center gap-4 p-5 rounded-2xl border-2 text-left transition-all duration-200 group',
                       selected
                         ? `${type.bg} ${type.border}`
                         : 'border-border/60 hover:border-border bg-surface-100/50 hover:bg-surface-100'
                     )}
                   >
+                    {badge && (
+                      <span className="absolute -top-2 right-4 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold tracking-wide shadow-sm">
+                        {badge}
+                      </span>
+                    )}
                     <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-all', type.iconBg)}>
                       <Icon className={cn('w-5 h-5', type.iconColor)} />
                     </div>

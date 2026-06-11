@@ -73,22 +73,25 @@ export function Header() {
       className="sticky top-0 z-20 flex items-center justify-between h-16 px-4 sm:px-6 border-b border-border/40 bg-background/80 backdrop-blur-xl"
     >
       {/* Left */}
-      <div className="flex items-center gap-3">
-        {isSubPage ? (
+      <div className="flex items-center gap-1.5 sm:gap-3">
+        {isSubPage && (
           <button
             onClick={() => router.back()}
+            aria-label="Voltar"
             className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-        ) : (
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
         )}
+        {/* Hamburger sempre disponível no mobile (inclusive em sub-páginas),
+            porque o sidebar não fica visível em <lg e sem isso o aluno fica preso. */}
+        <button
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Abrir menu"
+          className="lg:hidden p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
 
         {/* Page title */}
         <div>
