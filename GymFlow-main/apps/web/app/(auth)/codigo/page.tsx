@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowRight, ArrowLeft, AlertCircle, Loader2 } from 'lucide-react'
 
-import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 
 const fadeUp = {
@@ -22,35 +21,35 @@ function CodigoContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const isLoggedIn = searchParams.get('from') === 'dashboard'
-  const supabase = createClient()
 
   const [code, setCode] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
 
+  // Convites antigos têm código de 6 caracteres; novos têm 8.
+  const isValidLength = code.length === 6 || code.length === 8
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const trimmed = code.trim().toUpperCase()
-    if (trimmed.length !== 6) return
+    if (trimmed.length !== 6 && trimmed.length !== 8) return
 
     setStatus('loading')
     setError(null)
 
     try {
-      const { data, error: queryError } = await supabase
-        .from('invites')
-        .select('token')
-        .eq('code', trimmed)
-        .eq('is_active', true)
-        .single()
-
-      if (queryError || !data) {
-        setError('Código inválido ou expirado. Verifique e tente novamente.')
+      // Lookup via API (service role) — RLS não permite mais ler invites
+      // pelo client (migration 069).
+      const res = await fetch(`/api/invites/lookup?code=${encodeURIComponent(trimmed)}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => null) as { error?: string } | null
+        setError(err?.error ?? 'Código inválido ou expirado. Verifique e tente novamente.')
         setStatus('error')
         return
       }
 
-      router.push(`/convite/${(data as { token: string }).token}`)
+      const data = await res.json() as { token: string }
+      router.push(`/convite/${data.token}`)
     } catch {
       setError('Erro ao verificar código. Tente novamente.')
       setStatus('error')
@@ -68,7 +67,7 @@ function CodigoContent() {
         </button>
         <h1 className="text-2xl font-display font-bold">Entrar com código</h1>
         <p className="text-sm text-muted-foreground">
-          Digite o código de 6 caracteres recebido da sua academia
+          Digite o código recebido da sua academia
         </p>
       </motion.div>
 
@@ -93,30 +92,30 @@ function CodigoContent() {
             type="text"
             value={code}
             onChange={(e) =>
-              setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))
+              setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))
             }
-            placeholder="ABC123"
-            maxLength={6}
+            placeholder="ABC12345"
+            maxLength={8}
             autoComplete="off"
             autoCapitalize="characters"
             spellCheck={false}
             className={cn(
-              'field text-center font-mono text-3xl tracking-[0.6em] uppercase py-5',
+              'field text-center font-mono text-2xl tracking-[0.4em] uppercase py-5',
               status === 'error' && 'border-destructive/60'
             )}
           />
           <p className="text-xs text-muted-foreground text-center">
-            {code.length}/6 caracteres
+            {code.length}/8 caracteres
           </p>
         </motion.div>
 
         <motion.div variants={fadeUp} custom={2}>
           <button
             type="submit"
-            disabled={code.length !== 6 || status === 'loading'}
+            disabled={!isValidLength || status === 'loading'}
             className={cn(
               'w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2',
-              (code.length !== 6 || status === 'loading') && 'opacity-60 cursor-not-allowed'
+              (!isValidLength || status === 'loading') && 'opacity-60 cursor-not-allowed'
             )}
           >
             {status === 'loading' ? (

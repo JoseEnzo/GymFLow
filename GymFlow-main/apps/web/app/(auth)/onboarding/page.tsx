@@ -168,17 +168,17 @@ function OnboardingContent() {
     if (!trimmed) return
     setSaving(true)
     try {
-      const { data, error } = await supabase
-        .from('invites')
-        .select('token')
-        .eq('code', trimmed)
-        .eq('is_active', true)
-        .limit(1)
-      if (error || !data || data.length === 0) {
-        toast.error('Código inválido ou expirado. Verifique e tente novamente.')
+      // Lookup via API (service role) — RLS não permite mais ler invites
+      // pelo client (migration 069); a API também resolve colisão de código
+      // entre academias (antes o .limit(1) pegava um arbitrário).
+      const res = await fetch(`/api/invites/lookup?code=${encodeURIComponent(trimmed)}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => null) as { error?: string } | null
+        toast.error(err?.error ?? 'Código inválido ou expirado. Verifique e tente novamente.')
         return
       }
-      router.push(`/convite/${(data[0] as { token: string } | undefined)!.token}`)
+      const data = await res.json() as { token: string }
+      router.push(`/convite/${data.token}`)
     } catch {
       toast.error('Erro ao verificar código. Tente novamente.')
     } finally {
@@ -610,17 +610,17 @@ function OnboardingContent() {
                       <input
                         type="text"
                         value={inviteCode}
-                        onChange={(e) => setInviteCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
-                        placeholder="ABC123"
-                        maxLength={6}
+                        onChange={(e) => setInviteCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
+                        placeholder="ABC12345"
+                        maxLength={8}
                         autoComplete="off"
                         className="field tracking-widest font-mono"
-                        onKeyDown={(e) => e.key === 'Enter' && inviteCode.length === 6 && redeemInvite()}
+                        onKeyDown={(e) => e.key === 'Enter' && (inviteCode.length === 6 || inviteCode.length === 8) && redeemInvite()}
                       />
                     </div>
                     <button
                       onClick={redeemInvite}
-                      disabled={saving || inviteCode.length !== 6}
+                      disabled={saving || (inviteCode.length !== 6 && inviteCode.length !== 8)}
                       className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
                     >
                       {saving
