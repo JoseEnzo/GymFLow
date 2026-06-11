@@ -429,6 +429,19 @@ Setup PWA completo via `@ducanh2912/next-pwa` (configurado em `apps/web/next.con
 
 ## Fluxos críticos — não quebrar
 
+### Login e cadastro por papel (jun/2026)
+
+- **CREF é OPCIONAL no cadastro do personal** (era obrigatório). Se preenchido, valida formato + pre-check de duplicidade; se vazio, `signUp` normaliza pra `null` (NUNCA gravar `''` em `profiles.cref`/`cpf` — índice UNIQUE parcial só ignora NULL, string vazia colide no 2º cadastro sem documento).
+- **Login do personal aceita CREF OU e-mail** no mesmo campo: valor com `@` ou começando com letra → login direto por e-mail (caminho do aluno, com Turnstile); valor numérico → máscara CREF + lookup `/api/auth/lookup`. Não aplicar `maskCREF` em valor que parece e-mail (a máscara remove `@`/`.`).
+- **Conta de aluno não vira personal independente**: o seletor de papel do onboarding esconde o cartão "Sou personal trainer" quando `account_type === 'student'`. Personal entra pelo `/cadastro` ou por convite de academia.
+- **Login social (Google) sempre entra como aluno** (`auth/callback` força `account_type: 'student'`). Donos e personais entram por credenciais.
+
+### Login social — branding do consent screen (TODO, config externa)
+
+A tela do Google mostra "para continuar em `<projeto>.supabase.co`". Dois passos pra mostrar MeuTrein (nada disso é código deste repo):
+1. **Google Cloud Console → OAuth consent screen:** App name "MeuTrein" + logo + domínio autorizado — muda o nome exibido no topo. Grátis, fazer já.
+2. **Supabase Custom Domain** (add-on pago): aponta auth pra um domínio próprio (ex: `auth.gymflow.app`) — é o único jeito de sumir o `supabase.co` da URL exibida. Exige atualizar o redirect URI no Google Console e o Site URL no Supabase.
+
 ### Cadastro de academia
 ```
 CNPJ → ReceitaWS → preenche dados → Google Places → confirma → cria academia + membro owner

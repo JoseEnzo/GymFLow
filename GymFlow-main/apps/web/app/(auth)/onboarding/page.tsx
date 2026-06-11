@@ -63,6 +63,9 @@ function OnboardingContent() {
   const [saving, setSaving] = useState(false)
   const [step, setStep] = useState<'role' | 'personal-invite' | 'plan' | 'academy' | 'invite'>('role')
   const [authChecked, setAuthChecked] = useState(false)
+  // account_type do metadata — usado pra esconder opções incompatíveis no seletor
+  // de papel (ex: conta de aluno não pode virar personal independente).
+  const [accountType, setAccountType] = useState<string | null>(null)
 
   // Usuário já configurado → direto ao dashboard
   useEffect(() => {
@@ -80,6 +83,7 @@ function OnboardingContent() {
         }
 
         const accountType = data.user.user_metadata?.['account_type'] as string | undefined
+        setAccountType(accountType ?? null)
         const planFromUrl       = searchParams.get('plan')
         const isAcademyPlan     = PLANS.some(x => x.id === planFromUrl)
 
@@ -228,21 +232,25 @@ function OnboardingContent() {
                   <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto group-hover:translate-x-1 transition-transform" />
                 </button>
 
-                <button
-                  onClick={() => { setRole('personal'); setStep('personal-invite') }}
-                  className="flex items-center gap-4 p-5 rounded-2xl border border-border/60 hover:border-brand-500/40 hover:bg-brand-500/5 text-left transition-all duration-200 group"
-                >
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-500/15 flex-shrink-0 group-hover:scale-105 transition-transform">
-                    <Users className="w-6 h-6 text-brand-400" />
-                  </div>
-                  <div>
-                    <p className="font-semibold">Sou personal trainer</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Trabalho de forma independente com meus alunos
-                    </p>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto group-hover:translate-x-1 transition-transform" />
-                </button>
+                {/* Conta de aluno não vira personal independente — personal entra
+                    pelo /cadastro (com CREF) ou por convite de academia. */}
+                {accountType !== 'student' && (
+                  <button
+                    onClick={() => { setRole('personal'); setStep('personal-invite') }}
+                    className="flex items-center gap-4 p-5 rounded-2xl border border-border/60 hover:border-brand-500/40 hover:bg-brand-500/5 text-left transition-all duration-200 group"
+                  >
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-500/15 flex-shrink-0 group-hover:scale-105 transition-transform">
+                      <Users className="w-6 h-6 text-brand-400" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">Sou personal trainer</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Trabalho de forma independente com meus alunos
+                      </p>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto group-hover:translate-x-1 transition-transform" />
+                  </button>
+                )}
 
                 <button
                   onClick={() => { setRole('student'); setStep('invite') }}

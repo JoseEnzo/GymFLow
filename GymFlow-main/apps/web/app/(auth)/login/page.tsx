@@ -57,7 +57,7 @@ const ROLES: {
     label: 'Personal',
     sublabel: 'Treinador pessoal',
     description: 'Monte fichas, acompanhe alunos e resultados',
-    credential: 'Acesso com CREF',
+    credential: 'Acesso com CREF ou e-mail',
     icon: UserCheck,
     bg: 'bg-violet-500/8',
     border: 'border-violet-500/30',
@@ -155,8 +155,14 @@ function LoginInner() {
 
   function handleIdentifierChange(e: React.ChangeEvent<HTMLInputElement>) {
     let v = e.target.value
-    if (role === 'owner')    v = maskCNPJ(v)
-    if (role === 'personal') v = maskCREF(v)
+    if (role === 'owner') v = maskCNPJ(v)
+    if (role === 'personal') {
+      // Personal loga com CREF ou e-mail (CREF é opcional no cadastro). Só aplica
+      // a máscara de CREF quando não parece e-mail — CREF sempre começa com dígito
+      // e nunca tem '@'; a máscara removeria '@' e '.' do e-mail digitado.
+      const looksLikeEmail = v.includes('@') || /^[a-zA-Z]/.test(v.trim())
+      v = looksLikeEmail ? v : maskCREF(v)
+    }
     setIdentifier(v)
     setValue('identifier', v)
   }
@@ -169,7 +175,10 @@ function LoginInner() {
 
       let email = data.identifier
 
-      if (role === 'owner' || role === 'personal') {
+      // Personal sem CREF loga com e-mail — segue o caminho direto (como aluno).
+      const personalWithEmail = role === 'personal' && data.identifier.includes('@')
+
+      if ((role === 'owner' || role === 'personal') && !personalWithEmail) {
         // Lookup verifica o token Turnstile internamente (token é single-use).
         const res = await fetch('/api/auth/lookup', {
           method: 'POST',
@@ -188,7 +197,7 @@ function LoginInner() {
         }
         email = json.email
       } else {
-        // Student loga direto com email — verificação Turnstile sempre,
+        // Student (e personal com e-mail) loga direto — verificação Turnstile sempre,
         // server decide se aceita (em dev sem TURNSTILE_SECRET_KEY libera).
         const res = await fetch('/api/turnstile', {
           method: 'POST',
@@ -266,8 +275,8 @@ function LoginInner() {
 
   /* ── Step 2: login form ─────────────────────────────────────────── */
   const roleInfo = ROLES.find(r => r.key === role)!
-  const idLabel       = role === 'owner' ? 'CNPJ' : role === 'personal' ? 'CREF' : 'E-mail'
-  const idPlaceholder = role === 'owner' ? '00.000.000/0001-00' : role === 'personal' ? '123456-G/SP' : 'seu@email.com'
+  const idLabel       = role === 'owner' ? 'CNPJ' : role === 'personal' ? 'CREF ou e-mail' : 'E-mail'
+  const idPlaceholder = role === 'owner' ? '00.000.000/0001-00' : role === 'personal' ? '123456-G/SP ou seu@email.com' : 'seu@email.com'
   const idType        = role === 'student' ? 'email' : 'text'
 
   return (

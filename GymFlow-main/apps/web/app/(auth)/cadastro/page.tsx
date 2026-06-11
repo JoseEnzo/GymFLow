@@ -136,7 +136,8 @@ function CadastroInner() {
     setDocumentError(null)
     if (accountType === 'owner') {
       if (!validateCNPJ(document)) { setDocumentError('CNPJ inválido'); return }
-    } else if (accountType === 'personal') {
+    } else if (accountType === 'personal' && document.trim().length > 0) {
+      // CREF é opcional, mas se preenchido precisa ter formato válido.
       if (!validateCREF(document)) { setDocumentError('CREF inválido (ex: 123456-G/SP)'); return }
     } else if (accountType === 'student' && document.replace(/\D/g, '').length > 0) {
       // CPF é opcional, mas se preenchido precisa ser um CPF válido (dígitos verificadores).
@@ -148,7 +149,8 @@ function CadastroInner() {
     try {
       // Pre-check: CNPJ/CREF já em uso? Evita criar auth.user órfão.
       // CPF (student) pula esse check — student loga com email, não CPF.
-      if (accountType === 'owner' || accountType === 'personal') {
+      // CREF vazio (opcional) também pula — não há o que checar.
+      if (accountType === 'owner' || (accountType === 'personal' && document.trim().length > 0)) {
         const checkRes = await fetch('/api/check-document', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -342,7 +344,7 @@ function CadastroInner() {
               <motion.div variants={fadeUp} className="space-y-1.5">
                 <label className="text-sm font-medium flex items-center gap-1.5">
                   {accountType === 'owner' ? 'CNPJ da academia' : accountType === 'personal' ? 'CREF' : 'CPF'}
-                  {accountType === 'student' && (
+                  {(accountType === 'student' || accountType === 'personal') && (
                     <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
                   )}
                 </label>
