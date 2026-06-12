@@ -34,20 +34,6 @@ const fadeUp = {
 
 const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
-function computeBestStreak(timestamps: string[]): number {
-  if (timestamps.length === 0) return 0
-  const fmt = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  const days = [...new Set(timestamps.map(t => fmt(new Date(t))))].sort()
-  let best = 1, cur = 1
-  for (let i = 1; i < days.length; i++) {
-    const diff = Math.round((new Date(days[i]!).getTime() - new Date(days[i - 1]!).getTime()) / 86400000)
-    if (diff === 1) { cur++; if (cur > best) best = cur }
-    else cur = 1
-  }
-  return days.length > 0 ? best : 0
-}
-
 interface Stats {
   totalWorkouts: number
   prevWeekWorkouts: number
@@ -59,6 +45,7 @@ interface Stats {
   newSheets: number
   workoutsByDay: number[]
   topStudents: { name: string | null; count: number }[]
+  logDays: { d: string; c: number }[]
 }
 
 function DeltaBadge({ current, previous }: { current: number; previous: number }) {
@@ -105,31 +92,25 @@ export default function RelatoriosPage() {
 
       const prevWeekStart = new Date(weekStart)
       prevWeekStart.setDate(prevWeekStart.getDate() - 7)
-      const prevWeekEnd = new Date(weekStart)
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+      const yearAgo = new Date(now); yearAgo.setDate(now.getDate() - 365)
 
-      const base = sb.from('workout_logs').select('created_at, student_id').eq('academy_id', currentAcademy!.id)
-
+      // 2 roundtrips via RPC (migration 070 + 040). Counts, streak, top
+      // alunos e heatmap agregados no banco — substitui 6 queries (2 delas
+      // baixavam o histórico inteiro, truncado em 1000 linhas pelo
+      // db.max_rows do PostgREST) + 1 query de profiles.
       const [
-        { data: allLogs },
-        { data: weekLogs },
-        { data: prevWeekLogs },
-        { data: monthLogs },
-        { data: activeMembers },
-        { data: newSheets },
+        { data: report, error: reportError },
         { data: engagementRows, error: engagementError },
       ] = await Promise.all([
-        sb.from('workout_logs').select('created_at, student_id').eq('academy_id', currentAcademy!.id),
-        base.gte('created_at', weekStart.toISOString()),
-        sb.from('workout_logs').select('created_at').eq('academy_id', currentAcademy!.id)
-          .gte('created_at', prevWeekStart.toISOString())
-          .lt('created_at', prevWeekEnd.toISOString()),
-        sb.from('workout_logs').select('created_at').eq('academy_id', currentAcademy!.id)
-          .gte('created_at', monthStart.toISOString()),
-        sb.from('academy_members').select('user_id')
-          .eq('academy_id', currentAcademy!.id).eq('role', 'student').eq('is_active', true),
-        sb.from('workout_sheets').select('id')
-          .eq('academy_id', currentAcademy!.id).gte('created_at', monthStart.toISOString()),
+        sb.rpc('get_academy_reports', {
+          p_academy_id:      currentAcademy!.id,
+          p_week_start:      weekStart.toISOString(),
+          p_prev_week_start: prevWeekStart.toISOString(),
+          p_month_start:     monthStart.toISOString(),
+          p_year_ago:        yearAgo.toISOString(),
+          p_tz:              Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
         sb.rpc('academy_engagement_weekly', {
           p_academy_id:   currentAcademy!.id,
           p_weeks_back:   NSM_WEEKS_BACK,
@@ -144,39 +125,36 @@ export default function RelatoriosPage() {
         setEngagement((engagementRows ?? []) as EngagementWeek[])
       }
 
-      const workoutsByDay = Array(7).fill(0)
-      const studentWorkoutCount: Record<string, number> = {}
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(weekLogs ?? []).forEach((log: any) => {
-        workoutsByDay[new Date(log.created_at).getDay()]++
-        studentWorkoutCount[log.student_id] = (studentWorkoutCount[log.student_id] ?? 0) + 1
-      })
+      if (reportError || !report) {
+        console.error('get_academy_reports failed', {
+          message: reportError?.message, code: reportError?.code,
+          details: reportError?.details, hint: reportError?.hint,
+        })
+        setLoading(false)
+        return
+      }
 
-      const topIds = Object.entries(studentWorkoutCount)
-        .sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id]) => id)
-
-      const { data: topProfiles } = topIds.length > 0
-        ? await sb.from('profiles').select('id, full_name').in('id', topIds)
-        : { data: [] }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const nameMap: Record<string, string | null> = {}
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(topProfiles ?? []).forEach((p: any) => { nameMap[p.id] = p.full_name })
-
-      const allTimestamps = (allLogs ?? []).map((l: { created_at: string }) => l.created_at)
+      const r = report as {
+        week_count: number; prev_week_count: number; month_count: number
+        total_count: number; best_streak: number; active_students: number
+        total_active_members: number; new_sheets: number
+        workouts_by_day: number[]
+        top_students: { name: string | null; count: number }[]
+        log_days: { d: string; c: number }[]
+      }
 
       setStats({
-        totalWorkouts: weekLogs?.length ?? 0,
-        prevWeekWorkouts: prevWeekLogs?.length ?? 0,
-        thisMonth: monthLogs?.length ?? 0,
-        totalAllTime: allLogs?.length ?? 0,
-        bestStreak: computeBestStreak(allTimestamps),
-        activeStudents: new Set(Object.keys(studentWorkoutCount)).size,
-        totalActiveMembers: activeMembers?.length ?? 0,
-        newSheets: newSheets?.length ?? 0,
-        workoutsByDay,
-        topStudents: topIds.map((id) => ({ name: nameMap[id] ?? null, count: studentWorkoutCount[id]! })),
+        totalWorkouts: r.week_count,
+        prevWeekWorkouts: r.prev_week_count,
+        thisMonth: r.month_count,
+        totalAllTime: r.total_count,
+        bestStreak: r.best_streak,
+        activeStudents: r.active_students,
+        totalActiveMembers: r.total_active_members,
+        newSheets: r.new_sheets,
+        workoutsByDay: r.workouts_by_day,
+        topStudents: r.top_students,
+        logDays: r.log_days,
       })
       setLoading(false)
     }
@@ -447,7 +425,7 @@ export default function RelatoriosPage() {
               </div>
               <TrendingUp className="w-4 h-4 text-brand-400" />
             </div>
-            <FrequencyHeatmap />
+            <FrequencyHeatmap days={stats.logDays} />
             <div className="flex items-center justify-between mt-3 text-[10px] text-muted-foreground">
               <span>Menos</span>
               <div className="flex gap-1">

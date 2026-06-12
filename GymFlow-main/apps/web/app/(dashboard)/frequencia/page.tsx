@@ -52,21 +52,7 @@ function WeekGrid({ weekDays }: { weekDays: boolean[] }) {
   )
 }
 
-interface FreqStats { thisWeek: number; thisMonth: number; total: number; bestStreak: number; weekDays: boolean[]; allTimestamps: string[] }
-
-function computeBestStreak(timestamps: string[]): number {
-  if (timestamps.length === 0) return 0
-  const fmt = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  const days = [...new Set(timestamps.map(t => fmt(new Date(t))))].sort()
-  let best = 1, cur = 1
-  for (let i = 1; i < days.length; i++) {
-    const diff = Math.round((new Date(days[i]!).getTime() - new Date(days[i - 1]!).getTime()) / 86400000)
-    if (diff === 1) { cur++; if (cur > best) best = cur }
-    else cur = 1
-  }
-  return days.length > 0 ? best : 0
-}
+interface FreqStats { thisWeek: number; thisMonth: number; total: number; bestStreak: number; weekDays: boolean[]; logDays: { d: string; c: number }[] }
 
 export default function FrequenciaPage() {
   const { currentRole, currentAcademy } = useAuthStore()
@@ -78,7 +64,7 @@ export default function FrequenciaPage() {
     if (currentRole === 'owner') router.replace('/relatorios')
   }, [currentRole, router])
 
-  const [stats, setStats] = useState<FreqStats>({ thisWeek: 0, thisMonth: 0, total: 0, bestStreak: 0, weekDays: Array(7).fill(false), allTimestamps: [] })
+  const [stats, setStats] = useState<FreqStats>({ thisWeek: 0, thisMonth: 0, total: 0, bestStreak: 0, weekDays: Array(7).fill(false), logDays: [] })
 
   useEffect(() => {
     if (!currentAcademy) return
@@ -90,41 +76,45 @@ export default function FrequenciaPage() {
       const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay()); weekStart.setHours(0, 0, 0, 0)
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
+      const yearAgo = new Date(now); yearAgo.setDate(now.getDate() - 365)
+
+      // 1 roundtrip via RPC get_frequency_stats (migration 070). Counts,
+      // streak e heatmap agregados no banco — substitui 3 queries que
+      // baixavam o histórico inteiro (e eram truncadas em 1000 linhas
+      // pelo db.max_rows do PostgREST, zoando total e best streak).
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any
-      const base = isOwnerOrPersonal
-        ? sb.from('workout_logs').select('created_at').eq('academy_id', currentAcademy!.id)
-        : sb.from('workout_logs').select('created_at').eq('student_id', user.id).eq('academy_id', currentAcademy!.id)
-
-      // allLogs → total + best streak | monthLogs → este mês | weekLogs → semana atual
-      const [{ data: allLogs }, { data: monthLogs }, { data: weekLogs }] = await Promise.all([
-        base,
-        (isOwnerOrPersonal
-          ? sb.from('workout_logs').select('created_at').eq('academy_id', currentAcademy!.id)
-          : sb.from('workout_logs').select('created_at').eq('student_id', user.id).eq('academy_id', currentAcademy!.id)
-        ).gte('created_at', monthStart.toISOString()),
-        (isOwnerOrPersonal
-          ? sb.from('workout_logs').select('created_at').eq('academy_id', currentAcademy!.id)
-          : sb.from('workout_logs').select('created_at').eq('student_id', user.id).eq('academy_id', currentAcademy!.id)
-        ).gte('created_at', weekStart.toISOString()),
-      ])
-
-      const allTimestamps = (allLogs ?? []).map((l: { created_at: string }) => l.created_at)
-      const bestStreak = computeBestStreak(allTimestamps)
-
-      const weekDays = Array(7).fill(false)
-      ;(weekLogs ?? []).forEach((log: { created_at: string }) => {
-        const day = new Date(log.created_at).getDay()
-        weekDays[day] = true
+      const { data, error } = await sb.rpc('get_frequency_stats', {
+        p_academy_id:  currentAcademy!.id,
+        p_student_id:  isOwnerOrPersonal ? null : user.id,
+        p_week_start:  weekStart.toISOString(),
+        p_month_start: monthStart.toISOString(),
+        p_year_ago:    yearAgo.toISOString(),
+        p_tz:          Intl.DateTimeFormat().resolvedOptions().timeZone,
       })
 
+      if (error || !data) {
+        console.error('get_frequency_stats failed', {
+          message: error?.message, code: error?.code, details: error?.details, hint: error?.hint,
+        })
+        return
+      }
+
+      const d = data as {
+        total_count: number; week_count: number; month_count: number
+        best_streak: number; week_dows: number[]; log_days: { d: string; c: number }[]
+      }
+
+      const weekDays = Array(7).fill(false)
+      d.week_dows.forEach((dow) => { weekDays[dow] = true })
+
       setStats({
-        thisWeek: weekLogs?.length ?? 0,
-        thisMonth: monthLogs?.length ?? 0,
-        total: allLogs?.length ?? 0,
-        bestStreak,
+        thisWeek: d.week_count,
+        thisMonth: d.month_count,
+        total: d.total_count,
+        bestStreak: d.best_streak,
         weekDays,
-        allTimestamps,
+        logDays: d.log_days,
       })
     }
     load()
@@ -186,7 +176,7 @@ export default function FrequenciaPage() {
           </div>
           <TrendingUp className="w-4 h-4 text-brand-400" />
         </div>
-        <FrequencyHeatmap timestamps={stats.allTimestamps} />
+        <FrequencyHeatmap days={stats.logDays} />
         <div className="flex items-center justify-between mt-3 text-[10px] text-muted-foreground">
           <span>Menos</span>
           <div className="flex gap-1">

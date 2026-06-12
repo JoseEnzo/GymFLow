@@ -189,6 +189,10 @@ const visible = hasMore ? result.slice(0, PAGE_SIZE) : result
 
 Bug já corrigido em `app/(dashboard)/historico/page.tsx`. Padrão B é o recomendado quando você precisa do "Carregar mais".
 
+#### Query sem `.limit()` — truncamento silencioso em 1000 linhas
+
+O PostgREST corta TODA resposta em 1000 linhas (`db.max_rows`) **sem erro nem aviso** — `select('created_at')` da tabela inteira retorna no máximo 1000 e o cliente conta errado. Sintoma real: "Total de treinos" e "Melhor sequência" congelavam após 1000 logs (corrigido na migration 070, jun/2026). Regra: contagem/agregação de tabela grande vai pra RPC com `COUNT(*)`/`GROUP BY` no banco — nunca baixar linhas pra contar no cliente. Bônus: derruba o tráfego por page view (capacidade de usuários simultâneos).
+
 #### Dívida técnica — `(supabase as any).from(...)`
 
 Existem **~90 ocorrências** de `as any` no codebase, das quais ~65 são `(supabase as any).from(...)`. Eram necessárias quando `packages/database/src/types.ts` estava stale; **hoje os types estão atualizados** (regenerados após migrations 040/041). A maioria desses casts **pode ser removida sem efeito funcional**, e fazer isso revela bugs de tipo que estão escondidos.
@@ -503,6 +507,8 @@ Operações que precisam de atomicidade vivem em RPCs Postgres, não em código 
 - **`get_personal_dashboard(p_academy_id, p_personal_id, p_week_ago, p_today_start)`** — `057_get_personal_dashboard_rpc.sql`. Personal vê só os alunos que ele convidou (filtro `invited_by`). Permission: `p_personal_id = auth.uid()` AND role in (personal, owner).
 - **`get_student_dashboard(p_academy_id, p_student_id, p_week_ago, p_today_start, p_today_date, p_today_index)`** — `058_get_student_dashboard_rpc.sql`. Aluno vê só os próprios dados. Permission: `p_student_id = auth.uid()`. `p_today_date` (date) é separado pra evitar timezone drift em `agenda_completions.completed_on`.
 - **`get_student_evolution_summary(p_academy_id, p_student_id, p_since)`** — `059_get_student_evolution_summary_rpc.sql`. Load inicial de `/evolucao` em 1 roundtrip: `weekly_logs` (workouts completos + set_logs aninhados pra cálculo client-side de volume semanal) + `exercises` distintos com peso > 0 pra picker. Permission `p_student_id = auth.uid()`. Bucketização semanal fica no cliente (timezone-safe).
+- **`get_frequency_stats(p_academy_id, p_student_id, p_week_start, p_month_start, p_year_ago, p_tz)`** — `070_frequency_reports_rpcs.sql` (jun/2026). `/frequencia` em 1 roundtrip: counts + best streak (gaps-and-islands) + `week_dows` + `log_days` (heatmap, count por dia local, ≤366 entradas). `p_student_id` null = visão academia (exige owner/personal); senão precisa ser `auth.uid()`. `p_tz` = IANA do browser pra dia local. Substitui 3 queries unbounded.
+- **`get_academy_reports(p_academy_id, p_week_start, p_prev_week_start, p_month_start, p_year_ago, p_tz)`** — `070_frequency_reports_rpcs.sql` (jun/2026). `/relatorios` em 1 roundtrip (+ `academy_engagement_weekly` que já existia): counts, streak, `workouts_by_day[7]`, `top_students` (nome já resolvido) e `log_days`. Check owner/personal. Substitui 6 queries + lookup de profiles. `FrequencyHeatmap` agora aceita prop `days` (`{d, c}[]`) além de `timestamps`.
 
 Webhook Stripe (`apps/web/app/api/webhooks/stripe/route.ts`) usa claim atômico via `upsert ON CONFLICT DO NOTHING RETURNING` em `processed_events` + rollback do registro no `catch` (Stripe retenta evento se o handler subir).
 

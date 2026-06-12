@@ -74,7 +74,9 @@ const SECURITY_HEADERS = [
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://challenges.cloudflare.com",
+      // 'unsafe-eval' só em dev (HMR/source maps usam eval); prod não precisa.
+      // 'unsafe-inline' segue em ambos: removê-lo exige CSP com nonce por request.
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://js.stripe.com https://challenges.cloudflare.com`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' https: data: blob:",
       "font-src 'self'",

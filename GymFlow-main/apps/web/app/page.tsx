@@ -239,6 +239,7 @@ function Nav() {
 
           {/* CTA */}
           <div className="hidden md:flex items-center gap-3">
+            <InstallButton variant="ghost" className="px-3 py-2" />
             {isAuthenticated ? (
               <Link href="/dashboard" className="btn-primary text-sm px-5 py-2.5 rounded-xl">
                 Entrar
@@ -258,13 +259,26 @@ function Nav() {
             )}
           </div>
 
-          {/* Mobile menu button */}
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="md:hidden p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all"
-          >
-            {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
+          {/* Mobile actions — instalar + login sempre visíveis no topo */}
+          <div className="flex md:hidden items-center gap-1.5">
+            <InstallButton
+              variant="ghost"
+              className="p-2 rounded-xl hover:bg-surface-100 [&>span]:hidden min-[420px]:[&>span]:inline min-[420px]:px-3"
+            />
+            <Link
+              href={isAuthenticated ? '/dashboard' : '/login'}
+              className="btn-primary text-xs px-3.5 py-2 rounded-xl whitespace-nowrap"
+            >
+              Entrar
+            </Link>
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-surface-100 transition-all"
+              aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'}
+            >
+              {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -293,6 +307,7 @@ function Nav() {
                 </a>
               ))}
               <div className="pt-2 border-t border-border/60 flex flex-col gap-2">
+                <InstallButton variant="ghost" className="px-4 py-3 rounded-xl justify-center hover:bg-surface-100" />
                 {isAuthenticated ? (
                   <Link href="/dashboard" className="btn-primary text-sm py-3 rounded-xl text-center">
                     Entrar
@@ -428,11 +443,6 @@ function Hero() {
                   </Link>
                 </motion.div>
               )}
-
-              {/* PWA install — só renderiza quando navegador aceita instalar. */}
-              <motion.div variants={fadeUp}>
-                <InstallButton variant="ghost" />
-              </motion.div>
 
               {/* Reassurance tripla — reduz fricção antes do CTA */}
               <motion.div variants={fadeUp} className="pt-2">

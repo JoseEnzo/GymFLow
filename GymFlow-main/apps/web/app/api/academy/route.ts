@@ -26,6 +26,21 @@ export async function POST(request: Request) {
   const { name, plan = 'starter' } = body
   if (!name?.trim()) return NextResponse.json({ error: 'Nome obrigatório' }, { status: 400 })
 
+  // Modelo é 1 owner = 1 tenant (várias queries usam `.eq('owner_id').single()`).
+  // Sem este gate, POSTs repetidos criariam academias ilimitadas pro mesmo user.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: existingAcademy } = await (admin.from('academies') as any)
+    .select('id')
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (existingAcademy) {
+    return NextResponse.json(
+      { error: 'Você já possui uma academia cadastrada.' },
+      { status: 409 }
+    )
+  }
+
   // Busca CNPJ armazenado no metadata do Supabase Auth durante o cadastro
   const { data: { user: fullUser } } = await admin.auth.admin.getUserById(user.id)
   const cnpj = (fullUser?.user_metadata?.['document'] ?? '').replace(/\D/g, '') || null
