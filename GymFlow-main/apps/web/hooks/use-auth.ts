@@ -111,8 +111,12 @@ export function useAuth() {
 
   async function signUp(email: string, password: string, fullName: string, accountType: 'owner' | 'personal' | 'student' = 'owner', redirectTo?: string, document?: string) {
     // Personal usa CREF (alfanumérico); demais usam documento numérico (CPF/CNPJ).
-    const normalizedDoc = document
-      ? (accountType === 'personal' ? document.trim().toUpperCase() : document.replace(/\D/g, ''))
+    // Documento vazio/só-espaços vira null — o trigger handle_new_user grava o
+    // valor cru em profiles.cref/cpf (UNIQUE parcial), e '' não é NULL: dois
+    // cadastros sem documento colidiriam no índice.
+    const trimmedDoc = document?.trim() ?? ''
+    const normalizedDoc = trimmedDoc
+      ? (accountType === 'personal' ? trimmedDoc.toUpperCase() : trimmedDoc.replace(/\D/g, ''))
       : null
     const { data, error } = await supabase.auth.signUp({
       email,

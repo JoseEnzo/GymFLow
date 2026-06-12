@@ -976,6 +976,7 @@ export type Database = {
           height_cm: number | null
           id: string
           phone: string | null
+          specialty: string | null
           updated_at: string
           weight_kg: number | null
         }
@@ -993,6 +994,7 @@ export type Database = {
           height_cm?: number | null
           id: string
           phone?: string | null
+          specialty?: string | null
           updated_at?: string
           weight_kg?: number | null
         }
@@ -1010,6 +1012,7 @@ export type Database = {
           height_cm?: number | null
           id?: string
           phone?: string | null
+          specialty?: string | null
           updated_at?: string
           weight_kg?: number | null
         }

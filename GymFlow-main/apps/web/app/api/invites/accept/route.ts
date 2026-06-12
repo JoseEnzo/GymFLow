@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   if (authResult instanceof NextResponse) return authResult
   const user = authResult
 
-  // Rate limit por IP (10 tentativas / 5 min) — preset existente em rate-limit.ts.
+  // Rate limit por IP — preset `invite` em rate-limit.ts (30/5min desde 2026-06-11).
   const ip = clientIp(request)
   const { success: rlOk } = await limiters.invite.limit(`accept:${ip}`)
   if (!rlOk) {

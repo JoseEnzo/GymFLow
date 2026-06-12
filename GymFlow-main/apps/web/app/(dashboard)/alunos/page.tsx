@@ -923,7 +923,7 @@ export default function AlunosPage() {
             >
               <RefreshCw className="w-4 h-4" />
             </button>
-            {currentRole === 'owner' && (
+            {currentRole === 'owner' && currentAcademy.plan !== 'personal' && (
               <Link href="/personais" className="btn-secondary text-sm py-2.5 px-5 rounded-xl flex items-center gap-2">
                 <ShieldOff className="w-4 h-4" />
                 Gerenciar personais

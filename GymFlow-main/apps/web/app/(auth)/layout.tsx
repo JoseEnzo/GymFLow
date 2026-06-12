@@ -10,9 +10,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Left — form */}
-      <div className="relative flex flex-col items-center justify-center p-8">
+      <div className="relative flex flex-col items-center justify-center p-4 sm:p-8 pt-20 sm:pt-8">
         {/* Logo (link smart) */}
-        <div className="absolute top-8 left-8">
+        <div className="absolute top-6 left-4 sm:top-8 sm:left-8">
           <BrandLogo size="sm" />
         </div>
 

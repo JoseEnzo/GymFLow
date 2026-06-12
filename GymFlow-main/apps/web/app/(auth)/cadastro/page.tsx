@@ -87,6 +87,7 @@ const TYPES = [
     border: 'border-indigo-500/40',
     iconBg: 'bg-indigo-500/15',
     iconColor: 'text-indigo-400',
+    badge: 'Grátis',
   },
 ]
 
@@ -135,7 +136,8 @@ function CadastroInner() {
     setDocumentError(null)
     if (accountType === 'owner') {
       if (!validateCNPJ(document)) { setDocumentError('CNPJ inválido'); return }
-    } else if (accountType === 'personal') {
+    } else if (accountType === 'personal' && document.trim().length > 0) {
+      // CREF é opcional, mas se preenchido precisa ter formato válido.
       if (!validateCREF(document)) { setDocumentError('CREF inválido (ex: 123456-G/SP)'); return }
     } else if (accountType === 'student' && document.replace(/\D/g, '').length > 0) {
       // CPF é opcional, mas se preenchido precisa ser um CPF válido (dígitos verificadores).
@@ -147,7 +149,8 @@ function CadastroInner() {
     try {
       // Pre-check: CNPJ/CREF já em uso? Evita criar auth.user órfão.
       // CPF (student) pula esse check — student loga com email, não CPF.
-      if (accountType === 'owner' || accountType === 'personal') {
+      // CREF vazio (opcional) também pula — não há o que checar.
+      if (accountType === 'owner' || (accountType === 'personal' && document.trim().length > 0)) {
         const checkRes = await fetch('/api/check-document', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -208,6 +211,7 @@ function CadastroInner() {
               {TYPES.map((type) => {
                 const Icon = type.icon
                 const selected = accountType === type.value
+                const badge = 'badge' in type ? type.badge : null
                 return (
                   <button
                     key={type.value}
@@ -217,12 +221,17 @@ function CadastroInner() {
                       setStep(1)
                     }}
                     className={cn(
-                      'w-full flex items-center gap-4 p-5 rounded-2xl border-2 text-left transition-all duration-200 group',
+                      'relative w-full flex items-center gap-4 p-5 rounded-2xl border-2 text-left transition-all duration-200 group',
                       selected
                         ? `${type.bg} ${type.border}`
                         : 'border-border/60 hover:border-border bg-surface-100/50 hover:bg-surface-100'
                     )}
                   >
+                    {badge && (
+                      <span className="absolute -top-2 right-4 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold tracking-wide shadow-sm">
+                        {badge}
+                      </span>
+                    )}
                     <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-all', type.iconBg)}>
                       <Icon className={cn('w-5 h-5', type.iconColor)} />
                     </div>
@@ -341,7 +350,7 @@ function CadastroInner() {
               <motion.div variants={fadeUp} className="space-y-1.5">
                 <label className="text-sm font-medium flex items-center gap-1.5">
                   {accountType === 'owner' ? 'CNPJ da academia' : accountType === 'personal' ? 'CREF' : 'CPF'}
-                  {accountType === 'student' && (
+                  {(accountType === 'student' || accountType === 'personal') && (
                     <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
                   )}
                 </label>

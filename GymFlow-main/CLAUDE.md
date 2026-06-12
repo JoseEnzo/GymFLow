@@ -86,7 +86,7 @@ O produto foi rebrandado para **MeuTrein** mas o repositório, pacotes npm, stor
       /rate-limit.ts            → limiters Upstash + fallback in-memory
       /turnstile.ts             → verifyTurnstileToken + clientIp
       /validations.ts           → schemas Zod compartilhados
-      /stripe.ts, /cnpj.ts, /places.ts
+      /stripe.ts, /cnpj.ts
     /stores                     → Zustand (auth-store, ui-store)
     /hooks
     /middleware.ts              → guard de sessão + PUBLIC_API_ROUTES allowlist
@@ -129,6 +129,16 @@ get_user_role(academy_id) -- retorna role do usuário em uma academia
 ```
 
 **Regra de ouro:** nunca fazer query sem o contexto de `academy_id`. Um aluno jamais deve ver dados de outra academia.
+
+### Pegadinhas de policy (3 brechas reais corrigidas na migration 069, jun/2026)
+
+Padrões que passaram por revisão e viraram brecha crítica — não reintroduzir:
+
+1. **RLS é por LINHA, não por coluna.** Policy de SELECT criada "pra expor só nome e slug" (migration 013) expunha a linha inteira de `academies` (cnpj, contato, stripe) pra anônimos. Se só algumas colunas podem ser públicas, sirva-as via API route com service_role — nunca via policy.
+2. **Predicado sobre coluna ≠ filtro do request.** `using (... or token is not null)` é tautologia (toda linha tem token) — liberava a tabela `invites` inteira, até pra anônimos. O RLS não "sabe" qual token o cliente buscou no `.eq()`.
+3. **`with check (auth.uid() = user_id)` em INSERT de tabela de vínculo = auto-promoção.** Em `academy_members`, qualquer autenticado podia se inserir como `owner` de qualquer academia. Insert de membro é exclusivamente server-side (RPC `accept_invite` + `/api/academy`, ambos service_role).
+
+**Estado desde a 069:** lookup público de convite (por token OU código) é só via `GET /api/invites/lookup` (service_role + rate limit `invite`, resolve colisão de código entre academias). Client com anon key não lê `invites` — o SELECT é restrito a owner/personal da academia (dashboards).
 
 ---
 
@@ -287,7 +297,7 @@ A app tem 4 camadas defensivas — não atalhe nenhuma:
 
 1. **RLS no Postgres** — primeira e última linha. Toda tabela tem RLS habilitada; políticas em `supabase/migrations/002_rls_policies.sql` e revisões posteriores (`025_consolidate_permissive_policies.sql` consolida SELECTs em policies únicas por tabela).
 2. **Middleware de sessão** (`apps/web/middleware.ts`) — protege rotas autenticadas. Mantém `PUBLIC_API_ROUTES` allowlist explícita (`/api/auth/lookup`, `/api/turnstile`, `/api/invites/lookup`, `/api/webhooks/stripe`) e `PUBLIC_PREFIXES` (`/convite/`, `/auth/callback`). API protegida sem sessão → 401 JSON (não redirect).
-3. **Rate limiting** (`apps/web/lib/rate-limit.ts`) — Upstash Redis quando disponível, fallback in-memory caso contrário (validado por `hasValidUpstashEnv()`, não só presença). Limiters nomeados: `auth` (5/15min), `invite` (10/5min), `api` (30/min — **definido mas ainda não usado**, oportunidade de wiring via `api-guard.ts`). Use sempre `limiter.limit(ip)` em rotas de autenticação/convite. **Upstash é obrigatório em prod:** o in-memory não escala horizontalmente (cada instância serverless conta isolada → limite N× mais frouxo sob pico). Em `NODE_ENV === 'production'` sem Upstash, o módulo dispara alerta `fatal` no Sentry + `console.error` no boot (não derruba as rotas — fail-loud, não fail-closed, pra não bloquear login por var ausente).
+3. **Rate limiting** (`apps/web/lib/rate-limit.ts`) — Upstash Redis quando disponível, fallback in-memory caso contrário (validado por `hasValidUpstashEnv()`, não só presença). Limiters nomeados: `auth` (20/15min), `invite` (30/5min — usado em accept E create), `api` (60/min — **definido mas ainda não usado**, oportunidade de wiring via `api-guard.ts`). Use sempre `limiter.limit(ip)` em rotas de autenticação/convite. **Upstash é obrigatório em prod:** o in-memory não escala horizontalmente (cada instância serverless conta isolada → limite N× mais frouxo sob pico). Em `NODE_ENV === 'production'` sem Upstash, o módulo dispara alerta `fatal` no Sentry + `console.error` no boot (não derruba as rotas — fail-loud, não fail-closed, pra não bloquear login por var ausente). **Histórico:** desativado em 2026-06-09 (limites originais 5/15min bloqueavam usuários legítimos com "Muitas tentativas"); reativado em 2026-06-11 com limites ~4x mais folgados em vez de no-op.
 4. **Cloudflare Turnstile** (`apps/web/lib/turnstile.ts`) — obrigatório em rotas públicas de auth e lookup. Validação server-side via `verifyTurnstileToken()`. Em `NODE_ENV !== 'production'` com secret ausente, gate permissivo (só pra dev local sem Doppler).
 
 Toda rota nova de auth/lookup pública precisa passar pelas 4 camadas. Mensagens de erro normalizadas pra evitar enumeração (ex: "Credenciais inválidas" cobre user-not-found E senha errada).
@@ -299,7 +309,7 @@ Toda rota nova de auth/lookup pública precisa passar pelas 4 camadas. Mensagens
 1. **Todo insert precisa de `academy_id`** — sem exceção
 2. **Todo select já é filtrado pelo RLS** — mas sempre incluir `.eq('academy_id', academyId)` explicitamente para clareza
 3. **Ao criar uma academia**, inserir o usuário em `academy_members` com `role: 'owner'` na mesma transação
-4. **Convites expiram** — sempre checar `expires_at` e `used` antes de processar
+4. **Convites expiram** — sempre checar `expires_at` e `used` antes de processar. Desde 2026-06-11: `POST /api/invites/create` aplica default de **30 dias** quando `expiresAt` é omitido; `null` explícito continua significando "nunca expira" (opção dos modais de alunos/personais). Códigos novos têm **8 caracteres** (eram 6); inputs de código (`/codigo`, onboarding) aceitam 6 OU 8 pra não quebrar convites antigos.
 
 ```ts
 // Exemplo de insert seguro
@@ -331,7 +341,11 @@ O enum `academy_plan` (Postgres) aceita: `free | personal | starter | pro`. A mi
 - `role === 'personal'` → **sub-personal** que trabalha pra um owner em academia starter/pro.
 - `plan === 'personal'` → **personal trainer solo**, role no banco é `'owner'` (do próprio mini-tenant).
 
-**Dashboard / sidebar:** quando `plan === 'personal'`, esconder cards de "Personais ativos", "Convidar personal", item de sidebar `/personais` e `/relatorios`. Ver `apps/web/components/layout/sidebar.tsx` (`PERSONAL_PLAN_HIDDEN_HREFS`) e `apps/web/app/(dashboard)/dashboard/page.tsx` (`isPersonalPlan`).
+**Esconder "sub-personais" quando `plan === 'personal'`:** o personal solo é o único treinador, então tudo que pressupõe múltiplos personais some. Toda entrada pra `/personais` precisa do gate `currentAcademy?.plan !== 'personal'` — checar os 4 pontos ao mexer:
+- `apps/web/components/layout/sidebar.tsx` (`PERSONAL_PLAN_HIDDEN_HREFS` esconde `/personais` e `/relatorios`).
+- `apps/web/app/(dashboard)/dashboard/page.tsx` (`isPersonalPlan` esconde card "Personais ativos" + QuickAction "Convidar personal").
+- `apps/web/app/(dashboard)/alunos/page.tsx` (botão "Gerenciar personais" no header).
+- `apps/web/app/(dashboard)/personais/page.tsx` (guard `if (isPersonalPlan)` na própria página — rede de segurança pra acesso direto por URL).
 
 ### Banner de cobrança pendente (jun/2026)
 
@@ -416,6 +430,19 @@ Setup PWA completo via `@ducanh2912/next-pwa` (configurado em `apps/web/next.con
 
 ## Fluxos críticos — não quebrar
 
+### Login e cadastro por papel (jun/2026)
+
+- **CREF é OPCIONAL no cadastro do personal** (era obrigatório). Se preenchido, valida formato + pre-check de duplicidade; se vazio, `signUp` normaliza pra `null` (NUNCA gravar `''` em `profiles.cref`/`cpf` — índice UNIQUE parcial só ignora NULL, string vazia colide no 2º cadastro sem documento).
+- **Login do personal aceita CREF OU e-mail** no mesmo campo: valor com `@` ou começando com letra → login direto por e-mail (caminho do aluno, com Turnstile); valor numérico → máscara CREF + lookup `/api/auth/lookup`. Não aplicar `maskCREF` em valor que parece e-mail (a máscara remove `@`/`.`).
+- **Conta de aluno não vira personal independente**: o seletor de papel do onboarding esconde o cartão "Sou personal trainer" quando `account_type === 'student'`. Personal entra pelo `/cadastro` ou por convite de academia.
+- **Login social (Google) sempre entra como aluno** (`auth/callback` força `account_type: 'student'`). Donos e personais entram por credenciais.
+
+### Login social — branding do consent screen (TODO, config externa)
+
+A tela do Google mostra "para continuar em `<projeto>.supabase.co`". Dois passos pra mostrar MeuTrein (nada disso é código deste repo):
+1. **Google Cloud Console → OAuth consent screen:** App name "MeuTrein" + logo + domínio autorizado — muda o nome exibido no topo. Grátis, fazer já.
+2. **Supabase Custom Domain** (add-on pago): aponta auth pra um domínio próprio (ex: `auth.gymflow.app`) — é o único jeito de sumir o `supabase.co` da URL exibida. Exige atualizar o redirect URI no Google Console e o Site URL no Supabase.
+
 ### Cadastro de academia
 ```
 CNPJ → ReceitaWS → preenche dados → Google Places → confirma → cria academia + membro owner
@@ -499,6 +526,16 @@ Webhook Stripe (`apps/web/app/api/webhooks/stripe/route.ts`) usa claim atômico 
 
 ## Migrations
 
+### ⚠️ PENDENTE URGENTE — aplicar migration 069 em produção
+
+A `069_fix_rls_holes.sql` (corrige 3 brechas críticas de RLS — ver "Pegadinhas de policy" acima) foi criada em 2026-06-11 mas **NÃO foi aplicada em prod**: a máquina de dev estava sem Node/pnpm/supabase CLI. **Primeira ação da próxima sessão, assim que as dependências estiverem instaladas:**
+
+1. `pnpm db:push` (aplica a 069 em prod) — alternativa sem CLI: colar o SQL da 069 no SQL Editor do dashboard Supabase.
+2. `pnpm db:types` (regenerar types).
+3. `pnpm type-check` (as mudanças de 2026-06-11 — rate limit reativado, código de convite 8 chars, lookup por código, RLS — nunca passaram por type-check local).
+
+Até a 069 rodar, **qualquer pessoa com a anon key consegue se tornar owner de qualquer academia**. Depois de aplicada e verificada, REMOVER este aviso.
+
 Toda mudança no banco vira um arquivo novo em `supabase/migrations/`. Numeração sequencial (`001…039`) + arquivos `<timestamp>_remote_schema.sql` quando se faz `supabase db pull`.
 
 Atalhos no `package.json` da raiz:
@@ -507,7 +544,7 @@ Atalhos no `package.json` da raiz:
 - `pnpm db:types` — regenera `packages/database/src/types.ts` (rodar após toda migration que cria/altera tabela ou RPC)
 
 **Regras:**
-- Nunca editar uma migration já aplicada em produção — sempre criar uma nova
+- Nunca editar uma migration já aplicada em produção — sempre criar uma nova. **Única exceção registrada:** `065_reset_test_owners.sql` (DML destrutivo one-time, sem efeito de schema) foi neutralizada em jun/2026 pra que o replay do chain em ambiente novo não delete dados — o estado de prod não muda com isso.
 - Toda RPC com lado-efeito sensível: `SECURITY INVOKER` + permission check explícito, NÃO `SECURITY DEFINER` solto
 - Sempre regenerar `types.ts` após mexer no schema — sem isso o front cai em `as any`
 

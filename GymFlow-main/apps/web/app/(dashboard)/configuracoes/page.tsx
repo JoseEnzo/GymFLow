@@ -92,7 +92,9 @@ const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
 
 // ── Perfil ────────────────────────────────────────────────
 function PerfilTab() {
-  const { profile, setProfile } = useAuthStore()
+  const { profile, setProfile, currentRole } = useAuthStore()
+  const isStudent = currentRole === 'student'
+  const isPersonal = currentRole === 'personal'
   const supabase = createClient()
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -102,6 +104,7 @@ function PerfilTab() {
       full_name: profile?.full_name ?? '',
       phone: profile?.phone ?? '',
       goal: profile?.goal ?? '',
+      specialty: profile?.specialty ?? '',
       bio: profile?.bio ?? '',
     },
   })
@@ -111,30 +114,37 @@ function PerfilTab() {
       full_name: profile?.full_name ?? '',
       phone: profile?.phone ?? '',
       goal: profile?.goal ?? '',
+      specialty: profile?.specialty ?? '',
       bio: profile?.bio ?? '',
     })
   }, [profile, reset])
 
-  async function onSubmit(data: { full_name: string; phone: string; goal: string; bio: string }) {
+  async function onSubmit(data: { full_name: string; phone: string; goal: string; specialty: string; bio: string }) {
     setSaving(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Não autenticado')
 
+      const patch: { full_name: string | null; phone: string | null; bio: string | null; goal?: string | null; specialty?: string | null } = {
+        full_name: data.full_name || null,
+        phone: data.phone || null,
+        bio: data.bio || null,
+      }
+      // "Objetivo" é conceito de aluno (aparece na lista de alunos do personal/owner).
+      // Owner/personal não têm esse campo — não sobrescreve goal pra eles.
+      if (isStudent) patch.goal = data.goal || null
+      // "Especialidade" é só do personal.
+      if (isPersonal) patch.specialty = data.specialty || null
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (supabase as any)
         .from('profiles')
-        .update({
-          full_name: data.full_name || null,
-          phone: data.phone || null,
-          goal: data.goal || null,
-          bio: data.bio || null,
-        })
+        .update(patch)
         .eq('id', user.id)
 
       if (error) throw error
 
-      setProfile({ ...profile!, ...data })
+      setProfile({ ...profile!, ...patch })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
       toast.success('Perfil atualizado!')
@@ -172,14 +182,45 @@ function PerfilTab() {
         </div>
       </div>
 
-      <div className="space-y-1.5">
-        <label className="text-sm font-medium">Objetivo</label>
-        <input {...register('goal')} placeholder="Ex: Hipertrofia, Perda de peso..." className="field" />
-      </div>
+      {/* Objetivo — só aluno (objetivo de treino, exibido na lista de alunos) */}
+      {isStudent && (
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">Objetivo</label>
+          <input {...register('goal')} placeholder="Ex: Hipertrofia, Perda de peso..." className="field" />
+        </div>
+      )}
+
+      {/* CREF — só personal (credencial de login, somente leitura) */}
+      {isPersonal && profile?.cref && (
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">CREF</label>
+          <div className="field flex items-center text-muted-foreground select-all cursor-not-allowed">
+            {profile.cref}
+          </div>
+          <p className="text-[11px] text-muted-foreground">Seu registro profissional. Para alterar, fale com o suporte.</p>
+        </div>
+      )}
+
+      {/* Especialidade — só personal */}
+      {isPersonal && (
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">Especialidade</label>
+          <input {...register('specialty')} placeholder="Ex: Musculação, Funcional, Crossfit..." className="field" />
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <label className="text-sm font-medium">Bio</label>
-        <textarea {...register('bio')} rows={3} placeholder="Conte um pouco sobre você..." className="field resize-none" />
+        <textarea
+          {...register('bio')}
+          rows={3}
+          placeholder={
+            isStudent ? 'Conte um pouco sobre você...'
+              : isPersonal ? 'Sua experiência, especialidades e formação...'
+              : 'Sobre você e sua academia...'
+          }
+          className="field resize-none"
+        />
       </div>
 
       <button type="submit" disabled={saving} className="btn-primary text-sm py-2.5 px-6 rounded-xl">

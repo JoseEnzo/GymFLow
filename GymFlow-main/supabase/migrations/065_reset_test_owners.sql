@@ -1,37 +1,38 @@
 -- ============================================================
 -- RESET TOTAL de contas de teste — usuário autorizou 2026-06-08.
--- Ordem importa: academies.owner_id é ON DELETE RESTRICT, então
--- delete academies ANTES de auth.users.
--- Cascata: academies → academy_members, meal_plans, workout_sheets,
--- workout_logs, set_logs, recipes(academy_id), invites, etc.
+-- JÁ EXECUTADA em produção em 2026-06-08.
+--
+-- NEUTRALIZADA em 2026-06-11: o corpo destrutivo foi comentado para
+-- que o replay do chain de migrations em ambientes novos (db reset,
+-- CI, staging) NÃO delete owners/academias criados pelas migrations
+-- anteriores ou por seeds. Editar migration aplicada é proibido para
+-- mudanças de SCHEMA (drift); aqui é DML one-time sem efeito de
+-- schema — o estado de prod não muda com esta edição.
+--
+-- Corpo original preservado abaixo para referência:
 -- ============================================================
 
--- 1) Identifica owners de teste (todos com account_type='owner')
---    e deleta as academies deles primeiro.
-delete from academies
-where owner_id in (
-  select id from auth.users
-  where raw_user_meta_data->>'account_type' = 'owner'
-);
+-- delete from academies
+-- where owner_id in (
+--   select id from auth.users
+--   where raw_user_meta_data->>'account_type' = 'owner'
+-- );
+--
+-- delete from academy_members
+-- where academy_id not in (select id from academies);
+--
+-- delete from auth.users
+-- where raw_user_meta_data->>'account_type' = 'owner';
+--
+-- do $$
+-- declare
+--   n_owners int; n_academies int; n_members int;
+-- begin
+--   select count(*) into n_owners from auth.users where raw_user_meta_data->>'account_type' = 'owner';
+--   select count(*) into n_academies from academies;
+--   select count(*) into n_members from academy_members;
+--   raise notice '=== RESET COMPLETO: owners=% academies=% members=% ===',
+--     n_owners, n_academies, n_members;
+-- end $$;
 
--- 2) Limpa academy_members residuais (members convidados em academies
---    que não existem mais — ON DELETE CASCADE já deve ter feito isso
---    mas garante).
-delete from academy_members
-where academy_id not in (select id from academies);
-
--- 3) Agora deleta auth.users dos owners (sem academias bloqueando).
-delete from auth.users
-where raw_user_meta_data->>'account_type' = 'owner';
-
--- 4) Sanity check via NOTICE
-do $$
-declare
-  n_owners int; n_academies int; n_members int;
-begin
-  select count(*) into n_owners from auth.users where raw_user_meta_data->>'account_type' = 'owner';
-  select count(*) into n_academies from academies;
-  select count(*) into n_members from academy_members;
-  raise notice '=== RESET COMPLETO: owners=% academies=% members=% ===',
-    n_owners, n_academies, n_members;
-end $$;
+select 1; -- no-op: mantém o arquivo como migration válida no chain

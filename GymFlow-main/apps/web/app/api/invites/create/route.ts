@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 
 import { requireAuth } from '@/lib/api-guard'
+import { limiters } from '@/lib/rate-limit'
+import { clientIp } from '@/lib/turnstile'
 
 const admin = createAdminClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,6 +16,15 @@ export async function POST(request: Request) {
   if (authResult instanceof NextResponse) return authResult
   const user = authResult
 
+  const ip = clientIp(request)
+  const { success: rlOk } = await limiters.invite.limit(`create:${ip}`)
+  if (!rlOk) {
+    return NextResponse.json(
+      { error: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' },
+      { status: 429 }
+    )
+  }
+
   let body: { academyId?: string; role?: string; expiresAt?: string | null; usesLimit?: number | null }
   try {
     body = await request.json() as typeof body
@@ -21,7 +32,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'JSON inválido' }, { status: 400 })
   }
 
-  const { academyId, role, expiresAt = null, usesLimit = 1 } = body
+  // expiresAt: campo ausente → default 30 dias; null → "nunca expira"
+  // (opção explícita nos modais de alunos/personais — não tratar como ausente).
+  const { academyId, role, usesLimit = 1 } = body
+  const expiresAt = body.expiresAt === undefined
+    ? new Date(Date.now() + 30 * 86_400_000).toISOString()
+    : body.expiresAt
 
   if (!academyId) return NextResponse.json({ error: 'academyId obrigatório' }, { status: 400 })
   if (role !== 'student' && role !== 'personal') {
@@ -51,7 +67,7 @@ export async function POST(request: Request) {
   }
 
   const SAFE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  const code = Array.from({ length: 6 }, () => SAFE_CHARS[Math.floor(Math.random() * SAFE_CHARS.length)]).join('')
+  const code = Array.from({ length: 8 }, () => SAFE_CHARS[Math.floor(Math.random() * SAFE_CHARS.length)]).join('')
   const token = crypto.randomUUID()
 
   const { data, error } = await admin

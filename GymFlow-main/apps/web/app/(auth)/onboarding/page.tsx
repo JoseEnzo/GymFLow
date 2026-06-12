@@ -63,6 +63,13 @@ function OnboardingContent() {
   const [saving, setSaving] = useState(false)
   const [step, setStep] = useState<'role' | 'personal-invite' | 'plan' | 'academy' | 'invite'>('role')
   const [authChecked, setAuthChecked] = useState(false)
+  // account_type do metadata — usado pra esconder opções incompatíveis no seletor
+  // de papel (ex: conta de aluno não pode virar personal independente).
+  const [accountType, setAccountType] = useState<string | null>(null)
+  // CNPJ do owner (gravado no metadata no cadastro) → autofill do nome da academia
+  // via ReceitaWS quando ele chega no step 'academy'. cnpjAutofilled trava o re-fetch.
+  const [ownerCnpj, setOwnerCnpj] = useState<string | null>(null)
+  const [cnpjAutofilled, setCnpjAutofilled] = useState(false)
 
   // Usuário já configurado → direto ao dashboard
   useEffect(() => {
@@ -80,6 +87,9 @@ function OnboardingContent() {
         }
 
         const accountType = data.user.user_metadata?.['account_type'] as string | undefined
+        setAccountType(accountType ?? null)
+        const doc = data.user.user_metadata?.['document'] as string | undefined
+        if (doc) setOwnerCnpj(doc)
         const planFromUrl       = searchParams.get('plan')
         const isAcademyPlan     = PLANS.some(x => x.id === planFromUrl)
 
@@ -117,6 +127,23 @@ function OnboardingContent() {
       })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Autofill do nome da academia a partir do CNPJ (ReceitaWS) quando o owner chega
+  // no step de nomear a academia. /api/cnpj exige sessão — aqui já estamos autenticados.
+  useEffect(() => {
+    if (step !== 'academy' || role !== 'owner' || cnpjAutofilled) return
+    const cnpj = (ownerCnpj ?? '').replace(/\D/g, '')
+    if (cnpj.length !== 14) return
+    setCnpjAutofilled(true)
+    fetch(`/api/cnpj?cnpj=${cnpj}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { nomeFantasia?: string | null; razaoSocial?: string } | null) => {
+        const name = d?.nomeFantasia || d?.razaoSocial
+        // Funcional pra não sobrescrever o que o usuário já tiver digitado.
+        if (name) setAcademyName((prev) => (prev.trim() ? prev : name))
+      })
+      .catch(() => {})
+  }, [step, role, ownerCnpj, cnpjAutofilled])
 
   const firstName = profile?.full_name?.split(' ')[0] ?? 'você'
 
@@ -171,17 +198,17 @@ function OnboardingContent() {
     if (!trimmed) return
     setSaving(true)
     try {
-      const { data, error } = await supabase
-        .from('invites')
-        .select('token')
-        .eq('code', trimmed)
-        .eq('is_active', true)
-        .limit(1)
-      if (error || !data || data.length === 0) {
-        toast.error('Código inválido ou expirado. Verifique e tente novamente.')
+      // Lookup via API (service role) — RLS não permite mais ler invites
+      // pelo client (migration 069); a API também resolve colisão de código
+      // entre academias (antes o .limit(1) pegava um arbitrário).
+      const res = await fetch(`/api/invites/lookup?code=${encodeURIComponent(trimmed)}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => null) as { error?: string } | null
+        toast.error(err?.error ?? 'Código inválido ou expirado. Verifique e tente novamente.')
         return
       }
-      router.push(`/convite/${(data[0] as { token: string } | undefined)!.token}`)
+      const data = await res.json() as { token: string }
+      router.push(`/convite/${data.token}`)
     } catch {
       toast.error('Erro ao verificar código. Tente novamente.')
     } finally {
@@ -231,21 +258,25 @@ function OnboardingContent() {
                   <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto group-hover:translate-x-1 transition-transform" />
                 </button>
 
-                <button
-                  onClick={() => { setRole('personal'); setStep('personal-invite') }}
-                  className="flex items-center gap-4 p-5 rounded-2xl border border-border/60 hover:border-brand-500/40 hover:bg-brand-500/5 text-left transition-all duration-200 group"
-                >
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-500/15 flex-shrink-0 group-hover:scale-105 transition-transform">
-                    <Users className="w-6 h-6 text-brand-400" />
-                  </div>
-                  <div>
-                    <p className="font-semibold">Sou personal trainer</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Trabalho de forma independente com meus alunos
-                    </p>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto group-hover:translate-x-1 transition-transform" />
-                </button>
+                {/* Conta de aluno não vira personal independente — personal entra
+                    pelo /cadastro (com CREF) ou por convite de academia. */}
+                {accountType !== 'student' && (
+                  <button
+                    onClick={() => { setRole('personal'); setStep('personal-invite') }}
+                    className="flex items-center gap-4 p-5 rounded-2xl border border-border/60 hover:border-brand-500/40 hover:bg-brand-500/5 text-left transition-all duration-200 group"
+                  >
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-500/15 flex-shrink-0 group-hover:scale-105 transition-transform">
+                      <Users className="w-6 h-6 text-brand-400" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">Sou personal trainer</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Trabalho de forma independente com meus alunos
+                      </p>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground ml-auto group-hover:translate-x-1 transition-transform" />
+                  </button>
+                )}
 
                 <button
                   onClick={() => { setRole('student'); setStep('invite') }}
@@ -613,17 +644,17 @@ function OnboardingContent() {
                       <input
                         type="text"
                         value={inviteCode}
-                        onChange={(e) => setInviteCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
-                        placeholder="ABC123"
-                        maxLength={6}
+                        onChange={(e) => setInviteCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
+                        placeholder="ABC12345"
+                        maxLength={8}
                         autoComplete="off"
                         className="field tracking-widest font-mono"
-                        onKeyDown={(e) => e.key === 'Enter' && inviteCode.length === 6 && redeemInvite()}
+                        onKeyDown={(e) => e.key === 'Enter' && (inviteCode.length === 6 || inviteCode.length === 8) && redeemInvite()}
                       />
                     </div>
                     <button
                       onClick={redeemInvite}
-                      disabled={saving || inviteCode.length !== 6}
+                      disabled={saving || (inviteCode.length !== 6 && inviteCode.length !== 8)}
                       className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
                     >
                       {saving

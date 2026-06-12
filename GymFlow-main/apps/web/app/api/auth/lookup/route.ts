@@ -11,7 +11,7 @@ const GENERIC_ERROR = 'Credenciais inválidas'
 export async function POST(request: Request) {
   const ip = clientIp(request)
 
-  // 1. Rate limit por IP (5 tentativas / 15 min)
+  // 1. Rate limit por IP — preset `auth` em rate-limit.ts (20/15min desde 2026-06-11)
   const { success: rlOk } = await limiters.auth.limit(`lookup:${ip}`)
   if (!rlOk) {
     return NextResponse.json(

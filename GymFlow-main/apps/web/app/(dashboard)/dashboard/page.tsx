@@ -881,7 +881,7 @@ async function logFreeWorkout() {
 
           {/* Main grid */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* My students + Bio do personal vinculado */}
+            {/* Conteúdo principal: meus alunos + treinos recentes */}
             <motion.div variants={fadeUp} className="xl:col-span-2 space-y-4">
             <div className="glass rounded-2xl p-5">
               <div className="flex items-center justify-between mb-4">
@@ -921,11 +921,7 @@ async function logFreeWorkout() {
               )}
             </div>
 
-            </motion.div>
-
-            {/* Right col */}
-            <motion.div variants={fadeUp} className="space-y-4">
-              {/* Recent workouts */}
+              {/* Treinos recentes */}
               <div className="glass rounded-2xl p-5">
                 <h3 className="font-display font-bold text-sm mb-3">Treinos recentes</h3>
                 {personalRecentWorkouts.length === 0 ? (
@@ -955,6 +951,10 @@ async function logFreeWorkout() {
                 )}
               </div>
 
+            </motion.div>
+
+            {/* Right col */}
+            <motion.div variants={fadeUp} className="space-y-4">
               {/* Quick actions */}
               <div className="glass rounded-2xl p-4">
                 <h3 className="font-display font-bold text-sm mb-3">Ações rápidas</h3>
