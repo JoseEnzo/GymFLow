@@ -28,12 +28,12 @@ export const PLANS = {
   starter: {
     priceId: process.env['STRIPE_PRICE_STARTER_MONTHLY']!,
     name: 'Starter',
-    price: 9900,
+    price: 19700,
   },
   pro: {
     priceId: process.env['STRIPE_PRICE_PRO_MONTHLY']!,
     name: 'Pro',
-    price: 19900,
+    price: 39700,
   },
   personal: {
     priceId: process.env['STRIPE_PRICE_PERSONAL_MONTHLY']!,

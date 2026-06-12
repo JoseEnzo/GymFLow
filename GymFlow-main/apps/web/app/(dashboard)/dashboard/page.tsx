@@ -152,9 +152,13 @@ export default function DashboardPage() {
       })
       const { url, error } = await res.json()
       if (error) throw new Error(error)
+      if (!url) throw new Error('Resposta inválida do servidor (sem URL de pagamento).')
       window.location.href = url
-    } catch {
-      toast.error('Erro ao iniciar pagamento. Tente novamente.')
+    } catch (err) {
+      // Mostra a causa real (ex: "Variável STRIPE_PRICE_STARTER_MONTHLY não
+      // configurada no servidor") em vez de mascarar num genérico — sem isso o
+      // owner não descobre que falta configurar o Stripe / SKIP_STRIPE_CHECKOUT.
+      toast.error(err instanceof Error && err.message ? err.message : 'Erro ao iniciar pagamento. Tente novamente.')
       setUpgrading(null)
     }
   }
@@ -204,7 +208,10 @@ async function logFreeWorkout() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      setAccountType(user?.user_metadata?.['account_type'] ?? 'owner')
+      // Metadata ausente = conta criada por login social (Google) antes do callback
+      // gravar account_type. Pelo produto, social é sempre aluno — tratar como 'owner'
+      // aqui mandava pro /onboarding, que devolvia pro /dashboard em loop infinito.
+      setAccountType(user?.user_metadata?.['account_type'] ?? 'student')
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

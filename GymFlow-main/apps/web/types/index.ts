@@ -14,7 +14,7 @@ export type WorkoutLog = Tables<'workout_logs'>
 export type SetLog = Tables<'set_logs'>
 
 export type MemberRole = 'owner' | 'personal' | 'student'
-export type AcademyPlan = 'free' | 'starter' | 'pro'
+export type AcademyPlan = 'free' | 'personal' | 'starter' | 'pro'
 
 // ──────────────────────────────────────────────
 // Enriched / composed types
