@@ -333,6 +333,10 @@ O enum `academy_plan` (Postgres) aceita: `free | personal | starter | pro`. A mi
 
 **Dashboard / sidebar:** quando `plan === 'personal'`, esconder cards de "Personais ativos", "Convidar personal", item de sidebar `/personais` e `/relatorios`. Ver `apps/web/components/layout/sidebar.tsx` (`PERSONAL_PLAN_HIDDEN_HREFS`) e `apps/web/app/(dashboard)/dashboard/page.tsx` (`isPersonalPlan`).
 
+### Banner de cobrança pendente (jun/2026)
+
+`apps/web/components/layout/billing-banner.tsx`, montado no `(dashboard)/layout.tsx` acima do conteúdo. Só `role === 'owner'` vê; oculto em `/configuracoes`. Estados: sem `subscription_status` + plano pago + sem `stripe_subscription_id` (checkout abandonado, âmbar), `past_due` (vermelho), `canceled` (vermelho). CTA → `/configuracoes?tab=plano`. **Não bloqueia o uso** — paywall duro é decisão de produto pendente. Em dev (bypass de Stripe) o banner aparece pra toda academia criada, por design: reflete o estado real do banco.
+
 ### Bypass de Stripe em dev/test
 
 `apps/web/app/api/academy/route.ts` e `apps/web/app/api/academy/upgrade/route.ts` pulam o Stripe checkout quando `NODE_ENV !== 'production'` OU `SKIP_STRIPE_CHECKOUT=true`. Em dev: cria/atualiza academia direto no banco com o plano escolhido e redireciona pro dashboard, sem cobrança. Em prod: sempre passa pelo Stripe. Útil pra testar fluxo dos 3 planos sem configurar Price IDs.
@@ -402,10 +406,7 @@ Setup PWA completo via `@ducanh2912/next-pwa` (configurado em `apps/web/next.con
 - **Install UX:** `components/pwa/install-button.tsx` escuta `beforeinstallprompt` (Android/Chrome/Edge) e exibe bottom sheet com instrução manual no iOS. Detecta `display-mode: standalone` pra esconder quando já instalado.
 - **CSP:** `worker-src 'self' blob:` + `manifest-src 'self'` adicionados em `next.config.ts` pra registrar o SW.
 
-**Pendente pra instalação realmente disparar prompt no Chrome:**
-1. Gerar PNGs reais em `apps/web/public/icons/` — `icon-192.png`, `icon-512.png`, `icon-maskable-192.png`, `icon-maskable-512.png`. Sem esses 4 arquivos, Chrome ignora o critério "installable" e o evento `beforeinstallprompt` não dispara. Ferramenta: realfavicongenerator.net com o SVG do `BrandLogo`.
-2. `apple-touch-icon.png` (180x180) em `apps/web/public/`.
-3. Testar em produção com Lighthouse PWA audit (precisa HTTPS — Vercel já dá).
+**Ícones PWA: ✅ resolvidos (jun/2026).** Os 4 PNGs existem em `apps/web/public/icons/` (192/512 + maskable, validados como PNG reais) e o apple-touch-icon é gerado dinamicamente por `app/apple-icon.tsx` (Next file-convention, 180x180). **Pendente só:** testar em produção com Lighthouse PWA audit (precisa HTTPS — Vercel já dá).
 
 **Offline da execução de treino (out/2026):** funcional. Arquitetura em 3 camadas — ver seção "Execução de treino" abaixo. Resumo: shell HTML cacheado via Workbox `NetworkFirst` em `/treinos/executar/*`, snapshot da ficha em IndexedDB (`meutrein-offline.sheets`) gravado em todo load online, fila `pendingWorkouts` drenada pelo `useOnlineSync` no `online` event. Supabase **continua `NetworkOnly`** — nenhum dado de tenant é servido do cache (segurança multi-tenant intacta).
 
@@ -658,7 +659,7 @@ Implementado jun/2026: quando aluno conclui o **primeiro** treino, o `WorkoutCom
 
 Lógica de install extraída em hook reutilizável: `apps/web/hooks/use-install-prompt.ts`. `<InstallButton />` (que aparece em outras telas) consome o mesmo hook.
 
-**Bloqueio Android ainda válido**: sem os 4 PNGs em `public/icons/` + `apple-touch-icon.png`, Chrome **não dispara** `beforeinstallprompt`. O bottom sheet ainda aparece, mas botão "Instalar agora" cai pro fallback de instruções manuais (mesma estética do iOS). Pra desbloquear: gerar PNGs com realfavicongenerator.net usando o SVG do `<BrandLogo />`.
+**Bloqueio Android resolvido (jun/2026):** os 4 PNGs existem em `public/icons/` e o apple-touch-icon vem de `app/apple-icon.tsx`. Falta só validar com Lighthouse PWA audit em produção.
 
 ---
 

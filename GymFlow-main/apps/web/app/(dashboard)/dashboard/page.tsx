@@ -208,7 +208,10 @@ async function logFreeWorkout() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      setAccountType(user?.user_metadata?.['account_type'] ?? 'owner')
+      // Metadata ausente = conta criada por login social (Google) antes do callback
+      // gravar account_type. Pelo produto, social é sempre aluno — tratar como 'owner'
+      // aqui mandava pro /onboarding, que devolvia pro /dashboard em loop infinito.
+      setAccountType(user?.user_metadata?.['account_type'] ?? 'student')
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

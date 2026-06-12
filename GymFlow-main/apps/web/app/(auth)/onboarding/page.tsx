@@ -72,7 +72,7 @@ function OnboardingContent() {
   // Pula seleção de perfil se account_type já está no metadata (login com credenciais)
   useEffect(() => {
     supabase.auth.getUser()
-      .then(({ data }) => {
+      .then(async ({ data }) => {
         // Não autenticado → redireciona para login
         if (!data.user) {
           router.replace('/login')
@@ -103,6 +103,9 @@ function OnboardingContent() {
           // só vira ALUNO — nunca mostramos o seletor com dono/personal aqui (donos e
           // personais entram pelo /cadastro). Defesa caso o updateUser do callback falhe;
           // normalmente account_type já chega como 'student' e cai no branch acima.
+          // Repara o metadata antes de sair — sem isso o dashboard via o vazio como
+          // 'owner' e devolvia pra cá, num loop infinito de redirect.
+          await supabase.auth.updateUser({ data: { account_type: 'student' } }).catch(() => null)
           router.replace('/dashboard')
           return
         }

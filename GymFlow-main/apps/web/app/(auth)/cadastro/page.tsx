@@ -269,7 +269,13 @@ function CadastroInner() {
               )}
               <h1 className="text-2xl font-display font-bold">Criar sua conta</h1>
               <p className="text-sm text-muted-foreground">
-                {inviteToken ? 'Crie sua conta para aceitar o convite' : 'Grátis para sempre, sem cartão de crédito'}
+                {inviteToken
+                  ? 'Crie sua conta para aceitar o convite'
+                  : accountType === 'student'
+                    ? 'Grátis para sempre, sem cartão de crédito'
+                    : accountType === 'personal'
+                      ? '30 dias grátis para testar, cancele quando quiser'
+                      : 'Crie sua conta e escolha o plano da academia em seguida'}
               </p>
             </div>
 
