@@ -345,11 +345,17 @@ O enum `academy_plan` (Postgres) aceita: `free | personal | starter | pro`. A mi
 - `role === 'personal'` → **sub-personal** que trabalha pra um owner em academia starter/pro.
 - `plan === 'personal'` → **personal trainer solo**, role no banco é `'owner'` (do próprio mini-tenant).
 
-**Esconder "sub-personais" quando `plan === 'personal'`:** o personal solo é o único treinador, então tudo que pressupõe múltiplos personais some. Toda entrada pra `/personais` precisa do gate `currentAcademy?.plan !== 'personal'` — checar os 4 pontos ao mexer:
+**Esconder "sub-personais" quando `plan === 'personal'`:** o personal solo é o único treinador, então tudo que pressupõe múltiplos personais some. Toda entrada pra `/personais` ou `/relatorios` precisa do gate `currentAcademy?.plan !== 'personal'` — checar os 5 pontos ao mexer:
 - `apps/web/components/layout/sidebar.tsx` (`PERSONAL_PLAN_HIDDEN_HREFS` esconde `/personais` e `/relatorios`).
-- `apps/web/app/(dashboard)/dashboard/page.tsx` (`isPersonalPlan` esconde card "Personais ativos" + QuickAction "Convidar personal").
+- `apps/web/app/(dashboard)/dashboard/page.tsx` (`isPersonalPlan` esconde card "Personais ativos" + QuickActions "Convidar personal" e "Relatórios").
 - `apps/web/app/(dashboard)/alunos/page.tsx` (botão "Gerenciar personais" no header).
 - `apps/web/app/(dashboard)/personais/page.tsx` (guard `if (isPersonalPlan)` na própria página — rede de segurança pra acesso direto por URL).
+- `apps/web/app/(dashboard)/relatorios/page.tsx` (mesmo guard `if (isPersonalPlan)` — adicionado jun/2026; o `useEffect` também pula as RPCs nesse caso).
+
+**Substituto pro solo (jun/2026):** no plano Personal, "Frequência" entra no lugar de "Relatórios" — a visão academia de `/frequencia` (RPC `get_frequency_stats` com `p_student_id` null) É a frequência dos alunos dele, já que ele é o único treinador. Três pontos que sustentam isso:
+- `apps/web/app/(dashboard)/frequencia/page.tsx` — redirect owner → `/relatorios` NÃO se aplica quando `plan === 'personal'`.
+- `apps/web/components/layout/sidebar.tsx` — item "Frequência" com `roles: ['owner']` aparece só quando `isPersonalPlan` (filtro em `filteredNav`).
+- `apps/web/components/layout/bottom-nav.tsx` — `OWNER_ITEMS` já tinha "Frequência" pra todo owner (starter/pro continua redirecionando pra `/relatorios`).
 
 ### Banner de cobrança pendente (jun/2026)
 

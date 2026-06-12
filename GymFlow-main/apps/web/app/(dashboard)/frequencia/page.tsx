@@ -61,8 +61,10 @@ export default function FrequenciaPage() {
   const isOwnerOrPersonal = currentRole === 'owner' || currentRole === 'personal'
 
   useEffect(() => {
-    if (currentRole === 'owner') router.replace('/relatorios')
-  }, [currentRole, router])
+    // Owner de academia (starter/pro) tem visão de equipe em /relatorios.
+    // Owner solo (plan='personal') fica aqui: a frequência da academia É a dos alunos dele.
+    if (currentRole === 'owner' && currentAcademy?.plan !== 'personal') router.replace('/relatorios')
+  }, [currentRole, currentAcademy?.plan, router])
 
   const [stats, setStats] = useState<FreqStats>({ thisWeek: 0, thisMonth: 0, total: 0, bestStreak: 0, weekDays: Array(7).fill(false), logDays: [] })
 

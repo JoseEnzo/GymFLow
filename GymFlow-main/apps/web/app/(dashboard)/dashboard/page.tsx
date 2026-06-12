@@ -789,7 +789,9 @@ async function logFreeWorkout() {
                   <QuickAction icon={ShieldCheck} label="Convidar personal"      href="/personais"    color="#8B5CF6" />
                 )}
                 <QuickAction icon={Dumbbell}    label="Fichas de treino"       sublabel="Ver e gerenciar fichas" href="/treinos"      color="#10B981" />
-                <QuickAction icon={BarChart3}   label="Relatórios"             sublabel="Engajamento geral"      href="/relatorios"   color="#F97316" />
+                {!isPersonalPlan && (
+                  <QuickAction icon={BarChart3} label="Relatórios"             sublabel="Engajamento geral"      href="/relatorios"   color="#F97316" />
+                )}
                 <QuickAction icon={Settings}    label="Configurações"          href="/configuracoes" color="#6366F1" />
               </div>
 

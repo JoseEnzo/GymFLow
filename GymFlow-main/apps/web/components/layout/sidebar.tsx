@@ -31,6 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Planos alimentares',href: '/dietas',      icon: Salad,           roles: ['owner'] },
   { label: 'Bioimpedância',    href: '/bioimpedancia',icon: Scale,           roles: ['owner'] },
   { label: 'Relatórios',       href: '/relatorios',   icon: BarChart3,       roles: ['owner'] },
+  { label: 'Frequência',       href: '/frequencia',   icon: Activity,        roles: ['owner'] }, // só plan='personal' (ver filteredNav)
 
   // ── Personal: foco em treino ──────────────────────────────────
   { label: 'Meus alunos',      href: '/alunos',       icon: Users,           roles: ['personal'] },
@@ -110,6 +111,9 @@ export function Sidebar() {
     // existem em owner + personal.
     if (item.roles && (!currentRole || !item.roles.includes(currentRole))) return false
     if (isPersonalPlan && PERSONAL_PLAN_HIDDEN_HREFS.has(item.href)) return false
+    // Owner de academia (starter/pro) vê a frequência da equipe em /relatorios;
+    // o item "Frequência" do owner existe só pro solo (plan='personal').
+    if (!isPersonalPlan && currentRole === 'owner' && item.href === '/frequencia') return false
     return true
   })
 

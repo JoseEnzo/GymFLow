@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   BarChart3, TrendingUp, TrendingDown, Users, Dumbbell,
-  Calendar, Flame, ClipboardList, Activity, Minus, Target,
+  Calendar, Flame, ClipboardList, Activity, Minus, Target, ShieldOff,
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 
@@ -74,13 +74,14 @@ function DeltaBadge({ current, previous }: { current: number; previous: number }
 
 export default function RelatoriosPage() {
   const { currentAcademy } = useAuthStore()
+  const isPersonalPlan = currentAcademy?.plan === 'personal'
   const supabase = useMemo(() => createClient(), [])
   const [stats, setStats] = useState<Stats | null>(null)
   const [engagement, setEngagement] = useState<EngagementWeek[] | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!currentAcademy) { setLoading(false); return }
+    if (!currentAcademy || isPersonalPlan) { setLoading(false); return }
     async function load() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any
@@ -165,6 +166,22 @@ export default function RelatoriosPage() {
   // Engajamento (NSM): vem da RPC. Stat card e card grande consomem o mesmo número.
   const nsmRate = engagement?.[0]?.engagement_rate
   const maxDay = stats ? Math.max(...stats.workoutsByDay, 1) : 1
+
+  // Rede de segurança pra acesso direto por URL — sidebar já esconde a rota
+  // no plano Personal (mesmo padrão de /personais).
+  if (isPersonalPlan) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-surface-200 flex items-center justify-center mb-4">
+          <ShieldOff className="w-7 h-7 text-muted-foreground/40" />
+        </div>
+        <p className="font-semibold text-muted-foreground">Indisponível no plano Personal</p>
+        <p className="text-sm text-muted-foreground/60 mt-1 max-w-xs">
+          O plano Personal é individual — acompanhe a frequência dos seus alunos na aba Frequência.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
