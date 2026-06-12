@@ -15,15 +15,9 @@ export async function GET(request: Request) {
       // Para OAuth (Google), verifica se o usuário já tem academia
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        // Login social (Google) SEMPRE entra como aluno. Donos e personais passam
-        // pelo /cadastro (com CNPJ/CREF/pagamento) — nunca pelo OAuth. O signup por
-        // credenciais sempre grava account_type, então ausência aqui = 1º login social.
-        // Sem isso o usuário cairia no seletor de papel do /onboarding e poderia virar
-        // dono/personal sem academia configurada.
-        if (!user.user_metadata?.['account_type']) {
-          await supabase.auth.updateUser({ data: { account_type: 'student' } })
-        }
-
+        // Vínculo de academia (qualquer role) manda direto pro dashboard — o role
+        // efetivo vem de academy_members, não do account_type. Donos e personais reais
+        // têm vínculo e saem por aqui; entram pelo /cadastro, nunca pelo OAuth.
         const { data: members } = await supabase
           .from('academy_members')
           .select('id')
@@ -33,6 +27,14 @@ export async function GET(request: Request) {
 
         if (members && members.length > 0) {
           return NextResponse.redirect(`${origin}/dashboard`)
+        }
+
+        // Login social (Google) SEMPRE entra como aluno. Sem vínculo de academia,
+        // força account_type: 'student' mesmo se já houver valor antigo (ex: e-mail
+        // reusado de um cadastro personal/owner que nunca criou academia) — senão o
+        // onboarding cairia na tela de personal/dono em vez de mandar pro dashboard.
+        if (user.user_metadata?.['account_type'] !== 'student') {
+          await supabase.auth.updateUser({ data: { account_type: 'student' } })
         }
         return NextResponse.redirect(`${origin}/onboarding`)
       }

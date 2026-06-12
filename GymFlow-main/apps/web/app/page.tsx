@@ -709,7 +709,7 @@ const personas = [
     headline: 'Gerencie tudo em um painel',
     features: [
       'Cadastro da academia com CNPJ',
-      'Busca de fotos e horários via Google Places',
+      'Dados preenchidos automaticamente pela ReceitaWS',
       'Convites para personais e alunos',
       'Painel com frequência e métricas',
       'Gestão de plano e faturamento',
@@ -859,7 +859,7 @@ const steps = [
   {
     number: '01',
     title: 'Academia se cadastra',
-    description: 'Dono cria a conta, insere o CNPJ e os dados são preenchidos automaticamente pela ReceitaWS + Google Places.',
+    description: 'Dono cria a conta, insere o CNPJ e os dados da academia são preenchidos automaticamente pela ReceitaWS.',
     icon: Award,
     color: '#6366F1',
   },

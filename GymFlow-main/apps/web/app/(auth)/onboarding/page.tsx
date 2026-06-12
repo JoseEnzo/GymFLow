@@ -66,6 +66,10 @@ function OnboardingContent() {
   // account_type do metadata — usado pra esconder opções incompatíveis no seletor
   // de papel (ex: conta de aluno não pode virar personal independente).
   const [accountType, setAccountType] = useState<string | null>(null)
+  // CNPJ do owner (gravado no metadata no cadastro) → autofill do nome da academia
+  // via ReceitaWS quando ele chega no step 'academy'. cnpjAutofilled trava o re-fetch.
+  const [ownerCnpj, setOwnerCnpj] = useState<string | null>(null)
+  const [cnpjAutofilled, setCnpjAutofilled] = useState(false)
 
   // Usuário já configurado → direto ao dashboard
   useEffect(() => {
@@ -84,6 +88,8 @@ function OnboardingContent() {
 
         const accountType = data.user.user_metadata?.['account_type'] as string | undefined
         setAccountType(accountType ?? null)
+        const doc = data.user.user_metadata?.['document'] as string | undefined
+        if (doc) setOwnerCnpj(doc)
         const planFromUrl       = searchParams.get('plan')
         const isAcademyPlan     = PLANS.some(x => x.id === planFromUrl)
 
@@ -118,6 +124,23 @@ function OnboardingContent() {
       })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Autofill do nome da academia a partir do CNPJ (ReceitaWS) quando o owner chega
+  // no step de nomear a academia. /api/cnpj exige sessão — aqui já estamos autenticados.
+  useEffect(() => {
+    if (step !== 'academy' || role !== 'owner' || cnpjAutofilled) return
+    const cnpj = (ownerCnpj ?? '').replace(/\D/g, '')
+    if (cnpj.length !== 14) return
+    setCnpjAutofilled(true)
+    fetch(`/api/cnpj?cnpj=${cnpj}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { nomeFantasia?: string | null; razaoSocial?: string } | null) => {
+        const name = d?.nomeFantasia || d?.razaoSocial
+        // Funcional pra não sobrescrever o que o usuário já tiver digitado.
+        if (name) setAcademyName((prev) => (prev.trim() ? prev : name))
+      })
+      .catch(() => {})
+  }, [step, role, ownerCnpj, cnpjAutofilled])
 
   const firstName = profile?.full_name?.split(' ')[0] ?? 'você'
 

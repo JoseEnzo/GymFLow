@@ -86,7 +86,7 @@ O produto foi rebrandado para **MeuTrein** mas o repositório, pacotes npm, stor
       /rate-limit.ts            → limiters Upstash + fallback in-memory
       /turnstile.ts             → verifyTurnstileToken + clientIp
       /validations.ts           → schemas Zod compartilhados
-      /stripe.ts, /cnpj.ts, /places.ts
+      /stripe.ts, /cnpj.ts
     /stores                     → Zustand (auth-store, ui-store)
     /hooks
     /middleware.ts              → guard de sessão + PUBLIC_API_ROUTES allowlist
