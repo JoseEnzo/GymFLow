@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 
 import { requireAuth } from '@/lib/api-guard'
 import { createCheckoutSession, createFreeCheckoutSession } from '@/lib/stripe'
+import { validateCNPJ } from '@/lib/cnpj'
 
 // Admin client (service role — bypassa RLS)
 const admin = createClient(
@@ -44,6 +45,13 @@ export async function POST(request: Request) {
   // Busca CNPJ armazenado no metadata do Supabase Auth durante o cadastro
   const { data: { user: fullUser } } = await admin.auth.admin.getUserById(user.id)
   const cnpj = (fullUser?.user_metadata?.['document'] ?? '').replace(/\D/g, '') || null
+
+  // Revalida o CNPJ server-side: o metadata é setado client-side no signUp e pode
+  // ter sido forjado (bypass da validação do /cadastro). Sem isso, gravaríamos um
+  // CNPJ malformado em academies.cnpj.
+  if (cnpj && !validateCNPJ(cnpj)) {
+    return NextResponse.json({ error: 'CNPJ inválido' }, { status: 400 })
+  }
 
   const slug =
     name
@@ -100,10 +108,11 @@ export async function POST(request: Request) {
   const origin = request.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_URL ?? ''
 
   // Bypass do Stripe em dev/test: cria academia, pula checkout e cai direto no /dashboard.
-  // Ativa quando NODE_ENV !== 'production' OU env `SKIP_STRIPE_CHECKOUT=true` explicitamente.
-  // Use só em ambiente de teste — em produção sempre cobra via Stripe.
+  // Padrão em dev: bypass ativo. Para testar o fluxo Stripe em dev, setar SKIP_STRIPE_CHECKOUT=false.
+  // Em produção: sempre usa Stripe (a menos que SKIP_STRIPE_CHECKOUT=true seja explicitado).
   const skipStripe =
-    process.env.NODE_ENV !== 'production' || process.env['SKIP_STRIPE_CHECKOUT'] === 'true'
+    process.env['SKIP_STRIPE_CHECKOUT'] === 'true' ||
+    (process.env.NODE_ENV !== 'production' && process.env['SKIP_STRIPE_CHECKOUT'] !== 'false')
 
   // Plano pago → gera checkout URL na mesma request (evita segundo roundtrip com RLS)
   if (!skipStripe && (plan === 'starter' || plan === 'pro' || plan === 'personal')) {

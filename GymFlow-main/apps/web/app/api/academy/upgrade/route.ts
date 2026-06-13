@@ -36,9 +36,10 @@ export async function POST(request: Request) {
   }
 
   // Bypass do Stripe em dev/test — atualiza plan direto e retorna URL local.
-  // Ver comentário em ../route.ts. Produção sempre passa por Stripe.
+  // Ver comentário em ../route.ts. Para testar Stripe em dev: SKIP_STRIPE_CHECKOUT=false.
   const skipStripe =
-    process.env.NODE_ENV !== 'production' || process.env['SKIP_STRIPE_CHECKOUT'] === 'true'
+    process.env['SKIP_STRIPE_CHECKOUT'] === 'true' ||
+    (process.env.NODE_ENV !== 'production' && process.env['SKIP_STRIPE_CHECKOUT'] !== 'false')
 
   if (skipStripe) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
