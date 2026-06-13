@@ -93,7 +93,10 @@ function OnboardingContent() {
           .select('email_verified_at')
           .eq('id', data.user.id)
           .maybeSingle()
-        if (prof && !prof.email_verified_at) {
+        // Sem linha de profile (trigger não criou) também conta como não-verificado.
+        // Falso-positivo se auto-cura: a /verificar-email faz short-circuit
+        // (alreadyVerified) e devolve pro onboarding.
+        if (!prof?.email_verified_at) {
           router.replace('/verificar-email?next=/onboarding')
           return
         }
