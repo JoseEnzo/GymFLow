@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
+import { validateCPF, validateCNPJ, validateCREF } from '@/lib/cnpj'
 
 export function useAuth() {
   const router = useRouter()
@@ -118,6 +119,16 @@ export function useAuth() {
     const normalizedDoc = trimmedDoc
       ? (accountType === 'personal' ? trimmedDoc.toUpperCase() : trimmedDoc.replace(/\D/g, ''))
       : null
+    // Revalida o documento antes de gravar no metadata (o trigger handle_new_user
+    // copia pra profiles.cpf/cref sem checar). A validação do /cadastro é client-side
+    // e bypassável chamando supabase.auth.signUp direto.
+    if (normalizedDoc) {
+      const docValid =
+        accountType === 'owner' ? validateCNPJ(normalizedDoc)
+        : accountType === 'personal' ? validateCREF(normalizedDoc)
+        : validateCPF(normalizedDoc)
+      if (!docValid) throw new Error('Documento inválido')
+    }
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
