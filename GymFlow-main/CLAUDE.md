@@ -466,6 +466,16 @@ CNPJ → ReceitaWS → preenche dados → Google Places → confirma → cria ac
 
 Se vir auth.users com `account_type='owner'` E sem academia vinculada, é órfão de uma versão antiga. Migration `063_cleanup_orphan_owner.sql` faz limpeza idempotente (safety: só toca em users com mais de 1h de idade pra não pisar em signup ativo).
 
+### Exclusão de conta (jun/2026)
+
+Botão "Excluir minha conta" na Zona de perigo do perfil (`app/(dashboard)/perfil/page.tsx`), pros 3 papéis. Chama `POST /api/account/delete` (service_role) que libera **e-mail / CNPJ / CREF pra reuso imediato** num novo cadastro. **A ordem dos passos importa por causa das FKs** (migration 001):
+
+1. Deleta `academies WHERE owner_id = user` — `academies.owner_id` é **ON DELETE RESTRICT**, então tem que sair ANTES do deleteUser. Antes, cancela a assinatura Stripe (best-effort, não-fatal). O delete cascateia membros/fichas/treinos/convites/agenda/bio/dietas e **libera o CNPJ** (`academies.cnpj`).
+2. Zera as refs **NO ACTION** que sobram apontando pro user (senão o deleteUser falha por FK): `academy_members.invited_by` + `created_by` em `exercises`/`recipes`/`food_items` (catálogo global criado por ele).
+3. `admin.auth.admin.deleteUser` — remove auth.users (**libera e-mail + `user_metadata.document`**), cascateia `profiles` (**libera CREF de `profiles.cref`**) + memberships + histórico de treino.
+
+**Por que reuso funciona:** `check-document`/`auth/lookup` varrem `academies.cnpj`, `profiles.cref` e `user_metadata.document` — os 3 somem nos passos acima. **Se adicionar nova FK pra `auth.users` SEM cascade**, incluir no passo 2 ou o deleteUser quebra. Cliente faz `signOut` + `window.location='/'` no sucesso.
+
 ### Entrada do aluno
 ```
 Link /convite/[code] → valida código (não expirado, não usado) → cria user → cria academy_member → marca convite como usado
