@@ -381,13 +381,10 @@ function LoginInner() {
 
       {role === 'student' && (
         <>
-          <motion.div variants={fadeUp} custom={4} className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-border/60" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-background px-3 text-muted-foreground">ou continue com</span>
-            </div>
+          <motion.div variants={fadeUp} custom={4} className="flex items-center gap-3">
+            <div className="flex-1 border-t border-border/60" />
+            <span className="text-xs text-muted-foreground">ou continue com</span>
+            <div className="flex-1 border-t border-border/60" />
           </motion.div>
           <motion.div variants={fadeUp} custom={5}>
             <SocialButtons onLogin={signInWithProvider} />
