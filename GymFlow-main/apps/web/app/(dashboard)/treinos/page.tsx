@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Search, ClipboardList, Dumbbell, Clock, Target,
@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
+import { useRealtime } from '@/hooks/use-realtime'
 import { Skeleton } from '@/components/ui/skeleton'
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } }
@@ -213,16 +214,16 @@ export default function TreinosPage() {
   const [sheets, setSheets] = useState<Sheet[]>([])
   const [hasStudents, setHasStudents] = useState(false)
   const [loading, setLoading] = useState(true)
-  const { currentRole, currentAcademy } = useAuthStore()
-  const supabase = createClient()
+  const { currentRole, currentAcademy, profile } = useAuthStore()
+  // Memoizado: instância estável pro load (useCallback) e canais realtime.
+  const supabase = useMemo(() => createClient(), [])
   const isOwner    = currentRole === 'owner'
   const isPersonal = currentRole === 'personal'
   const isStudent  = currentRole === 'student'
   // Owner tem as MESMAS capacidades de personal pra fichas (criar, atribuir, deletar).
   const canManage = isOwner || isPersonal
 
-  useEffect(() => {
-    async function load() {
+  const load = useCallback(async () => {
       if (!currentAcademy) { setLoading(false); return }
 
       const { data: { user } } = await supabase.auth.getUser()
@@ -290,9 +291,18 @@ export default function TreinosPage() {
       }
 
       setLoading(false)
-    }
-    load()
-  }, [currentAcademy, currentRole])
+  }, [currentAcademy, currentRole, canManage, isStudent, supabase])
+
+  useEffect(() => { load() }, [load])
+
+  // Atualização ao vivo pro aluno: nova ficha atribuída, ficha removida/editada,
+  // ou exercício adicionado a alguma das suas fichas. A RLS garante que ele só
+  // recebe eventos das próprias linhas.
+  useRealtime(
+    { table: 'workout_sheets', filter: profile ? `student_id=eq.${profile.id}` : undefined, enabled: isStudent && !!profile },
+    load,
+  )
+  useRealtime({ table: 'sheet_exercises', enabled: isStudent }, load)
 
   async function handleDelete(id: string) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
