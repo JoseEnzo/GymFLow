@@ -207,7 +207,7 @@ export default function PrivacidadePage() {
                 O <strong className="text-foreground">MeuTrein</strong> é uma plataforma SaaS brasileira para gestão de academias. O controlador dos dados é a empresa responsável pelo MeuTrein, com sede no Brasil.
               </p>
               <p>
-                Ao usar nossa plataforma, você concorda com os termos desta política. Em caso de dúvidas, entre em contato pelo e-mail <strong className="text-foreground">privacidade@gymflow.app</strong>.
+                Ao usar nossa plataforma, você concorda com os termos desta política. Em caso de dúvidas, entre em contato pelo e-mail <strong className="text-foreground">privacidade@meutrein.com.br</strong>.
               </p>
             </Section>
 
@@ -351,7 +351,7 @@ export default function PrivacidadePage() {
                 <Li><strong className="text-foreground">Oposição:</strong> opor-se ao tratamento de dados em determinadas situações.</Li>
               </ul>
               <p className="mt-3">
-                Para exercer qualquer desses direitos, envie um e-mail para <strong className="text-foreground">privacidade@gymflow.app</strong>. Respondemos em até <strong className="text-foreground">15 dias úteis</strong>.
+                Para exercer qualquer desses direitos, envie um e-mail para <strong className="text-foreground">privacidade@meutrein.com.br</strong>. Respondemos em até <strong className="text-foreground">15 dias úteis</strong>.
               </p>
             </Section>
 
@@ -361,7 +361,7 @@ export default function PrivacidadePage() {
               <div className="mt-4 rounded-xl bg-surface-100/60 border border-border/40 p-4 space-y-2">
                 <div className="flex items-center gap-2 text-sm">
                   <Mail className="w-4 h-4 text-brand-400" />
-                  <span><strong className="text-foreground">E-mail:</strong> privacidade@gymflow.app</span>
+                  <span><strong className="text-foreground">E-mail:</strong> privacidade@meutrein.com.br</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Shield className="w-4 h-4 text-brand-400" />
