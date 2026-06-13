@@ -61,11 +61,11 @@
 @layer base {
   * {
     @apply border-border;
-    scroll-behavior: smooth;
   }
 
   html {
     @apply antialiased;
+    scroll-behavior: smooth;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -73,6 +73,20 @@
 
   body {
     @apply bg-background text-foreground font-sans;
+  }
+
+  /* Fundo numa camada fixa própria, composta pela GPU.
+     Antes os gradientes ficavam no body com background-attachment:fixed, que
+     re-pintava o fundo inteiro a cada frame de scroll — causando o banding /
+     "chiado de TV de tubo" ao rolar, além de jank. Movendo pra um pseudo
+     position:fixed, o fundo vira uma layer isolada que o scroll NÃO re-pinta.
+     pointer-events:none garante que não captura cliques. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
     background-image:
       linear-gradient(155deg, rgba(25, 15, 55, 0.10) 0%, transparent 42%, rgba(4, 26, 48, 0.08) 100%),
       radial-gradient(ellipse 80% 60% at 15% 8%,  rgba(99, 102, 241, 0.10) 0%, transparent 70%),
@@ -81,13 +95,6 @@
       radial-gradient(ellipse 60% 50% at 92% 52%, rgba(6, 182, 212, 0.04) 0%, transparent 60%),
       radial-gradient(ellipse 70% 50% at 20% 95%, rgba(99, 102, 241, 0.06) 0%, transparent 65%),
       radial-gradient(ellipse 65% 50% at 80% 95%, rgba(8, 145, 178, 0.05) 0%, transparent 60%);
-    background-attachment: fixed;
-  }
-
-  /* Em mobile, fixed re-paint a cada scroll = lag.
-     Trocar pra scroll mantém o visual sem custo de frame. */
-  @media (max-width: 768px) {
-    body { background-attachment: scroll; }
   }
 
   ::selection {
