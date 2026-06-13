@@ -111,7 +111,7 @@ export default function Image() {
             fontWeight: 600,
           }}
         >
-          gymflow.app
+          meutrein.com.br
         </div>
       </div>
     ),
