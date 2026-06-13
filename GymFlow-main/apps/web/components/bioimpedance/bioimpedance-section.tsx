@@ -5,12 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, X, Activity, Loader2, Calendar,
   ChevronDown, Scale, Zap, BarChart3,
-  TrendingDown, Droplets, Clock,
+  TrendingDown, Droplets, Clock, Target, Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { GoalProgress, GOAL_METRICS, type BioGoal, type GoalMetric } from './goal-progress'
 
 // ── Types ────────────────────────────────────────────────────
 interface BioAssessment {
@@ -140,11 +141,13 @@ export function BioimpedanceSection({
   academyId,
   studentHeight,
   readOnly = false,
+  autoOpenForm = false,
 }: {
   studentId: string
   academyId: string
   studentHeight?: number | null
   readOnly?: boolean
+  autoOpenForm?: boolean
 }) {
   const supabase = createClient()
   const [assessments, setAssessments] = useState<BioAssessment[]>([])
@@ -153,6 +156,11 @@ export function BioimpedanceSection({
   const [showHistory, setShowHistory] = useState(false)
   const [form, setForm] = useState<BioForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  // Meta de bioimpedância (1 por aluno)
+  const [goal, setGoal] = useState<BioGoal | null>(null)
+  const [showGoalModal, setShowGoalModal] = useState(false)
+  const [goalForm, setGoalForm] = useState<{ metric: GoalMetric; target_value: string }>({ metric: 'weight_kg', target_value: '' })
+  const [savingGoal, setSavingGoal] = useState(false)
 
   function setField(field: keyof BioForm, value: string) {
     setForm((prev) => {
@@ -181,10 +189,26 @@ export function BioimpedanceSection({
         .order('assessed_at', { ascending: false })
       if (error) toast.error('Erro ao carregar avaliações.')
       setAssessments(data ?? [])
+
+      // Meta (tabela nova, ainda fora dos types gerados → cast)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: goalData } = await (supabase as any)
+        .from('bioimpedance_goals')
+        .select('metric, target_value, start_value')
+        .eq('academy_id', academyId)
+        .eq('student_id', studentId)
+        .maybeSingle()
+      setGoal(goalData ?? null)
+
       setLoading(false)
     }
     load()
   }, [studentId, academyId])
+
+  // Abre o modal direto quando veio de "Nova bioimpedância" no card do aluno (?bio=new).
+  useEffect(() => {
+    if (autoOpenForm && !readOnly) setShowModal(true)
+  }, [autoOpenForm, readOnly])
 
   async function save() {
     if (!form.weight_kg) { toast.error('Informe o peso.'); return }
@@ -233,6 +257,67 @@ export function BioimpedanceSection({
 
   const latest = assessments[0] ?? null
   const previous = assessments[1] ?? null
+  const goalCurrent = goal && latest ? (latest[goal.metric as keyof BioAssessment] as number | null) : null
+
+  function openGoalModal() {
+    setGoalForm(goal
+      ? { metric: goal.metric, target_value: String(goal.target_value) }
+      : { metric: 'weight_kg', target_value: '' })
+    setShowGoalModal(true)
+  }
+
+  async function saveGoal() {
+    const target = parseFloat(goalForm.target_value.replace(',', '.'))
+    if (isNaN(target)) { toast.error('Informe o valor-alvo da meta.'); return }
+    setSavingGoal(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Não autenticado')
+      // Baseline: preserva o start ao só editar o alvo da mesma métrica; senão
+      // tira snapshot do valor atual da métrica na última avaliação (pode ser null).
+      const start = goal && goal.metric === goalForm.metric
+        ? goal.start_value
+        : (latest ? (latest[goalForm.metric as keyof BioAssessment] as number | null) : null)
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from('bioimpedance_goals')
+        .upsert({
+          academy_id: academyId,
+          student_id: studentId,
+          personal_id: user.id,
+          metric: goalForm.metric,
+          target_value: target,
+          start_value: start,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'academy_id,student_id' })
+        .select('metric, target_value, start_value')
+        .single()
+      if (error) throw error
+      setGoal(data)
+      setShowGoalModal(false)
+      toast.success('Meta salva!')
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? 'Erro ao salvar meta.')
+    } finally {
+      setSavingGoal(false)
+    }
+  }
+
+  async function removeGoal() {
+    setSavingGoal(true)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
+      .from('bioimpedance_goals')
+      .delete()
+      .eq('academy_id', academyId)
+      .eq('student_id', studentId)
+    setSavingGoal(false)
+    if (error) { toast.error('Erro ao remover meta.'); return }
+    setGoal(null)
+    setShowGoalModal(false)
+    toast.success('Meta removida.')
+  }
 
   return (
     <>
@@ -252,6 +337,42 @@ export function BioimpedanceSection({
             </button>
           )}
         </div>
+
+        {/* Meta — barra de progresso que o aluno também vê */}
+        {!loading && (goal || !readOnly) && (
+          <div className="mb-4 space-y-2">
+            {goal && (
+              <GoalProgress goal={goal} current={goalCurrent} audience="personal" />
+            )}
+            {!readOnly && (
+              goal ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={openGoalModal}
+                    className="btn-secondary flex-1 py-2 rounded-xl text-xs font-semibold"
+                  >
+                    Editar meta
+                  </button>
+                  <button
+                    onClick={removeGoal}
+                    disabled={savingGoal}
+                    title="Remover meta"
+                    className="px-3 py-2 rounded-xl text-xs text-red-400 border border-red-500/20 hover:bg-red-500/10 transition-all"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={openGoalModal}
+                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold border border-dashed border-brand-500/30 text-brand-300 hover:bg-brand-500/10 transition-all"
+                >
+                  <Target className="w-3.5 h-3.5" /> Definir meta de bioimpedância
+                </button>
+              )
+            )}
+          </div>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-8">
@@ -509,6 +630,99 @@ export function BioimpedanceSection({
                     className="btn-primary flex-1 py-3 rounded-xl text-sm font-semibold"
                   >
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Salvar avaliação'}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── Modal de meta ── */}
+      <AnimatePresence>
+        {showGoalModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowGoalModal(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            />
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                className="w-full max-w-sm glass rounded-2xl p-6 border border-border/60 shadow-2xl"
+              >
+                <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-brand-500/15 flex items-center justify-center">
+                      <Target className="w-4.5 h-4.5 text-brand-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-display font-bold">{goal ? 'Editar meta' : 'Definir meta'}</h3>
+                      <p className="text-xs text-muted-foreground">O aluno vê o progresso</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowGoalModal(false)}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-200 transition-all"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Métrica</label>
+                    <select
+                      value={goalForm.metric}
+                      onChange={(e) => setGoalForm((f) => ({ ...f, metric: e.target.value as GoalMetric }))}
+                      className="field text-sm"
+                    >
+                      {(Object.keys(GOAL_METRICS) as GoalMetric[]).map((k) => (
+                        <option key={k} value={k}>
+                          {GOAL_METRICS[k].label}{GOAL_METRICS[k].unit ? ` (${GOAL_METRICS[k].unit})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      Valor-alvo {GOAL_METRICS[goalForm.metric].unit && `(${GOAL_METRICS[goalForm.metric].unit})`}
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.1"
+                      value={goalForm.target_value}
+                      onChange={(e) => setGoalForm((f) => ({ ...f, target_value: e.target.value }))}
+                      placeholder="ex: 75"
+                      className="field text-sm"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      O progresso é medido do valor atual do aluno até esse alvo.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 mt-6">
+                  <button
+                    onClick={() => setShowGoalModal(false)}
+                    className="btn-secondary flex-1 py-3 rounded-xl text-sm"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={saveGoal}
+                    disabled={savingGoal || !goalForm.target_value}
+                    className="btn-primary flex-1 py-3 rounded-xl text-sm font-semibold"
+                  >
+                    {savingGoal ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Salvar meta'}
                   </button>
                 </div>
               </motion.div>

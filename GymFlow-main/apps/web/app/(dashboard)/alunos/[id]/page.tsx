@@ -70,6 +70,14 @@ export default function StudentDetailPage() {
   const [totalWorkouts, setTotalWorkouts] = useState(0)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  // ?bio=new (vindo do card do aluno) abre direto o modal de nova avaliação.
+  const [autoOpenBio, setAutoOpenBio] = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setAutoOpenBio(new URLSearchParams(window.location.search).get('bio') === 'new')
+    }
+  }, [])
 
   useEffect(() => {
     async function load() {
@@ -268,6 +276,7 @@ export default function StudentDetailPage() {
             academyId={currentAcademy.id}
             studentHeight={student.height_cm ?? undefined}
             readOnly={!(isOwner || isPersonal)}
+            autoOpenForm={autoOpenBio}
           />
         </motion.div>
       )}

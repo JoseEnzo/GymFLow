@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { GoalProgress, type BioGoal } from './goal-progress'
 
 // ── Types ─────────────────────────────────────────────────────
 interface BioAssessment {
@@ -104,6 +105,7 @@ function DeltaBadge({ curr, prev, lowerIsBetter = false }: {
 function BioCard({ studentId }: { studentId: string }) {
   const supabase = createClient()
   const [assessments, setAssessments] = useState<BioAssessment[]>([])
+  const [goal, setGoal] = useState<BioGoal | null>(null)
   const [loading, setLoading] = useState(true)
   const [showHistory, setShowHistory] = useState(false)
 
@@ -119,6 +121,16 @@ function BioCard({ studentId }: { studentId: string }) {
         .order('assessed_at', { ascending: false })
       if (error) toast.error('Erro ao carregar avaliações.')
       setAssessments(data ?? [])
+
+      // Meta definida pelo personal (tabela nova, ainda fora dos types gerados → cast)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: goalData } = await (supabase as any)
+        .from('bioimpedance_goals')
+        .select('metric, target_value, start_value')
+        .eq('student_id', studentId)
+        .maybeSingle()
+      setGoal(goalData ?? null)
+
       setLoading(false)
     }
     void load()
@@ -126,6 +138,7 @@ function BioCard({ studentId }: { studentId: string }) {
 
   const latest = assessments[0] ?? null
   const previous = assessments[1] ?? null
+  const goalCurrent = goal && latest ? (latest[goal.metric as keyof BioAssessment] as number | null) : null
 
   return (
     <div className="glass rounded-2xl p-5">
@@ -138,6 +151,12 @@ function BioCard({ studentId }: { studentId: string }) {
           </span>
         )}
       </div>
+
+      {!loading && goal && (
+        <div className="mb-4">
+          <GoalProgress goal={goal} current={goalCurrent} audience="student" />
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-8">
