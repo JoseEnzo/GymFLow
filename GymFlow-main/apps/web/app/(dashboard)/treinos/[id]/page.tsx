@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
+import { useRealtime } from '@/hooks/use-realtime'
 import { cn } from '@/lib/utils'
 
 const fadeUp = {
@@ -247,7 +248,9 @@ export default function WorkoutSheetDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const { currentRole, currentAcademy } = useAuthStore()
-  const supabase = createClient()
+  // Memoizado: instância estável evita re-subscrever o canal realtime e re-rodar
+  // o load (useCallback) a cada render. Ver pegadinha documentada em use-auth.
+  const supabase = useMemo(() => createClient(), [])
   const isPersonal = currentRole === 'owner' || currentRole === 'personal'
 
   const [sheet, setSheet] = useState<WorkoutSheet | null>(null)
@@ -257,8 +260,7 @@ export default function WorkoutSheetDetailPage() {
   const [savingDays, setSavingDays] = useState(false)
   const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay())
 
-  useEffect(() => {
-    async function load() {
+  const load = useCallback(async () => {
       if (!currentAcademy) { setLoading(false); return }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -312,9 +314,15 @@ export default function WorkoutSheetDetailPage() {
       } else {
         setSiblings([])
       }
-    }
-    load()
-  }, [id, currentAcademy])
+  }, [id, currentAcademy, supabase])
+
+  useEffect(() => { load() }, [load])
+
+  // Atualização ao vivo: quando o personal/owner adiciona, edita ou remove um
+  // exercício desta ficha (ou altera a própria ficha), o aluno que está com a
+  // página aberta vê a mudança na hora, sem reload.
+  useRealtime({ table: 'sheet_exercises', filter: `sheet_id=eq.${id}`, enabled: !!id }, load)
+  useRealtime({ table: 'workout_sheets', filter: `id=eq.${id}`, enabled: !!id }, load)
 
   async function handleScheduledDaysChange(days: number[]) {
     if (!sheet) return

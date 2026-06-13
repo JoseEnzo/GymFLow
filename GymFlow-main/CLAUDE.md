@@ -530,6 +530,18 @@ Webhook Stripe (`apps/web/app/api/webhooks/stripe/route.ts`) usa claim atômico 
 
 ---
 
+## Realtime (atualização ao vivo das fichas) — jun/2026
+
+O aluno com a página aberta vê na hora quando o personal/owner adiciona/edita/remove exercício ou atribui uma ficha nova — sem reload.
+
+- **Migration `072_realtime_workout_sheets.sql`:** adiciona `workout_sheets` + `sheet_exercises` à publicação `supabase_realtime` (DO block idempotente) e seta `REPLICA IDENTITY FULL` nas duas. **FULL é obrigatório** pros filtros por coluna não-PK (`sheet_id`, `student_id`) casarem em eventos UPDATE/DELETE — com DEFAULT o registro `old` só traz a PK e o filtro não bate no delete.
+- **Hook `apps/web/hooks/use-realtime.ts`:** `useRealtime({ table, filter?, event?, enabled? }, onChange)`. Client memoizado + callback em ref → passar função inline NÃO re-subscreve o canal a cada render (mesma pegadinha do `use-auth`). Canal só recria quando table/filter/event/enabled mudam.
+- **Onde está plugado:** `/treinos/[id]` (escuta `sheet_exercises` por `sheet_id` + `workout_sheets` por `id`) e `/treinos` lista do aluno (`workout_sheets` por `student_id` + `sheet_exercises` sem filtro — RLS limita aos próprios). O `load` dessas páginas virou `useCallback` pra ser reusado pelo realtime.
+- **Segurança:** postgres_changes respeita a RLS da sessão — aluno só recebe eventos das linhas que já podia ler. Nenhum vazamento cross-tenant pelo canal.
+- **Como NÃO quebrar:** o `supabase` dessas páginas precisa ficar memoizado (`useMemo`); voltar a `createClient()` no corpo re-subscreve em loop. Pra observar uma tabela nova via realtime, adicione-a à publicação numa migration ANTES de chamar `useRealtime` (sem isso o canal conecta mas nunca recebe evento).
+
+---
+
 ## O que não fazer
 
 - **Não criar componentes de UI do zero** se existe no shadcn/ui
