@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
@@ -14,6 +14,7 @@ import { cn, MEAL_TYPE_COLORS } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { getCached, setCached, CACHE_TTL } from '@/lib/global-cache'
 import { useAuthStore } from '@/stores/auth-store'
+import { useIsMobile } from '@/hooks/use-is-mobile'
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } }
 const fadeUp = {
@@ -760,6 +761,15 @@ function ReceitasContent() {
   const [quickAdd, setQuickAdd] = useState<FoodItem | null>(null)
   const [detail, setDetail] = useState<Recipe | null>(null)
 
+  const isMobile = useIsMobile()
+  const PAGE_SIZE = 20
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return }
+    setVisibleCount(PAGE_SIZE)
+  }, [search, selectedMeal, selectedCategory, activeTab])
+
   const recipesCacheKey = `recipes_${currentAcademy?.id ?? 'global'}`
   const foodsCacheKey   = `food_items_${currentAcademy?.id ?? 'global'}`
 
@@ -1027,7 +1037,7 @@ function ReceitasContent() {
 
       {!loading && activeTab === 'receitas' && (
         <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map((r) => {
+          {(isMobile ? filtered.slice(0, visibleCount) : filtered).map((r) => {
             const primaryMeal = r.meal_types[0]
             const color = primaryMeal ? (MEAL_TYPE_COLORS[primaryMeal] ?? '#6366F1') : '#6366F1'
             const isAdded = addedIds.has(r.id)
@@ -1079,7 +1089,7 @@ function ReceitasContent() {
 
       {!loading && activeTab === 'ingredientes' && (
         <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredFoods.map((f) => {
+          {(isMobile ? filteredFoods.slice(0, visibleCount) : filteredFoods).map((f) => {
             const color = f.category ? (CATEGORY_COLORS[f.category] ?? '#6366F1') : '#6366F1'
             const isAdded = addedFoodIds.has(f.id)
             const isAddingThis = adding === f.id
@@ -1134,6 +1144,23 @@ function ReceitasContent() {
             )
           })}
         </motion.div>
+      )}
+
+      {/* Load more receitas — mobile only */}
+      {!loading && isMobile && activeTab === 'receitas' && visibleCount < filtered.length && (
+        <div className="flex justify-center pt-2">
+          <button onClick={() => setVisibleCount((n) => n + PAGE_SIZE)} className="btn-secondary text-sm py-2.5 px-6 rounded-xl">
+            Carregar mais ({filtered.length - visibleCount} restantes)
+          </button>
+        </div>
+      )}
+      {/* Load more ingredientes — mobile only */}
+      {!loading && isMobile && activeTab === 'ingredientes' && visibleCount < filteredFoods.length && (
+        <div className="flex justify-center pt-2">
+          <button onClick={() => setVisibleCount((n) => n + PAGE_SIZE)} className="btn-secondary text-sm py-2.5 px-6 rounded-xl">
+            Carregar mais ({filteredFoods.length - visibleCount} restantes)
+          </button>
+        </div>
       )}
 
       {!loading && activeTab === 'receitas' && filtered.length === 0 && (

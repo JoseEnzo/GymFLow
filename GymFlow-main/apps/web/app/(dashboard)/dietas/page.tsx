@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import {
   Plus, Search, Salad, Target, Flame, Users, Trash2, ChevronRight, UserPlus,
@@ -12,6 +12,7 @@ import { cn, DIET_GOAL_COLORS } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useIsMobile } from '@/hooks/use-is-mobile'
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } }
 const fadeUp = {
@@ -102,6 +103,15 @@ export default function DietasPage() {
   // Owner tem as MESMAS capacidades de personal (criar, atribuir, deletar planos).
   // Essa é a regra geral do produto: owner manda + personal manda, student só vê o seu.
   const canManage = isOwner || isPersonal
+
+  const isMobile = useIsMobile()
+  const PAGE_SIZE = 20
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return }
+    setVisibleCount(PAGE_SIZE)
+  }, [search])
 
   useEffect(() => {
     async function load() {
@@ -210,10 +220,18 @@ export default function DietasPage() {
 
       {!loading && (
         <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((p) => (
+          {(isMobile ? filtered.slice(0, visibleCount) : filtered).map((p) => (
             <PlanCard key={p.id} plan={p} isPersonal={canManage} readOnly={!canManage} onDelete={handleDelete} />
           ))}
         </motion.div>
+      )}
+
+      {!loading && isMobile && visibleCount < filtered.length && (
+        <div className="flex justify-center pt-2">
+          <button onClick={() => setVisibleCount((n) => n + PAGE_SIZE)} className="btn-secondary text-sm py-2.5 px-6 rounded-xl">
+            Carregar mais ({filtered.length - visibleCount} restantes)
+          </button>
+        </div>
       )}
 
       {!loading && filtered.length === 0 && plans.length === 0 && !(canManage && !hasStudents) && (
