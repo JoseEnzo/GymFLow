@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 
-import { limiters } from '@/lib/rate-limit'
-import { clientIp } from '@/lib/turnstile'
 
 const admin = createAdminClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,17 +32,6 @@ function isExhausted(row: InviteRow) {
 }
 
 export async function GET(request: Request) {
-  // Rota pública (allowlist do middleware) que resolve segredos compartilháveis
-  // (token/código) com service_role — rate limit obrigatório.
-  const ip = clientIp(request)
-  const { success: rlOk } = await limiters.invite.limit(`lookup:${ip}`)
-  if (!rlOk) {
-    return NextResponse.json(
-      { error: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' },
-      { status: 429 }
-    )
-  }
-
   const { searchParams } = new URL(request.url)
   const token = searchParams.get('token')?.trim() ?? ''
   const code = searchParams.get('code')?.trim().toUpperCase() ?? ''

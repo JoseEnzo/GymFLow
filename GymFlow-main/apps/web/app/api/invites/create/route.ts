@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 
 import { requireAuth } from '@/lib/api-guard'
-import { limiters } from '@/lib/rate-limit'
-import { clientIp } from '@/lib/turnstile'
 
 const admin = createAdminClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,15 +13,6 @@ export async function POST(request: Request) {
   const authResult = await requireAuth()
   if (authResult instanceof NextResponse) return authResult
   const user = authResult
-
-  const ip = clientIp(request)
-  const { success: rlOk } = await limiters.invite.limit(`create:${ip}`)
-  if (!rlOk) {
-    return NextResponse.json(
-      { error: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' },
-      { status: 429 }
-    )
-  }
 
   let body: { academyId?: string; role?: string; expiresAt?: string | null; usesLimit?: number | null }
   try {

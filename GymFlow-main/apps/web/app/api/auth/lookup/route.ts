@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { validateCNPJ, validateCPF, validateCREF, normalizeCREF } from '@/lib/cnpj'
-import { limiters } from '@/lib/rate-limit'
 import { lookupSchema } from '@/lib/validations'
 import { verifyTurnstileToken, clientIp } from '@/lib/turnstile'
 
@@ -11,16 +10,7 @@ const GENERIC_ERROR = 'Credenciais inválidas'
 export async function POST(request: Request) {
   const ip = clientIp(request)
 
-  // 1. Rate limit por IP — preset `auth` em rate-limit.ts (20/15min desde 2026-06-11)
-  const { success: rlOk } = await limiters.auth.limit(`lookup:${ip}`)
-  if (!rlOk) {
-    return NextResponse.json(
-      { error: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' },
-      { status: 429 },
-    )
-  }
-
-  // 2. Parse + valida body
+  // Parse + valida body
   let rawBody: unknown
   try {
     rawBody = await request.json()
@@ -140,7 +130,7 @@ export async function POST(request: Request) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const match = (list?.users ?? []).find((u: any) => {
         const meta = u.user_metadata ?? {}
-        if (meta.account_type !== 'personal') return false
+        if (meta.account_type !== 'student') return false
         const doc = String(meta.document ?? '').replace(/\D/g, '')
         return doc === clean
       })

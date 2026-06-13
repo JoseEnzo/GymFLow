@@ -660,7 +660,7 @@ interface StripeInvoice {
   pdfUrl: string | null
 }
 
-const PLAN_ORDER = ['starter', 'pro'] as const
+const PLAN_ORDER = ['personal', 'starter', 'pro'] as const
 
 function PlanTab() {
   const { currentAcademy } = useAuthStore()
@@ -761,8 +761,9 @@ function PlanTab() {
   }
 
   const plans: { id: string; name: string; price: string; limit: string; color: string }[] = [
-    { id: 'starter', name: 'Starter', price: 'R$ 197/mês', limit: 'Até 50 alunos · Até 3 personais', color: '#06B6D4' },
-    { id: 'pro',     name: 'Pro',     price: 'R$ 397/mês', limit: 'Alunos e personais ilimitados',   color: '#10B981' },
+    { id: 'personal', name: 'Personal', price: 'R$ 97/mês',  limit: 'Alunos ilimitados · Personal independente', color: '#8B5CF6' },
+    { id: 'starter',  name: 'Starter',  price: 'R$ 197/mês', limit: 'Até 50 alunos · Até 3 personais',           color: '#06B6D4' },
+    { id: 'pro',      name: 'Pro',      price: 'R$ 397/mês', limit: 'Alunos e personais ilimitados',             color: '#10B981' },
   ]
 
   return (

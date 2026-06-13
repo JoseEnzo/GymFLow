@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 
 import { requireAuth } from '@/lib/api-guard'
-import { limiters } from '@/lib/rate-limit'
-import { clientIp } from '@/lib/turnstile'
 
 const admin = createAdminClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,16 +22,6 @@ export async function POST(request: Request) {
   const authResult = await requireAuth()
   if (authResult instanceof NextResponse) return authResult
   const user = authResult
-
-  // Rate limit por IP — preset `invite` em rate-limit.ts (30/5min desde 2026-06-11).
-  const ip = clientIp(request)
-  const { success: rlOk } = await limiters.invite.limit(`accept:${ip}`)
-  if (!rlOk) {
-    return NextResponse.json(
-      { error: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' },
-      { status: 429 },
-    )
-  }
 
   let token: string
   try {

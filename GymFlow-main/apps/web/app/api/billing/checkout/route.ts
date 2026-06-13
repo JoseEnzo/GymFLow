@@ -34,7 +34,9 @@ export async function POST(request: Request) {
   // quebra dentro do create() e o erro vira genérico. Avisar qual falta — mesmo
   // padrão da rota /api/academy/upgrade.
   const priceEnvKey =
-    planId === 'pro' ? 'STRIPE_PRICE_PRO_MONTHLY' : 'STRIPE_PRICE_STARTER_MONTHLY'
+    planId === 'pro' ? 'STRIPE_PRICE_PRO_MONTHLY'
+    : planId === 'personal' ? 'STRIPE_PRICE_PERSONAL_MONTHLY'
+    : 'STRIPE_PRICE_STARTER_MONTHLY'
   if (!process.env['STRIPE_SECRET_KEY']) {
     return NextResponse.json({ error: 'Pagamento indisponível: STRIPE_SECRET_KEY não configurada no servidor.' }, { status: 500 })
   }
