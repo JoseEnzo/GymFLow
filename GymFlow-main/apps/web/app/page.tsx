@@ -1331,7 +1331,7 @@ function Footer() {
               title: 'Empresa',
               links: [
                 { label: 'Sobre', href: '#sobre' },
-                { label: 'Contato', href: 'mailto:contato@gymflow.app' },
+                { label: 'Contato', href: 'mailto:contato@meutrein.com.br' },
               ],
             },
             {
@@ -1543,7 +1543,7 @@ function FAQSection() {
         >
           <p className="text-sm text-muted-foreground">
             Ainda tem dúvidas?{' '}
-            <a href="mailto:contato@gymflow.app" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
+            <a href="mailto:contato@meutrein.com.br" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
               Fale com a gente →
             </a>
           </p>

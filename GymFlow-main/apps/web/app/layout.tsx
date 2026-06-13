@@ -49,6 +49,11 @@ export const metadata: Metadata = {
     description: 'Plataforma SaaS para academias.',
     creator: '@gymflow',
   },
+  // Verificação da propriedade "Prefixo do URL" no Google Search Console
+  // (https://www.meutrein.com.br). Gera <meta name="google-site-verification" ...>.
+  verification: {
+    google: '3mCL_LM_g6G7jLdE4PQg5iZW3I_tP0Wwpq13JzvsFwY',
+  },
   manifest: '/manifest.json',
   // Apple touch icon vem de `app/apple-icon.tsx` (Next.js gera dinamicamente
   // em 180x180 com o gradient indigo + dumbbell). Não setamos `icons.apple`

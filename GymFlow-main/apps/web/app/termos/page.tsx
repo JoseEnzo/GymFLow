@@ -190,7 +190,7 @@ export default function TermosPage() {
             <Section icon={FileText} color="#6366F1" title="1. Aceitação dos Termos">
               <p>
                 Estes Termos de Uso regulam o acesso e uso da plataforma MeuTrein, disponível em{' '}
-                <span className="text-foreground font-medium">gymflow.app</span> e seus subdomínios.
+                <span className="text-foreground font-medium">meutrein.com.br</span> e seus subdomínios.
               </p>
               <p>
                 O uso da plataforma é destinado a academias, personal trainers e seus alunos.
@@ -290,10 +290,10 @@ export default function TermosPage() {
               </p>
               <p className="mt-2">
                 <a
-                  href="mailto:contato@gymflow.app"
+                  href="mailto:contato@meutrein.com.br"
                   className="text-brand-400 hover:underline font-medium"
                 >
-                  contato@gymflow.app
+                  contato@meutrein.com.br
                 </a>
               </p>
               <p className="text-xs text-muted-foreground/60 mt-4">
