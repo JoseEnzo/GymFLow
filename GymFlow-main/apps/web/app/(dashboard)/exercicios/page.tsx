@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Search, Plus, ChevronRight, Dumbbell, X, Loader2, Check, ArrowLeft } from 'lucide-react'
@@ -11,6 +11,7 @@ import { cn, MUSCLE_GROUP_COLORS } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { getCached, setCached, CACHE_TTL } from '@/lib/global-cache'
 import { useAuthStore } from '@/stores/auth-store'
+import { useIsMobile } from '@/hooks/use-is-mobile'
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } }
 const fadeUp = {
@@ -288,6 +289,15 @@ function ExerciciosContent() {
   const [sheetName, setSheetName] = useState('')
   const [pendingExercise, setPendingExercise] = useState<Exercise | null>(null)
 
+  const isMobile = useIsMobile()
+  const PAGE_SIZE = 20
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return }
+    setVisibleCount(PAGE_SIZE)
+  }, [search, selectedMuscle, selectedDifficulty])
+
   const exercisesCacheKey = `exercises_${currentAcademy?.id ?? 'global'}`
 
   useEffect(() => {
@@ -486,7 +496,7 @@ function ExerciciosContent() {
       {/* Grid view */}
       {!loading && view === 'grid' && (
         <motion.div variants={stagger} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filtered.map((ex) => {
+          {(isMobile ? filtered.slice(0, visibleCount) : filtered).map((ex) => {
             const primaryMuscle = ex.muscle_groups[0]
             const color = primaryMuscle ? (MUSCLE_GROUP_COLORS[primaryMuscle] ?? '#6366F1') : '#6366F1'
             const isAdded = addedIds.has(ex.id)
@@ -547,7 +557,7 @@ function ExerciciosContent() {
       {/* List view */}
       {!loading && view === 'list' && (
         <motion.div variants={stagger} className="space-y-1.5">
-          {filtered.map((ex) => {
+          {(isMobile ? filtered.slice(0, visibleCount) : filtered).map((ex) => {
             const primaryMuscle = ex.muscle_groups[0]
             const color = primaryMuscle ? (MUSCLE_GROUP_COLORS[primaryMuscle] ?? '#6366F1') : '#6366F1'
             const isAdded = addedIds.has(ex.id)
@@ -590,6 +600,18 @@ function ExerciciosContent() {
             )
           })}
         </motion.div>
+      )}
+
+      {/* Load more — mobile only */}
+      {!loading && isMobile && visibleCount < filtered.length && (
+        <div className="flex justify-center pt-2">
+          <button
+            onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+            className="btn-secondary text-sm py-2.5 px-6 rounded-xl"
+          >
+            Carregar mais ({filtered.length - visibleCount} restantes)
+          </button>
+        </div>
       )}
 
       {/* Empty state */}
