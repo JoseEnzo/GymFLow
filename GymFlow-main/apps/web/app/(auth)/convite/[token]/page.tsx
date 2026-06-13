@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Loader2, AlertCircle, CheckCircle2, Dumbbell } from 'lucide-react'
+import { Loader2, AlertCircle, CheckCircle2, Dumbbell, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { createClient } from '@/lib/supabase/client'
@@ -28,6 +28,7 @@ export default function ConvitePage() {
   const [invite, setInvite] = useState<InviteDetails | null>(null)
   const [status, setStatus] = useState<'loading' | 'found' | 'accepting' | 'done' | 'error'>('loading')
   const [error, setError] = useState<string | null>(null)
+  const [showBackConfirm, setShowBackConfirm] = useState(false)
 
   useEffect(() => {
     if (!token) return
@@ -118,6 +119,33 @@ export default function ConvitePage() {
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       className="w-full"
     >
+      {showBackConfirm && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-4 bg-black/60">
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="w-full max-w-sm bg-surface-100 rounded-2xl p-5 space-y-4 border border-border/40"
+          >
+            <p className="text-sm text-center leading-relaxed">
+              Se você voltar o seu convite não estará sendo utilizado. Deseja mesmo fazer isso?
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setShowBackConfirm(false)}
+                className="btn-secondary py-2.5 rounded-xl text-sm font-semibold"
+              >
+                Ficar
+              </button>
+              <button
+                onClick={() => router.back()}
+                className="py-2.5 rounded-xl text-sm font-semibold bg-destructive/15 text-red-400 hover:bg-destructive/25 transition-colors"
+              >
+                Sair assim mesmo
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
       <AnimatePresence mode="wait">
 
           {/* Loading state */}
@@ -213,13 +241,23 @@ export default function ConvitePage() {
                     onClick={acceptInvite}
                     className="w-full btn-primary py-3.5 rounded-xl font-semibold text-sm"
                   >
-                    Criar conta e aceitar convite
+                    {invite.role === 'personal'
+                      ? 'Criar conta como Personal Trainer'
+                      : 'Criar conta como Aluno'}
                   </button>
                   <button
                     onClick={() => router.push(`/login?redirect=/convite/${token}&role=${invite.role}`)}
                     className="w-full btn-secondary py-3.5 rounded-xl font-semibold text-sm"
                   >
-                    Já tenho conta — fazer login
+                    {invite.role === 'personal'
+                      ? 'Já tenho conta de Personal Trainer — fazer login'
+                      : 'Já tenho conta de Aluno — fazer login'}
+                  </button>
+                  <button
+                    onClick={() => setShowBackConfirm(true)}
+                    className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground py-2 transition-colors"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" /> Voltar
                   </button>
                 </div>
               )}

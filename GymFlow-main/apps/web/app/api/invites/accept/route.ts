@@ -13,10 +13,13 @@ const admin = createAdminClient(
 
 // Mapeia exceções nomeadas da RPC pra HTTP + mensagem amigável.
 function mapRpcError(message: string): { status: number; error: string } | null {
-  if (message.includes('INVITE_EXPIRED'))     return { status: 410, error: 'Este convite expirou' }
-  if (message.includes('INVITE_EXHAUSTED'))   return { status: 409, error: 'Este convite já foi utilizado' }
-  if (message.includes('INVITE_UNAVAILABLE')) return { status: 404, error: 'Convite não encontrado ou inválido' }
-  if (message.includes('INVALID_ROLE'))       return { status: 400, error: 'Convite com configuração inválida' }
+  if (message.includes('INVITE_EXPIRED'))       return { status: 410, error: 'Este convite expirou' }
+  if (message.includes('INVITE_EXHAUSTED'))     return { status: 409, error: 'Este convite já foi utilizado' }
+  if (message.includes('INVITE_UNAVAILABLE'))   return { status: 404, error: 'Convite não encontrado ou inválido' }
+  if (message.includes('INVALID_ROLE'))         return { status: 400, error: 'Convite com configuração inválida' }
+  if (message.includes('PLAN_LIMIT_STUDENTS'))  return { status: 403, error: 'Esta academia atingiu o limite de 50 alunos do plano Starter. Entre em contato com o responsável.' }
+  if (message.includes('PLAN_LIMIT_PERSONALS')) return { status: 403, error: 'Esta academia atingiu o limite de 3 personais do plano Starter. Entre em contato com o responsável.' }
+  if (message.includes('PLAN_NO_SUBPERSONALS')) return { status: 403, error: 'O plano desta academia não permite adicionar personais.' }
   return null
 }
 

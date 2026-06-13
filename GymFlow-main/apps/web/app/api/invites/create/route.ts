@@ -60,6 +60,54 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
   }
 
+  // Checar limites do plano antes de criar o convite
+  const { data: academy } = await admin
+    .from('academies')
+    .select('plan')
+    .eq('id', academyId)
+    .single()
+
+  if (academy) {
+    const plan = academy.plan as string
+
+    if (plan === 'personal' && role === 'personal') {
+      return NextResponse.json(
+        { error: 'O plano Personal não permite sub-personais. Faça upgrade para Starter ou Pro.' },
+        { status: 403 },
+      )
+    }
+
+    if (plan === 'starter') {
+      if (role === 'student') {
+        const { count } = await admin
+          .from('academy_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('academy_id', academyId)
+          .eq('role', 'student')
+          .eq('is_active', true)
+        if ((count ?? 0) >= 50) {
+          return NextResponse.json(
+            { error: 'Limite de 50 alunos do plano Starter atingido. Faça upgrade para Pro para adicionar mais alunos.' },
+            { status: 403 },
+          )
+        }
+      } else if (role === 'personal') {
+        const { count } = await admin
+          .from('academy_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('academy_id', academyId)
+          .eq('role', 'personal')
+          .eq('is_active', true)
+        if ((count ?? 0) >= 3) {
+          return NextResponse.json(
+            { error: 'Limite de 3 personais do plano Starter atingido. Faça upgrade para Pro para adicionar mais personais.' },
+            { status: 403 },
+          )
+        }
+      }
+    }
+  }
+
   const SAFE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   const code = Array.from({ length: 8 }, () => SAFE_CHARS[Math.floor(Math.random() * SAFE_CHARS.length)]).join('')
   const token = crypto.randomUUID()
