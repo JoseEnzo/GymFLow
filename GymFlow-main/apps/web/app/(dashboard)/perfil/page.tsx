@@ -6,7 +6,7 @@ import {
   User, Camera, Save, Loader2, CheckCircle2,
   Dumbbell, CalendarDays, TrendingUp, Flame,
   Pencil, X, Phone, Target, Ruler, Weight,
-  ChevronDown,
+  ChevronDown, Trash2, AlertTriangle, ShieldAlert,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -81,7 +81,14 @@ function Field({
 export default function PerfilPage() {
   const { profile: storeProfile, setProfile, currentAcademy, currentRole } = useAuthStore()
   const isStudent = currentRole === 'student'
+  const isOwner = currentRole === 'owner'
+  const hasDocument = currentRole === 'owner' || currentRole === 'personal'
   const supabase = useMemo(() => createClient(), [])
+
+  // delete-account flow
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   const [profile, setLocalProfile] = useState<Profile | null>(storeProfile)
   const [editing, setEditing] = useState(false)
@@ -222,6 +229,29 @@ export default function PerfilPage() {
       bio:        profile.bio        ?? '',
     })
     setEditing(false)
+  }
+
+  // ── excluir conta (irreversível) ──────────────────────────────────────────
+  const handleDeleteAccount = async () => {
+    if (deleteConfirm.trim().toUpperCase() !== 'EXCLUIR') return
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/account/delete', { method: 'POST' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string }
+        toast.error(err.error ?? 'Erro ao excluir a conta.')
+        setDeleting(false)
+        return
+      }
+      // Conta apagada no servidor — limpa sessão local e recarrega na landing.
+      // window.location (em vez de router) força reload total, zerando todo estado.
+      await supabase.auth.signOut().catch(() => {})
+      useAuthStore.getState().reset()
+      window.location.href = '/'
+    } catch {
+      toast.error('Erro ao excluir a conta.')
+      setDeleting(false)
+    }
   }
 
   // ── avatar upload (via API server-side para validação segura) ─────────────
@@ -578,6 +608,105 @@ export default function PerfilPage() {
           <StudentBioView studentId={profile.id} />
         </motion.div>
       )}
+
+      {/* ── Zona de perigo — excluir conta ── */}
+      <motion.div variants={fadeUp} className="glass rounded-2xl p-6 space-y-4 border border-destructive/20">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="w-4 h-4 text-red-400" />
+          <h3 className="font-display font-bold text-sm">Zona de perigo</h3>
+        </div>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          {isOwner
+            ? 'Excluir sua conta remove permanentemente a academia e todos os dados vinculados — alunos, personais, fichas, treinos e histórico. Esta ação não pode ser desfeita.'
+            : currentRole === 'personal'
+              ? 'Excluir sua conta remove permanentemente seu perfil e as fichas que você criou. Seus alunos perdem acesso a esses treinos. Esta ação não pode ser desfeita.'
+              : 'Excluir sua conta remove permanentemente seu perfil, treinos e todo o histórico. Esta ação não pode ser desfeita.'}
+        </p>
+        <button
+          onClick={() => { setDeleteConfirm(''); setShowDeleteModal(true) }}
+          className="flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl border border-destructive/30 text-red-400 hover:bg-destructive/10 transition-colors"
+        >
+          <Trash2 className="w-4 h-4" /> Excluir minha conta
+        </button>
+      </motion.div>
+
+      {/* ── Modal de confirmação de exclusão ── */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => !deleting && setShowDeleteModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              onClick={(e) => e.stopPropagation()}
+              className="glass rounded-2xl p-6 w-full max-w-md space-y-5 border border-destructive/30"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-destructive/15 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-base">Excluir conta permanentemente</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Esta ação não pode ser desfeita.</p>
+                </div>
+              </div>
+
+              <div className="text-sm text-muted-foreground space-y-2 leading-relaxed">
+                <p>
+                  {isOwner
+                    ? 'A academia e TODOS os dados vinculados (alunos, personais, fichas, treinos e histórico) serão apagados para sempre.'
+                    : currentRole === 'personal'
+                      ? 'Seu perfil e as fichas que você criou para seus alunos serão apagados para sempre.'
+                      : 'Seu perfil, treinos e todo o histórico serão apagados para sempre.'}
+                </p>
+                <p>
+                  Depois disso, o mesmo e-mail{hasDocument ? ' e documento (CNPJ/CREF)' : ''} poderá ser
+                  usado em um novo cadastro.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Digite <span className="font-bold text-red-400">EXCLUIR</span> para confirmar
+                </label>
+                <input
+                  autoFocus
+                  value={deleteConfirm}
+                  onChange={(e) => setDeleteConfirm(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && deleteConfirm.trim().toUpperCase() === 'EXCLUIR' && handleDeleteAccount()}
+                  placeholder="EXCLUIR"
+                  className="field w-full text-sm"
+                  disabled={deleting}
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={deleting}
+                  className="btn-secondary text-sm px-4 py-2.5 disabled:opacity-40"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleting || deleteConfirm.trim().toUpperCase() !== 'EXCLUIR'}
+                  className="flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl bg-destructive text-white hover:bg-destructive/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  Excluir conta
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Save confirmation visual ── */}
       <AnimatePresence>
