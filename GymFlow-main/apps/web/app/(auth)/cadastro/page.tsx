@@ -530,13 +530,10 @@ function CadastroInner() {
 
             {accountType === 'student' && !inviteToken && (
               <>
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-border/60" />
-                  </div>
-                  <div className="relative flex justify-center text-xs">
-                    <span className="bg-background px-3 text-muted-foreground">ou continue com</span>
-                  </div>
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <div className="flex-1 border-t border-border/60" />
+                  <span>ou continue com</span>
+                  <div className="flex-1 border-t border-border/60" />
                 </div>
                 <SocialButtons onLogin={signInWithProvider} />
               </>
