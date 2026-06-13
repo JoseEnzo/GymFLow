@@ -663,7 +663,7 @@ interface StripeInvoice {
 const PLAN_ORDER = ['personal', 'starter', 'pro'] as const
 
 function PlanTab() {
-  const { currentAcademy } = useAuthStore()
+  const { currentAcademy, currentRole, setCurrentAcademy } = useAuthStore()
   const currentPlan = currentAcademy?.plan ?? 'starter'
   const status = currentAcademy?.subscription_status
   const hasSubscription = !!currentAcademy?.stripe_subscription_id
@@ -677,10 +677,29 @@ function PlanTab() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    if (params.get('success') === '1') {
+    if (params.get('success') !== '1') return
+
+    window.history.replaceState({}, '', '/configuracoes?tab=plano')
+
+    const sessionId = params.get('session_id')
+    // Lê o estado atual do store (evita stale closure) para passar academy_id
+    const { currentAcademy: academy, currentRole: role } = useAuthStore.getState()
+
+    if (!sessionId || !academy?.id) {
       toast.success('Assinatura ativada! Bem-vindo ao plano pago.')
-      window.history.replaceState({}, '', '/configuracoes?tab=plano')
+      return
     }
+
+    // Sincroniza direto com o Stripe antes de exibir o toast, resolvendo a race
+    // condition entre o redirect de sucesso e o webhook de checkout.session.completed.
+    fetch(`/api/billing/verify-session?session_id=${sessionId}&academy_id=${academy.id}`)
+      .then((r) => r.json())
+      .then(({ ready, academy: fresh }) => {
+        if (ready && fresh) setCurrentAcademy(fresh, role)
+        toast.success('Assinatura ativada! Bem-vindo ao plano pago.')
+      })
+      .catch(() => toast.success('Assinatura ativada! Bem-vindo ao plano pago.'))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
