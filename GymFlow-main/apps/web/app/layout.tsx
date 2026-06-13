@@ -47,7 +47,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'MeuTrein',
     description: 'Plataforma SaaS para academias.',
-    creator: '@gymflow',
+    creator: '@meutrein',
   },
   // Verificação da propriedade "Prefixo do URL" no Google Search Console
   // (https://www.meutrein.com.br). Gera <meta name="google-site-verification" ...>.

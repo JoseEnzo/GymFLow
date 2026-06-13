@@ -57,7 +57,7 @@ serve(async (req) => {
       body: JSON.stringify({
         from: 'GymFlow <noreply@gymflow.app>',
         to: email,
-        subject: `Você foi convidado para ${academy.name} no GymFlow`,
+        subject: `Você foi convidado para ${academy.name} no MeuTrein`,
         html: buildInviteEmail({ academyName: academy.name, role, inviteUrl, code }),
       }),
     })
@@ -89,7 +89,7 @@ function buildInviteEmail(params: {
     <body style="font-family: sans-serif; background: #06060F; color: #F1F5F9; padding: 40px 20px; margin:0;">
       <div style="max-width:560px; margin:0 auto; background:#0D0D1F; border-radius:16px; overflow:hidden; border:1px solid #1C1C35;">
         <div style="background:linear-gradient(135deg,#6366F1,#06B6D4); padding:32px; text-align:center;">
-          <h1 style="margin:0; color:white; font-size:28px; font-weight:800;">GymFlow</h1>
+          <h1 style="margin:0; color:white; font-size:28px; font-weight:800;">MeuTrein</h1>
         </div>
         <div style="padding:32px;">
           <h2 style="color:#F1F5F9; font-size:22px;">Você foi convidado!</h2>
@@ -105,7 +105,7 @@ function buildInviteEmail(params: {
             Aceitar convite
           </a>
           <p style="color:#475569; font-size:13px; text-align:center;">
-            Ou acesse gymflow.app e use o código acima.
+            Ou acesse meutrein.com.br e use o código acima.
           </p>
         </div>
       </div>
