@@ -27,6 +27,7 @@ interface Sheet {
   is_active: boolean
   created_at: string
   schedule_type?: string | null
+  scheduled_days?: number[] | null
   student_name?: string | null
   exercise_count?: number
 }
@@ -35,6 +36,8 @@ const SCHEDULE_BADGE: Record<string, string> = {
   weekly: 'Semanal',
   monthly: 'Mensal',
 }
+
+const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 
 function MoreVertical({ className }: { className?: string }) {
   return (
@@ -176,16 +179,29 @@ function SheetCard({ sheet, isPersonal, isStudent, readOnly, onDelete }: {
             <Eye className="w-3.5 h-3.5" />
             Ver ficha
           </Link>
-          {isStudent && !readOnly && (
-            <Link
-              href={`/treinos/executar/${sheet.id}`}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all"
-              style={{ background: `${color}15`, color, border: `1px solid ${color}30` }}
-            >
-              <Play className="w-3 h-3" />
-              Executar
-            </Link>
-          )}
+          {isStudent && !readOnly && (() => {
+            const today = new Date().getDay()
+            const hasSchedule = Array.isArray(sheet.scheduled_days) && sheet.scheduled_days.length > 0
+            const canToday = !hasSchedule || sheet.scheduled_days!.includes(today)
+            if (!canToday) {
+              return (
+                <div className="flex-1 flex flex-col items-center justify-center py-2 rounded-xl text-[10px] font-medium border border-border/40 text-muted-foreground opacity-60 select-none">
+                  <span className="font-semibold">Hoje não é dia</span>
+                  <span className="opacity-70">{sheet.scheduled_days!.map((d) => DAY_LABELS[d]).join(' · ')}</span>
+                </div>
+              )
+            }
+            return (
+              <Link
+                href={`/treinos/executar/${sheet.id}`}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all"
+                style={{ background: `${color}15`, color, border: `1px solid ${color}30` }}
+              >
+                <Play className="w-3 h-3" />
+                Executar
+              </Link>
+            )
+          })()}
         </div>
       </div>
     </motion.div>
@@ -230,7 +246,7 @@ export default function TreinosPage() {
       let query = (supabase as any)
         .from('workout_sheets')
         .select(`
-          id, name, goal, is_active, created_at, student_id, schedule_type,
+          id, name, goal, is_active, created_at, student_id, schedule_type, scheduled_days,
           sheet_exercises ( id )
         `)
         .eq('academy_id', currentAcademy.id)
