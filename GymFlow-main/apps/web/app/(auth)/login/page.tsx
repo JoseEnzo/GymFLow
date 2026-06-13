@@ -113,6 +113,8 @@ function LoginInner() {
   // o destino pretendido se perca e o usuário caia sempre em /dashboard.
   const redirect = searchParams.get('redirect') ?? searchParams.get('next')
   const roleParam = searchParams.get('role') as Role | null
+  // Se o redirect aponta pra /convite/TOKEN, extrai o token pra preservar o contexto de convite
+  const conviteToken = redirect?.startsWith('/convite/') ? redirect.split('/convite/')[1]?.split('?')[0] : null
 
   const [role, setRole] = useState<Role | null>(roleParam)
   const [step, setStep] = useState<'role' | 'form'>(roleParam ? 'form' : 'role')
