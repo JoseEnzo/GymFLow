@@ -25,6 +25,7 @@ function CodigoContent() {
   const [code, setCode] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
+  const [showBackConfirm, setShowBackConfirm] = useState(false)
 
   // Convites antigos têm código de 6 caracteres; novos têm 8.
   const isValidLength = code.length === 6 || code.length === 8
@@ -58,9 +59,36 @@ function CodigoContent() {
 
   return (
     <motion.div initial="hidden" animate="show" className="space-y-6">
+      {showBackConfirm && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-4 bg-black/60">
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="w-full max-w-sm bg-surface-100 rounded-2xl p-5 space-y-4 border border-border/40"
+          >
+            <p className="text-sm text-center leading-relaxed">
+              Se você voltar o seu convite não estará sendo utilizado. Deseja mesmo fazer isso?
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setShowBackConfirm(false)}
+                className="btn-secondary py-2.5 rounded-xl text-sm font-semibold"
+              >
+                Ficar
+              </button>
+              <button
+                onClick={() => router.back()}
+                className="py-2.5 rounded-xl text-sm font-semibold bg-destructive/15 text-red-400 hover:bg-destructive/25 transition-colors"
+              >
+                Sair assim mesmo
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
       <motion.div variants={fadeUp} custom={0} className="space-y-1.5">
         <button
-          onClick={() => router.back()}
+          onClick={() => setShowBackConfirm(true)}
           className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Voltar
