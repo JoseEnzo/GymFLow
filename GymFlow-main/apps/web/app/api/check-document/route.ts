@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server'
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { validateCNPJ, validateCREF, normalizeCREF } from '@/lib/cnpj'
-import { limiters } from '@/lib/rate-limit'
-import { clientIp } from '@/lib/turnstile'
 
 /**
  * Pre-check usado no /cadastro: dado um CNPJ ou CREF, retorna se já
@@ -15,12 +13,6 @@ import { clientIp } from '@/lib/turnstile'
  * sempre retornado mascarado pra evitar enumeração casual.
  */
 export async function POST(request: Request) {
-  const ip = clientIp(request)
-  const { success: rlOk } = await limiters.auth.limit(`check-document:${ip}`)
-  if (!rlOk) {
-    return NextResponse.json({ error: 'Muitas tentativas. Aguarde alguns minutos.' }, { status: 429 })
-  }
-
   let body: { document?: string; type?: string }
   try {
     body = await request.json()

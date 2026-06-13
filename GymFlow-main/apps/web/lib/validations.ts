@@ -8,7 +8,7 @@ import { z } from 'zod'
 
 export const checkoutSchema = z.object({
   academyId: z.string().uuid('academyId inválido'),
-  planId: z.enum(['starter', 'pro'], { message: 'planId deve ser starter ou pro' }),
+  planId: z.enum(['starter', 'pro', 'personal'], { message: 'planId inválido' }),
 })
 
 export const portalSchema = z.object({
