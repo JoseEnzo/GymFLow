@@ -34,11 +34,11 @@ export const metadata: Metadata = {
   keywords: ['academia', 'treino', 'personal trainer', 'fitness', 'gestão de academia'],
   authors: [{ name: 'MeuTrein Team' }],
   creator: 'MeuTrein',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://gymflow.app'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.meutrein.com.br'),
   openGraph: {
     type: 'website',
     locale: 'pt_BR',
-    url: 'https://gymflow.app',
+    url: process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.meutrein.com.br',
     title: 'MeuTrein — Plataforma para Academias',
     description: 'Gerencie treinos, alunos e evolução física com facilidade.',
     siteName: 'MeuTrein',

@@ -82,7 +82,7 @@ export async function GET(request: Request) {
     academies: { name: string } | null
   }>
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://gymflow.app'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.meutrein.com.br'
   let sent = 0
   let skipped = 0
   let errors = 0
