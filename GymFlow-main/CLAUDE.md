@@ -548,7 +548,13 @@ Webhook Stripe (`apps/web/app/api/webhooks/stripe/route.ts`) usa claim atômico 
 
 ## Migrations
 
-**Estado em 2026-06-13:** prod sincronizado até a `071`. As migrations `068`/`069`/`070` (que estavam pendentes — a 069 fechava 3 brechas críticas de RLS) foram aplicadas via `supabase db push` + `db:types` + `type-check` OK. As brechas de RLS não existem mais.
+**Estado em 2026-06-13:** prod sincronizado até a `073`. As migrations `068`/`069`/`070` (que estavam pendentes — a 069 fechava 3 brechas críticas de RLS) foram aplicadas via `supabase db push` + `db:types` + `type-check` OK. As brechas de RLS não existem mais.
+
+**Colisão de número 071 resolvida (jun/2026):** havia DUAS migrations `071` (`071_email_verification` — aplicada — e `071_plan_limits_in_accept_invite` — nunca aplicada). Número duplicado trava o `db push` inteiro (`schema_migrations_pkey` duplicate key). Fix: `plan_limits` renumerada pra `072`, e a nova `bioimpedance_goals` pra `073`. **Regra: nunca reusar número de migration** — checar o maior número existente antes de criar.
+
+**Pegadinha `uuid_generate_v4()` (jun/2026):** migrations antigas (007) usam `uuid_generate_v4()`, mas no push atual ele não está no search_path (`function does not exist`, SQLSTATE 42883). **Use `gen_random_uuid()`** (built-in no Postgres do Supabase) em PK default de tabela nova.
+
+**Metas de bioimpedância (jun/2026):** tabela `bioimpedance_goals` (1 meta ativa por aluno: `metric` + `target_value` + `start_value` baseline). Personal define em `components/bioimpedance/bioimpedance-section.tsx`; aluno vê o progresso em `student-bio-view.tsx`. Barra de progresso compartilhada em `components/bioimpedance/goal-progress.tsx` (`computeGoalProgress` = (atual−start)/(alvo−start), cobre perder E ganhar; animação escala por faixa: start/half/close/done). RLS espelha `bioimpedance_assessments`.
 
 Toda mudança no banco vira um arquivo novo em `supabase/migrations/`. Numeração sequencial (`001…039`) + arquivos `<timestamp>_remote_schema.sql` quando se faz `supabase db pull`.
 

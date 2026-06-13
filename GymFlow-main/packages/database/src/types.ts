@@ -283,6 +283,50 @@ export type Database = {
           },
         ]
       }
+      bioimpedance_goals: {
+        Row: {
+          academy_id: string
+          created_at: string
+          id: string
+          metric: string
+          personal_id: string
+          start_value: number | null
+          student_id: string
+          target_value: number
+          updated_at: string
+        }
+        Insert: {
+          academy_id: string
+          created_at?: string
+          id?: string
+          metric: string
+          personal_id: string
+          start_value?: number | null
+          student_id: string
+          target_value: number
+          updated_at?: string
+        }
+        Update: {
+          academy_id?: string
+          created_at?: string
+          id?: string
+          metric?: string
+          personal_id?: string
+          start_value?: number | null
+          student_id?: string
+          target_value?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bioimpedance_goals_academy_id_fkey"
+            columns: ["academy_id"]
+            isOneToOne: false
+            referencedRelation: "academies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       body_measurements: {
         Row: {
           abdomen_cm: number | null

@@ -7,7 +7,7 @@ import {
   Clock, ChevronRight, Copy, Loader2, Users,
   Link2, CheckCircle2, ClipboardList, ShieldOff,
   AlertCircle, RefreshCw, Trash2, MoreVertical,
-  UserX, CheckCheck, XCircle,
+  UserX, CheckCheck, XCircle, Activity, Salad,
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -185,13 +185,27 @@ function StudentCard({
         </div>
 
         {isPersonal && (
-          <div className="mt-3 pt-3 border-t border-border/40">
+          <div className="mt-3 pt-3 border-t border-border/40 grid grid-cols-3 gap-1.5">
             <Link
               href={`/treinos/novo?studentId=${student.id}`}
-              className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-semibold transition-all bg-brand-500/10 text-brand-300 hover:bg-brand-500/20 border border-brand-500/20"
+              className="flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[11px] font-semibold transition-all bg-brand-500/10 text-brand-300 hover:bg-brand-500/20 border border-brand-500/20"
             >
               <ClipboardList className="w-3.5 h-3.5" />
-              {student.activeSheets > 0 ? 'Nova ficha' : 'Atribuir ficha'}
+              Ficha
+            </Link>
+            <Link
+              href={`/alunos/${student.id}?bio=new`}
+              className="flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[11px] font-semibold transition-all bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 border border-cyan-500/20"
+            >
+              <Activity className="w-3.5 h-3.5" />
+              Bio
+            </Link>
+            <Link
+              href={`/dietas/novo?studentId=${student.id}`}
+              className="flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[11px] font-semibold transition-all bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/20"
+            >
+              <Salad className="w-3.5 h-3.5" />
+              Plano
             </Link>
           </div>
         )}
