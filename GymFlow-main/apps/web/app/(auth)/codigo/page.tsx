@@ -88,7 +88,7 @@ function CodigoContent() {
       )}
       <motion.div variants={fadeUp} custom={0} className="space-y-1.5">
         <button
-          onClick={() => setShowBackConfirm(true)}
+          onClick={() => code.length > 0 ? setShowBackConfirm(true) : router.back()}
           className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-3 transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Voltar
