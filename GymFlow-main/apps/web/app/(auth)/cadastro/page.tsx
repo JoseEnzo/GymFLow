@@ -103,6 +103,7 @@ function CadastroInner() {
   const [inviteRole, setInviteRole] = useState<'personal' | 'student' | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [showBackConfirm, setShowBackConfirm] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
   const [document, setDocument] = useState('')
@@ -190,6 +191,33 @@ function CadastroInner() {
 
   return (
     <motion.div initial="hidden" animate="show" className="space-y-6">
+      {showBackConfirm && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-4 bg-black/60">
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="w-full max-w-sm bg-surface-100 rounded-2xl p-5 space-y-4 border border-border/40"
+          >
+            <p className="text-sm text-center leading-relaxed">
+              Se você voltar o seu convite não estará sendo utilizado. Deseja mesmo fazer isso?
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setShowBackConfirm(false)}
+                className="btn-secondary py-2.5 rounded-xl text-sm font-semibold"
+              >
+                Ficar
+              </button>
+              <button
+                onClick={() => router.push('/')}
+                className="py-2.5 rounded-xl text-sm font-semibold bg-destructive/15 text-red-400 hover:bg-destructive/25 transition-colors"
+              >
+                Sair assim mesmo
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
       <AnimatePresence mode="wait">
 
         {/* ── Etapa 0: escolha de tipo ── */}
@@ -269,15 +297,10 @@ function CadastroInner() {
               {inviteToken ? (
                 <button
                   type="button"
-                  onClick={() => router.push(`/convite/${inviteToken}`)}
-                  className="flex flex-col items-start gap-0.5 text-muted-foreground hover:text-foreground transition-colors mb-3"
+                  onClick={() => setShowBackConfirm(true)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-3"
                 >
-                  <span className="flex items-center gap-1.5 text-xs font-medium">
-                    <ArrowLeft className="w-3.5 h-3.5" /> Voltar
-                  </span>
-                  <span className="text-[10px] text-muted-foreground/70">
-                    Se você voltar o seu convite não estará sendo utilizado
-                  </span>
+                  <ArrowLeft className="w-3.5 h-3.5" /> Voltar
                 </button>
               ) : (
                 <button
