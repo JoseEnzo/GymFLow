@@ -455,12 +455,20 @@ export default function WorkoutSheetDetailPage() {
         )}
         {/* Owner também pode adicionar exercício à ficha — mesma regra do personal */}
         {isPersonal && (
-          <Link
-            href={sheet.schedule_type === 'daily' ? `/exercicios?addTo=${sheet.id}` : `/exercicios?addTo=${sheet.id}&day=${selectedDay}&type=${sheet.schedule_type}`}
-            className="flex-1 btn-secondary py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
-          >
-            <Plus className="w-4 h-4" /> Adicionar exercício
-          </Link>
+          <>
+            <Link
+              href={sheet.schedule_type === 'daily' ? `/exercicios?addTo=${sheet.id}` : `/exercicios?addTo=${sheet.id}&day=${selectedDay}&type=${sheet.schedule_type}`}
+              className="flex-1 btn-secondary py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" /> Adicionar exercício
+            </Link>
+            <Link
+              href="/treinos"
+              className="flex-1 btn-primary py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+            >
+              <Check className="w-4 h-4" /> Concluir
+            </Link>
+          </>
         )}
       </motion.div>
 
