@@ -77,7 +77,7 @@ function CodigoContent() {
                 Ficar
               </button>
               <button
-                onClick={() => router.back()}
+                onClick={() => router.push('/')}
                 className="py-2.5 rounded-xl text-sm font-semibold bg-destructive/15 text-red-400 hover:bg-destructive/25 transition-colors"
               >
                 Sair assim mesmo
