@@ -548,15 +548,7 @@ Webhook Stripe (`apps/web/app/api/webhooks/stripe/route.ts`) usa claim atômico 
 
 ## Migrations
 
-### ⚠️ PENDENTE URGENTE — aplicar migration 069 em produção
-
-A `069_fix_rls_holes.sql` (corrige 3 brechas críticas de RLS — ver "Pegadinhas de policy" acima) foi criada em 2026-06-11 mas **NÃO foi aplicada em prod**: a máquina de dev estava sem Node/pnpm/supabase CLI. **Primeira ação da próxima sessão, assim que as dependências estiverem instaladas:**
-
-1. `pnpm db:push` (aplica a 069 em prod) — alternativa sem CLI: colar o SQL da 069 no SQL Editor do dashboard Supabase.
-2. `pnpm db:types` (regenerar types).
-3. `pnpm type-check` (as mudanças de 2026-06-11 — rate limit reativado, código de convite 8 chars, lookup por código, RLS — nunca passaram por type-check local).
-
-Até a 069 rodar, **qualquer pessoa com a anon key consegue se tornar owner de qualquer academia**. Depois de aplicada e verificada, REMOVER este aviso.
+**Estado em 2026-06-13:** prod sincronizado até a `071`. As migrations `068`/`069`/`070` (que estavam pendentes — a 069 fechava 3 brechas críticas de RLS) foram aplicadas via `supabase db push` + `db:types` + `type-check` OK. As brechas de RLS não existem mais.
 
 Toda mudança no banco vira um arquivo novo em `supabase/migrations/`. Numeração sequencial (`001…039`) + arquivos `<timestamp>_remote_schema.sql` quando se faz `supabase db pull`.
 
@@ -693,6 +685,24 @@ Rodar da **raiz do monorepo** (`GymFlow-main/`), não de `apps/web/`:
 - Rotinas integradas: skill `.claude/skills/run-gymflow/SKILL.md`
 
 ---
+
+## Verificação de e-mail (OTP via Resend) — jun/2026
+
+Política app-side de confirmação de e-mail. **Não usa a confirmação nativa do Supabase** (`enable_confirmations` continua `false`): ligá-la removeria a sessão imediata pós-signup e quebraria o onboarding/criação de academia + tratamento de órfão. Aqui a verificação é um gate da aplicação.
+
+**Mecanismo (OTP 6 dígitos):**
+- Migration `071_email_verification.sql`: coluna `profiles.email_verified_at timestamptz` (gate) + tabela `email_verifications` (guarda só o **hash sha256** do código, nunca o código cru; RLS ligada **sem policy** = só service_role acessa). Backfill: todos os profiles existentes viraram verificados (grandfather) — só contas novas começam com `email_verified_at = null`.
+- Lógica compartilhada em `apps/web/lib/email-verification.ts` (admin client service_role, `generateCode`, `hashCode`, TTL 15min, máx 6 tentativas, cooldown reenvio 30s).
+- `POST /api/auth/send-verification` (sessão obrigatória): gera código, invalida anteriores não consumidos, envia via `lib/resend.ts` + template `lib/email-templates/email-verification.ts`. Idempotente se já verificado. Cooldown de 30s.
+- `POST /api/auth/verify-email` (sessão + Zod `^\d{6}$`): valida hash/expiração/tentativas, marca `consumed_at` + `profiles.email_verified_at = now()`.
+- Página `apps/web/app/(auth)/verificar-email/page.tsx`: input OTP + reenviar com contagem. Auto-envia 1 código no mount. As 2 rotas **não** estão na allowlist do middleware (exigem sessão — o user já está logado pós-signup).
+
+**Gate (3 camadas):**
+1. `signUp` (`hooks/use-auth.ts`) roteia pra `/verificar-email?next=<dest>` em vez de direto ao onboarding.
+2. `/onboarding` redireciona pra `/verificar-email` se `email_verified_at` é null (UX/defesa).
+3. `POST /api/academy` retorna **403 `EMAIL_NOT_VERIFIED`** se não verificado (gate autoritativo server-side — criação de academia é o ponto sensível).
+
+**Pendente:** FROM ainda é sandbox `onboarding@resend.dev` (mesma limitação do email de inatividade — só entrega pro dono da conta Resend até validar domínio). Trocar quando o domínio for verificado.
 
 ## Notificações via Resend
 

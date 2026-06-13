@@ -142,8 +142,10 @@ export function useAuth() {
     if (Array.isArray(identities) && identities.length === 0) {
       throw new Error('Este e-mail já está cadastrado. Faça login.')
     }
-    toast.success('Conta criada com sucesso!')
-    router.push(redirectTo ?? '/onboarding')
+    toast.success('Conta criada! Confirme seu e-mail.')
+    // Gate de verificação: passa por /verificar-email antes do destino final.
+    const dest = redirectTo ?? '/onboarding'
+    router.push(`/verificar-email?next=${encodeURIComponent(dest)}`)
   }
 
   async function signOut() {

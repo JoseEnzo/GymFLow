@@ -27,6 +27,20 @@ export async function POST(request: Request) {
   const { name, plan = 'starter' } = body
   if (!name?.trim()) return NextResponse.json({ error: 'Nome obrigatório' }, { status: 400 })
 
+  // Gate autoritativo de verificação de e-mail (defesa em profundidade — a página
+  // /verificar-email já barra antes, mas a criação de academia é o ponto sensível).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: verifProf } = await (admin.from('profiles') as any)
+    .select('email_verified_at')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (!verifProf?.email_verified_at) {
+    return NextResponse.json(
+      { error: 'Confirme seu e-mail antes de criar a academia.', code: 'EMAIL_NOT_VERIFIED' },
+      { status: 403 },
+    )
+  }
+
   // Modelo é 1 owner = 1 tenant (várias queries usam `.eq('owner_id').single()`).
   // Sem este gate, POSTs repetidos criariam academias ilimitadas pro mesmo user.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

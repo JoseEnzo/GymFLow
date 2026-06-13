@@ -539,6 +539,36 @@ export type Database = {
         }
         Relationships: []
       }
+      email_verifications: {
+        Row: {
+          attempts: number
+          code_hash: string
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       exercises: {
         Row: {
           academy_id: string | null
@@ -970,6 +1000,7 @@ export type Database = {
           created_at: string
           cref: string | null
           email: string | null
+          email_verified_at: string | null
           full_name: string | null
           gender: string | null
           goal: string | null
@@ -988,6 +1019,7 @@ export type Database = {
           created_at?: string
           cref?: string | null
           email?: string | null
+          email_verified_at?: string | null
           full_name?: string | null
           gender?: string | null
           goal?: string | null
@@ -1006,6 +1038,7 @@ export type Database = {
           created_at?: string
           cref?: string | null
           email?: string | null
+          email_verified_at?: string | null
           full_name?: string | null
           gender?: string | null
           goal?: string | null
@@ -1489,6 +1522,28 @@ export type Database = {
         Returns: string
       }
       generate_academy_slug: { Args: { name: string }; Returns: string }
+      get_academy_reports: {
+        Args: {
+          p_academy_id: string
+          p_month_start: string
+          p_prev_week_start: string
+          p_tz: string
+          p_week_start: string
+          p_year_ago: string
+        }
+        Returns: Json
+      }
+      get_frequency_stats: {
+        Args: {
+          p_academy_id: string
+          p_month_start: string
+          p_student_id: string
+          p_tz: string
+          p_week_start: string
+          p_year_ago: string
+        }
+        Returns: Json
+      }
       get_owner_dashboard: {
         Args: {
           p_academy_id: string

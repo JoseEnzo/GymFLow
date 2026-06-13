@@ -86,6 +86,18 @@ function OnboardingContent() {
           return
         }
 
+        // Gate de verificação de e-mail: não verificado → confirma antes do onboarding.
+        // Cast: o client tipado infere `never` no select pontual (dívida conhecida).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: prof } = await (supabase.from('profiles') as any)
+          .select('email_verified_at')
+          .eq('id', data.user.id)
+          .maybeSingle()
+        if (prof && !prof.email_verified_at) {
+          router.replace('/verificar-email?next=/onboarding')
+          return
+        }
+
         const accountType = data.user.user_metadata?.['account_type'] as string | undefined
         setAccountType(accountType ?? null)
         const doc = data.user.user_metadata?.['document'] as string | undefined
