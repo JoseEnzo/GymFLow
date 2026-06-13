@@ -4,11 +4,15 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { validateCNPJ, validateCPF, validateCREF, normalizeCREF } from '@/lib/cnpj'
 import { lookupSchema } from '@/lib/validations'
 import { verifyTurnstileToken, clientIp } from '@/lib/turnstile'
+import { rateLimit, tooManyRequests, RATE_LIMITS } from '@/lib/rate-limit'
 
 const GENERIC_ERROR = 'Credenciais inválidas'
 
 export async function POST(request: Request) {
   const ip = clientIp(request)
+
+  const rl = rateLimit(`auth-lookup:${ip}`, RATE_LIMITS.auth)
+  if (!rl.success) return tooManyRequests(rl.retryAfterSec)
 
   // Parse + valida body
   let rawBody: unknown

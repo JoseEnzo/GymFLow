@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 
 import { requireAuth } from '@/lib/api-guard'
+import { clientIp } from '@/lib/turnstile'
+import { rateLimit, tooManyRequests, RATE_LIMITS } from '@/lib/rate-limit'
 
 const admin = createAdminClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,6 +24,10 @@ export async function POST(request: Request) {
   const authResult = await requireAuth()
   if (authResult instanceof NextResponse) return authResult
   const user = authResult
+
+  // Limite por IP: trava brute-force de token de convite mesmo autenticado.
+  const rl = rateLimit(`invite-accept:${clientIp(request)}`, RATE_LIMITS.invite)
+  if (!rl.success) return tooManyRequests(rl.retryAfterSec)
 
   let token: string
   try {

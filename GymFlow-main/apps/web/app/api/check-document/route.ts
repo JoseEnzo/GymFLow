@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { validateCNPJ, validateCREF, normalizeCREF } from '@/lib/cnpj'
+import { clientIp } from '@/lib/turnstile'
+import { rateLimit, tooManyRequests, RATE_LIMITS } from '@/lib/rate-limit'
 
 /**
  * Pre-check usado no /cadastro: dado um CNPJ ou CREF, retorna se já
@@ -13,6 +15,11 @@ import { validateCNPJ, validateCREF, normalizeCREF } from '@/lib/cnpj'
  * sempre retornado mascarado pra evitar enumeração casual.
  */
 export async function POST(request: Request) {
+  // Rota pública sem Turnstile + faz scan pesado (listUsers) — rate limit por IP
+  // é a primeira barreira contra DoS/enumeração.
+  const rl = rateLimit(`check-document:${clientIp(request)}`, RATE_LIMITS.checkDocument)
+  if (!rl.success) return tooManyRequests(rl.retryAfterSec)
+
   let body: { document?: string; type?: string }
   try {
     body = await request.json()

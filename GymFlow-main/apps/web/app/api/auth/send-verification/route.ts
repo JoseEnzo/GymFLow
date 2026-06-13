@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 
 import { requireAuth } from '@/lib/api-guard'
+import { clientIp } from '@/lib/turnstile'
+import { rateLimit, tooManyRequests, RATE_LIMITS } from '@/lib/rate-limit'
 import { resend, FROM_EMAIL, isResendConfigured } from '@/lib/resend'
 import { emailVerificationEmail } from '@/lib/email-templates/email-verification'
 import {
@@ -20,6 +22,11 @@ export async function POST(request: Request) {
   if (!user.email) {
     return NextResponse.json({ error: 'Conta sem e-mail.' }, { status: 400 })
   }
+
+  // Limite por IP além do cooldown por usuário: protege a quota do Resend de
+  // muitas contas diferentes disparando emails do mesmo ponto (free tier 100/dia).
+  const rl = rateLimit(`send-verification:${clientIp(request)}`, RATE_LIMITS.sendEmail)
+  if (!rl.success) return tooManyRequests(rl.retryAfterSec)
 
   // Já verificado → nada a fazer (idempotente; o client redireciona).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

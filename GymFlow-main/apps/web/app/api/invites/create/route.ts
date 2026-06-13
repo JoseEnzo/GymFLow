@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 
 import { requireAuth } from '@/lib/api-guard'
+import { rateLimit, tooManyRequests, RATE_LIMITS } from '@/lib/rate-limit'
 
 const admin = createAdminClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,6 +14,10 @@ export async function POST(request: Request) {
   const authResult = await requireAuth()
   if (authResult instanceof NextResponse) return authResult
   const user = authResult
+
+  // Limite por usuário: evita geração em massa de convites por uma conta.
+  const rl = rateLimit(`invite-create:${user.id}`, RATE_LIMITS.invite)
+  if (!rl.success) return tooManyRequests(rl.retryAfterSec)
 
   let body: { academyId?: string; role?: string; expiresAt?: string | null; usesLimit?: number | null }
   try {

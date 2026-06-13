@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 
+import { clientIp } from '@/lib/turnstile'
+import { rateLimit, tooManyRequests, RATE_LIMITS } from '@/lib/rate-limit'
 
 const admin = createAdminClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,6 +34,10 @@ function isExhausted(row: InviteRow) {
 }
 
 export async function GET(request: Request) {
+  // Rota pública (preview de convite) — limite por IP contra brute-force de código.
+  const rl = rateLimit(`invite-lookup:${clientIp(request)}`, RATE_LIMITS.invite)
+  if (!rl.success) return tooManyRequests(rl.retryAfterSec)
+
   const { searchParams } = new URL(request.url)
   const token = searchParams.get('token')?.trim() ?? ''
   const code = searchParams.get('code')?.trim().toUpperCase() ?? ''
