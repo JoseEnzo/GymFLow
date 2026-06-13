@@ -266,7 +266,20 @@ function CadastroInner() {
           >
             {/* Header */}
             <div className="space-y-1.5">
-              {!inviteToken && (
+              {inviteToken ? (
+                <button
+                  type="button"
+                  onClick={() => router.push(`/convite/${inviteToken}`)}
+                  className="flex flex-col items-start gap-0.5 text-muted-foreground hover:text-foreground transition-colors mb-3"
+                >
+                  <span className="flex items-center gap-1.5 text-xs font-medium">
+                    <ArrowLeft className="w-3.5 h-3.5" /> Voltar
+                  </span>
+                  <span className="text-[10px] text-muted-foreground/70">
+                    Se você voltar o seu convite não estará sendo utilizado
+                  </span>
+                </button>
+              ) : (
                 <button
                   type="button"
                   onClick={() => setStep(0)}
@@ -508,7 +521,12 @@ function CadastroInner() {
 
             <p className="text-center text-sm text-muted-foreground">
               Já tem uma conta?{' '}
-              <Link href="/login" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
+              <Link
+                href={inviteToken
+                  ? `/login?redirect=/convite/${inviteToken}&role=${inviteRole ?? accountType}`
+                  : '/login'}
+                className="text-brand-400 hover:text-brand-300 font-semibold transition-colors"
+              >
                 Fazer login
               </Link>
             </p>
