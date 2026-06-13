@@ -260,7 +260,10 @@ function LoginInner() {
 
         <motion.p variants={fadeUp} custom={4} className="text-center text-sm text-muted-foreground">
           Não tem uma conta?{' '}
-          <Link href="/cadastro" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
+          <Link
+            href={conviteToken ? `/cadastro?token=${conviteToken}` : '/cadastro'}
+            className="text-brand-400 hover:text-brand-300 font-semibold transition-colors"
+          >
             Criar conta grátis
           </Link>
         </motion.p>
@@ -396,13 +399,16 @@ function LoginInner() {
       {role === 'student' && (
         <motion.p variants={fadeUp} custom={6} className="text-center text-sm text-muted-foreground">
           Não tem uma conta?{' '}
-          <Link href="/cadastro" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
+          <Link
+            href={conviteToken ? `/cadastro?token=${conviteToken}` : '/cadastro'}
+            className="text-brand-400 hover:text-brand-300 font-semibold transition-colors"
+          >
             Criar conta grátis
           </Link>
         </motion.p>
       )}
 
-      {role === 'student' && (
+      {role === 'student' && !conviteToken && (
         <motion.p variants={fadeUp} custom={7} className="text-center text-sm text-muted-foreground">
           Recebeu um código de convite?{' '}
           <Link href="/codigo" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
@@ -414,7 +420,10 @@ function LoginInner() {
       {role === 'owner' && (
         <motion.p variants={fadeUp} custom={6} className="text-center text-sm text-muted-foreground">
           Ainda não tem academia?{' '}
-          <Link href="/cadastro" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
+          <Link
+            href={conviteToken ? `/cadastro?token=${conviteToken}` : '/cadastro'}
+            className="text-brand-400 hover:text-brand-300 font-semibold transition-colors"
+          >
             Cadastrar academia
           </Link>
         </motion.p>
@@ -423,13 +432,16 @@ function LoginInner() {
       {role === 'personal' && (
         <motion.p variants={fadeUp} custom={6} className="text-center text-sm text-muted-foreground">
           Não tem uma conta?{' '}
-          <Link href="/cadastro" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
+          <Link
+            href={conviteToken ? `/cadastro?token=${conviteToken}` : '/cadastro'}
+            className="text-brand-400 hover:text-brand-300 font-semibold transition-colors"
+          >
             Criar conta grátis
           </Link>
         </motion.p>
       )}
 
-      {role === 'personal' && (
+      {role === 'personal' && !conviteToken && (
         <motion.p variants={fadeUp} custom={7} className="text-center text-sm text-muted-foreground">
           Recebeu um código de convite?{' '}
           <Link href="/codigo" className="text-brand-400 hover:text-brand-300 font-semibold transition-colors">
