@@ -697,7 +697,7 @@ function PlanTab() {
       .finally(() => setLoadingInvoices(false))
   }, [currentAcademy?.id])
 
-  async function handleUpgrade(planId: 'starter' | 'pro') {
+  async function handleUpgrade(planId: 'starter' | 'pro' | 'personal') {
     if (!currentAcademy) return
     setLoadingCheckout(planId)
     try {
@@ -749,6 +749,7 @@ function PlanTab() {
     if (status === 'active' && periodEnd) {
       return `Renova em ${new Date(periodEnd).toLocaleDateString('pt-BR')}`
     }
+    if (!status && currentPlan !== 'free' && !currentAcademy?.stripe_subscription_id) return 'Aguardando pagamento'
     return 'Plano gratuito'
   }
 
@@ -757,6 +758,7 @@ function PlanTab() {
     if (status === 'past_due') return 'text-red-400'
     if (status === 'canceled') return 'text-muted-foreground'
     if (status === 'active') return 'text-emerald-400'
+    if (!status && currentPlan !== 'free' && !currentAcademy?.stripe_subscription_id) return 'text-amber-400'
     return 'text-muted-foreground'
   }
 
@@ -827,7 +829,18 @@ function PlanTab() {
                 <p className="text-xs text-muted-foreground">{plan.limit}</p>
               </div>
               {isCurrentPlan ? (
-                <span className="badge-success text-[10px]">Atual</span>
+                !hasSubscription && currentPlan !== 'free' ? (
+                  <button
+                    onClick={() => handleUpgrade(currentPlan as 'starter' | 'pro' | 'personal')}
+                    disabled={loadingCheckout !== null}
+                    className="text-xs text-amber-400 font-semibold flex items-center gap-1 hover:underline disabled:opacity-50"
+                  >
+                    {loadingCheckout === currentPlan ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                    Pagar agora <ExternalLink className="w-3 h-3" />
+                  </button>
+                ) : (
+                  <span className="badge-success text-[10px]">Atual</span>
+                )
               ) : isUpgrade ? (
                 hasSubscription ? (
                   <button
@@ -840,7 +853,7 @@ function PlanTab() {
                   </button>
                 ) : (
                   <button
-                    onClick={() => handleUpgrade(plan.id as 'starter' | 'pro')}
+                    onClick={() => handleUpgrade(plan.id as 'starter' | 'pro' | 'personal')}
                     disabled={loadingCheckout !== null}
                     className="text-xs text-brand-400 font-semibold flex items-center gap-1 hover:underline disabled:opacity-50"
                   >

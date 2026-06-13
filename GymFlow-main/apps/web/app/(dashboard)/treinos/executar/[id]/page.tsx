@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, Check, Timer, Dumbbell,
-  X, Flame, Volume2, VolumeX, Trophy, Loader2,
+  X, Flame, Volume2, VolumeX, Trophy, Loader2, CalendarDays,
 } from 'lucide-react'
 
 const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
@@ -63,6 +63,7 @@ export default function ExecutarTreinoPage() {
   const [exercises, setExercises] = useState<ExerciseSlot[]>([])
   const [sheetName, setSheetName] = useState('')
   const [scheduleType, setScheduleType] = useState<'daily' | 'weekly' | 'monthly'>('daily')
+  const [scheduledDays, setScheduledDays] = useState<number[]>([])
   const [availableDays, setAvailableDays] = useState<number[]>([])
   const [selectedDay, setSelectedDay] = useState<number>(initialDay)
   const [loading, setLoading] = useState(true)
@@ -89,7 +90,7 @@ export default function ExecutarTreinoPage() {
       const { data, error } = await (supabase as any)
         .from('workout_sheets')
         .select(`
-          id, name, schedule_type,
+          id, name, schedule_type, scheduled_days,
           sheet_exercises (
             id, sets, reps, rest_seconds, weight_suggestion, notes, order_index, day_index,
             exercise:exercises ( id, name_pt )
@@ -118,6 +119,7 @@ export default function ExecutarTreinoPage() {
       const sheetSchedule = (data.schedule_type ?? 'daily') as 'daily' | 'weekly' | 'monthly'
       setScheduleType(sheetSchedule)
       setSheetName(data.name)
+      setScheduledDays(data.scheduled_days ?? [])
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const allRows: any[] = (data.sheet_exercises ?? [])
@@ -519,6 +521,37 @@ export default function ExecutarTreinoPage() {
     return (
       <div className="flex items-center justify-center py-24">
         <Loader2 className="w-6 h-6 animate-spin text-brand-400" />
+      </div>
+    )
+  }
+
+  const todayDay = new Date().getDay()
+  const notToday =
+    scheduleType === 'daily' &&
+    scheduledDays.length > 0 &&
+    !scheduledDays.includes(todayDay)
+
+  if (notToday) {
+    return (
+      <div className="max-w-sm mx-auto text-center space-y-5 py-16">
+        <div className="w-16 h-16 rounded-2xl bg-surface-200 flex items-center justify-center mx-auto">
+          <CalendarDays className="w-8 h-8 text-muted-foreground/40" />
+        </div>
+        <div>
+          <h2 className="font-display font-bold text-lg">Hoje não é dia deste treino</h2>
+          <p className="text-sm text-muted-foreground mt-2">
+            Este treino está programado para:{' '}
+            <span className="font-semibold text-foreground">
+              {scheduledDays.map((d) => DAY_LABELS[d]).join(', ')}
+            </span>
+          </p>
+        </div>
+        <button
+          onClick={() => router.back()}
+          className="btn-secondary py-2.5 px-6 rounded-xl text-sm font-semibold"
+        >
+          Voltar
+        </button>
       </div>
     )
   }
