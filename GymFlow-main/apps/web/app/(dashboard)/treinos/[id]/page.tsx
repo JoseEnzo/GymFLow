@@ -48,9 +48,16 @@ interface WorkoutSheet {
   created_at: string
   scheduled_days: number[]
   schedule_type: 'daily' | 'weekly' | 'monthly'
+  student_id: string
   student?: { full_name: string | null } | null
   exercises: SheetExercise[]
 }
+
+// Fichas geradas por split são nomeadas "Treino A — <objetivo>" em /treinos/novo.
+// Esse regex reconhece esse padrão pra agrupar as irmãs (mesmo aluno + mesmo sufixo).
+const SPLIT_NAME_RE = /^Treino ([A-F]) — (.+)$/
+
+interface SplitSibling { id: string; letter: string }
 
 const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
 const WEEK_LABELS = ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4']
@@ -244,6 +251,7 @@ export default function WorkoutSheetDetailPage() {
   const isPersonal = currentRole === 'owner' || currentRole === 'personal'
 
   const [sheet, setSheet] = useState<WorkoutSheet | null>(null)
+  const [siblings, setSiblings] = useState<SplitSibling[]>([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [savingDays, setSavingDays] = useState(false)
@@ -257,7 +265,7 @@ export default function WorkoutSheetDetailPage() {
       const { data, error } = await (supabase as any)
         .from('workout_sheets')
         .select(`
-          id, name, goal, description, is_active, created_at, scheduled_days, schedule_type,
+          id, name, goal, description, is_active, created_at, scheduled_days, schedule_type, student_id,
           sheet_exercises (
             id, sets, reps, rest_seconds, weight_suggestion, notes, order_index, day_index,
             exercise:exercises ( id, name_pt, muscle_groups )
@@ -280,6 +288,30 @@ export default function WorkoutSheetDetailPage() {
         ),
       })
       setLoading(false)
+
+      // Se a ficha faz parte de um split (nome "Treino X — objetivo"), busca as irmãs
+      // do mesmo aluno com o mesmo sufixo pra montar o navegador A/B/C.
+      const m = (data.name as string).match(SPLIT_NAME_RE)
+      if (m && data.student_id) {
+        const suffix = m[2]
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: sibs } = await (supabase as any)
+          .from('workout_sheets')
+          .select('id, name')
+          .eq('academy_id', currentAcademy.id)
+          .eq('student_id', data.student_id)
+        const list: SplitSibling[] = (sibs ?? [])
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((s: any) => {
+            const sm = (s.name as string).match(SPLIT_NAME_RE)
+            return sm && sm[2] === suffix ? { id: s.id, letter: sm[1] } : null
+          })
+          .filter((x: SplitSibling | null): x is SplitSibling => x !== null)
+          .sort((a: SplitSibling, b: SplitSibling) => a.letter.localeCompare(b.letter))
+        setSiblings(list.length > 1 ? list : [])
+      } else {
+        setSiblings([])
+      }
     }
     load()
   }, [id, currentAcademy])
@@ -375,6 +407,32 @@ export default function WorkoutSheetDetailPage() {
           </div>
         </div>
       </motion.div>
+
+      {/* Navegador de split — pula entre as fichas A/B/C do mesmo aluno */}
+      {siblings.length > 1 && (
+        <motion.div custom={0.5} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-3">
+          <p className="text-[11px] text-muted-foreground mb-2 px-1">Fichas deste split — monte cada uma:</p>
+          <div className="flex gap-1.5 flex-wrap">
+            {siblings.map((sib) => {
+              const active = sib.id === sheet.id
+              return (
+                <Link
+                  key={sib.id}
+                  href={`/treinos/${sib.id}`}
+                  className={cn(
+                    'w-10 h-10 rounded-xl text-sm font-display font-bold flex items-center justify-center transition-all',
+                    active
+                      ? 'bg-brand-500 text-white shadow-[0_0_12px_rgba(99,102,241,0.3)]'
+                      : 'bg-surface-200 text-muted-foreground hover:text-foreground hover:bg-surface-300'
+                  )}
+                >
+                  {sib.letter}
+                </Link>
+              )
+            })}
+          </div>
+        </motion.div>
+      )}
 
       {/* Description */}
       {sheet.description && (
