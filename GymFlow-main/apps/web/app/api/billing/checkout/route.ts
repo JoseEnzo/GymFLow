@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       academyId,
       planId,
       customerId: (academy as { stripe_customer_id: string | null } | null)?.stripe_customer_id ?? undefined,
-      successUrl: `${origin}/configuracoes?tab=plano&success=1`,
+      successUrl: `${origin}/configuracoes?tab=plano&success=1&session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${origin}/configuracoes?tab=plano`,
     })
     return NextResponse.json({ url: session.url })
