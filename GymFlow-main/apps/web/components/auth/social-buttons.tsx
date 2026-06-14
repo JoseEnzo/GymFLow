@@ -32,6 +32,15 @@ interface SocialButtonsProps {
 export function SocialButtons({ onLogin, label = 'Continuar com' }: SocialButtonsProps) {
   const [loading, setLoading] = React.useState<Provider | null>(null)
 
+  // Ao voltar pro login pelo "voltar" do navegador, a página é restaurada do
+  // bfcache com o loading do OAuth ainda ligado (o redirect saiu da página mas
+  // o estado ficou). pageshow dispara nesse retorno e cancela o spinner travado.
+  React.useEffect(() => {
+    const reset = () => setLoading(null)
+    window.addEventListener('pageshow', reset)
+    return () => window.removeEventListener('pageshow', reset)
+  }, [])
+
   async function handle(provider: Provider) {
     setLoading(provider)
     try { await onLogin(provider) }

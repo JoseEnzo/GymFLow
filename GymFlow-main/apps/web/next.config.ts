@@ -82,7 +82,7 @@ const SECURITY_HEADERS = [
       "font-src 'self'",
       "worker-src 'self' blob:",
       "manifest-src 'self'",
-      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://maps.googleapis.com${isDev ? ' http://localhost:54321 ws://localhost:54321' : ''}`,
+      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://maps.googleapis.com https://challenges.cloudflare.com${isDev ? ' http://localhost:54321 ws://localhost:54321' : ''}`,
       "frame-src https://js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com",
       "object-src 'none'",
       "base-uri 'self'",
