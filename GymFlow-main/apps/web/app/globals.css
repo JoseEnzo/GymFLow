@@ -97,6 +97,23 @@
       radial-gradient(ellipse 65% 50% at 80% 95%, rgba(8, 145, 178, 0.05) 0%, transparent 60%);
   }
 
+  /* Camada de ruído (dithering) por cima do gradiente fixo.
+     Os gradientes escuros do ::before mostram banding ("degraus"/pixels) porque
+     a cor é 8-bit e as transições são longas e sutis. Um ruído SVG tileado em
+     opacidade baixíssima dissolve esses degraus sem alterar o visual nem o
+     desempenho (é estático, fixo, não re-pinta no scroll). pointer-events:none
+     pra não capturar clique. */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.022;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 160px 160px;
+  }
+
   ::selection {
     background: rgba(99, 102, 241, 0.3);
     color: #f1f5f9;
@@ -296,6 +313,9 @@
   /* Mesh background */
   .bg-mesh {
     background-image:
+      /* ruído (dithering) no topo — dissolve o banding dos gradientes abaixo
+         sem mudar o visual; alpha baixa bakeada no SVG (feFuncA slope) */
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.04'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
       /* tint diagonal base — une todo o gradiente */
       linear-gradient(155deg, rgba(25, 15, 55, 0.22) 0%, transparent 42%, rgba(4, 26, 48, 0.18) 100%),
       /* canto sup-esq — bloom índigo */
@@ -310,6 +330,8 @@
       radial-gradient(ellipse 70% 50% at 20% 95%,  rgba(99, 102, 241, 0.12) 0%, transparent 65%),
       /* canto inf-dir — bloom ciano escuro */
       radial-gradient(ellipse 65% 50% at 80% 95%,  rgba(8, 145, 178, 0.10) 0%, transparent 60%);
+    background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+    background-size: 160px 160px, auto, auto, auto, auto, auto, auto, auto;
   }
 
   /* Safe area for mobile */
