@@ -751,7 +751,8 @@ function ReceitasContent() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selectedMeal, setSelectedMeal] = useState<MealType | null>(mealParam ?? null)
-  const [showModal, setShowModal] = useState(false)
+  // Abre direto o modal de criação quando vem do "+ Novo" do header (?novo=1).
+  const [showModal, setShowModal] = useState(searchParams.get('novo') === '1' && isPersonal)
   const [adding, setAdding] = useState<string | null>(null)
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set())
   const [addedFoodIds, setAddedFoodIds] = useState<Set<string>>(new Set())

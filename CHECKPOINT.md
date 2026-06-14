@@ -1,5 +1,70 @@
 # Checkpoint
 
+## 2026-06-14 ~20:30 — Header: "+ Novo", busca (⌘K) e sino com função
+
+**Tarefa:** dar função aos botões/inputs do header (screenshot): o "+ Novo" abre menu de criação (nova ficha/rotina/treino, nova receita, etc.), a busca e o sino também passam a funcionar.
+
+**Feito (working tree, NÃO commitado, type-check OK):**
+- **"+ Novo" → dropdown role-aware (owner/personal):** Nova ficha de treino → `/treinos/novo`; Novo plano alimentar → `/dietas/novo`; Nova receita → `/receitas?novo=1`; Novo exercício → `/exercicios?novo=1`. Aluno NÃO vê o botão (não cria nada). Decisão: "ficha = rotina = treino" no app → 1 item só ("Nova ficha de treino").
+- **Busca (input desktop + ícone mobile) + ⌘K/Ctrl+K → command palette** novo componente. Filtra (sem acento) ações "Criar" + páginas que o papel vê (reusa `NAV_ITEMS` do sidebar com mesmo filtro de plano solo). ↑/↓ + Enter navega, Esc/clique-fora fecha.
+- **Sino → painel "Notificações"** estado vazio honesto ("Você está em dia") + link "Ver solicitações" (`/solicitacoes`) só owner/personal. Removido o pontinho vermelho fixo (fingia não-lida).
+- **Avatar:** migrado pro mesmo controle `openMenu` ('user'|'novo'|'bell'|null) — abrir um fecha os outros, clique-fora fecha tudo (clusterRef).
+- **`?novo=1`:** receitas/exercicios abrem o modal de criação direto (gate `&& isPersonal`).
+
+**Arquivos tocados:**
+- NOVO `apps/web/lib/quick-create.ts` — `getQuickCreateActions(role)`, fonte única das 4 ações (header + palette).
+- NOVO `apps/web/components/layout/command-palette.tsx` — modal de busca/comando.
+- `apps/web/components/layout/header.tsx` — reescrito o cluster da direita (3 dropdowns + palette + ⌘K).
+- `apps/web/components/layout/sidebar.tsx` — `export const NAV_ITEMS` (reuso pela palette).
+- `apps/web/app/(dashboard)/exercicios/page.tsx` + `receitas/page.tsx` — showModal inicial lê `?novo=1`.
+
+**Próximos passos:**
+- [ ] Subir dev (`doppler run -- pnpm --filter @gymflow/web dev`) e conferir visual nos 3 papéis.
+- [ ] Commitar se aprovado (2 novos + 4 editados; `sw.js` e CHECKPOINT.md já estavam M).
+- [ ] (Opcional) limpar `?novo=1` da URL após abrir o modal — hoje fica no histórico igual aos params `addTo`/`meal` existentes.
+
+**Como retomar:** type-check passou; nada commitado. Falta só verificação visual e commit.
+
+## 2026-06-14 ~18:10 — Auditoria de bugs do site: SEM erros que quebrem nada ✅
+
+**Tarefa:** usuário pediu "procure erros que comprometam o funcionamento do site, em tudo, quero tudo funcionando perfeitamente". Varredura ampla por bugs.
+
+**Resultado — site saudável, nenhum bug crítico encontrado:**
+- **Portas automáticas (todas ✅):** `tsc --noEmit` 0 erros · `next lint` 0 erros (só warnings `exhaustive-deps` intencionais) · `next build` produção exit 0, **60 rotas compilaram**.
+- **Revisado à mão (sólido):** billing-banner + webhooks/stripe + verify-session (lógica trialing/trial_ends_at correta e consistente) · profile-completion-banner/brand-logo/navigation-progress/layout · use-auth (useMemo evita loop) · auth-store (refaz currentAcademy do banco) · middleware (guard sessão) · finishWorkout + fila offline (idempotência client_id).
+- **Classes de crash checadas:** todos os `JSON.parse` em try/catch · `useSearchParams` todos sob `<Suspense>` · nenhum `reduce` sem seed.
+
+**Itens menores (dívida técnica, NÃO quebram nada):**
+- ~18 warnings `react-hooks/exhaustive-deps` (deliberados — omitir `supabase`/`load` evita re-render loop).
+- Vários componentes chamam `createClient()` no corpo em vez de `useMemo` (mitigado por omitir das deps; padrão recomendado é useMemo). Páginas de realtime já corretas.
+
+**Próximos passos (se o usuário quiser ir além do estático):**
+- [ ] (a) Smoke test ao vivo: `pnpm dev` (precisa Doppler logado) → testar telas principais.
+- [ ] (b) Investigar tela/ação específica SE o usuário relatar sintoma concreto.
+- [ ] Limpeza opcional: remover dead code `components/layout/navigation-progress.tsx` (existe `ui/navigation-progress.tsx` em uso).
+
+**Como retomar:** nada foi alterado nesta sessão (só leitura/análise). Working tree continua limpo no commit 845a954. Build/type-check/lint passam. Para achar bugs além do estático, precisa rodar o app com dados reais (Doppler+Supabase) — pedir ao usuário um sintoma concreto antes de varrer no escuro.
+
+## 2026-06-14 ~15:33 — TUDO COMMITADO ✅ (commit 845a954, working tree limpo)
+
+**Estado:** branch `Branch_Jose` sincronizada com origin, working tree **limpo**. O commit `845a954 "Configurações gerais"` empacotou as 3 levas abaixo (logo, profile-completion-banner, aviso de trial) + CHECKPOINT.md + CLAUDE.md. Nada pendente de commit.
+
+**Arquivos no commit 845a954:**
+- `apps/web/components/ui/navigation-progress.tsx` (+3) — guard mesma-rota (fix linha travada)
+- `apps/web/components/layout/brand-logo.tsx` (+15) — onClick scroll-top + refresh
+- `apps/web/components/layout/profile-completion-banner.tsx` (novo, +97) — aviso cadastro incompleto
+- `apps/web/app/(dashboard)/layout.tsx` (+2) — monta o banner
+- `apps/web/components/layout/billing-banner.tsx` (+13) — aviso fim de trial vermelho
+- `apps/web/app/api/webhooks/stripe/route.ts` (+14) e `apps/web/app/api/billing/verify-session/route.ts` (+14) — grava status real + trial_ends_at
+- `GymFlow-main/CLAUDE.md` (+4) — pegadinha do estado de trial
+
+**Próximos passos (só verificação visual, opcional):**
+- [ ] `run` app → clicar logo na home (sem linha travada).
+- [ ] Ver profile-completion-banner com conta incompleta no dashboard.
+- [ ] Banner trial: seedar academia `subscription_status='trialing'` + `trial_ends_at` ~2 dias à frente (bypass Stripe dev não simula).
+
+**Como retomar:** tudo commitado e type-check OK; sem migration nova. Dead code candidato a remoção: `components/layout/navigation-progress.tsx`. Os blocos abaixo são o histórico detalhado de cada leva.
+
 ## 2026-06-14 — Aviso de cadastro incompleto (todos os papéis) ✅ type-check OK
 
 **Tarefa:** quando o usuário se cadastra ou faltam dados da conta, mostrar um aviso pra preencher. Vale pros 3 papéis (ex.: telefone do aluno, e-mail da academia, especialidade do personal).
