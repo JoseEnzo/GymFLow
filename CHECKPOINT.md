@@ -1,5 +1,49 @@
 # Checkpoint
 
+## 2026-06-14 16:55 — Migration 075 APLICADA em PROD ✅ + types + smoke test OK
+
+**Feito:**
+- **Migration 075 aplicada em produção.** Pegadinha resolvida: havia um **072 órfão** (`072_realtime_workout_sheets.sql` local, não no histórico remoto — colisão de nº) que fazia `--include-all` tentar reaplicar versão 072 (duplicate key). Solução segura: movi o 072 pra /tmp (já está aplicado de fato + é idempotente), `db push --include-all` aplicou SÓ o 075, e devolvi o 072 ao folder. Histórico remoto agora tem 075.
+- **`pnpm db:types` regenerado** (via `npx supabase gen types --linked`): `contact_requests` + `get_public_academies` agora nos types (1863 linhas). `type-check` OK.
+- **Smoke test em PROD:** `curl` na RPC `get_public_academies` com a anon key retornou as academias com contagens e SÓ colunas públicas (sem PII). Path público funciona em produção.
+- Comando usado p/ aplicar (caso precise de novo): mover 072 órfão → `npx supabase db push --include-all` → devolver 072. CLI já tem sessão/senha salva (conecta sem pedir).
+
+**Pendências:**
+- [ ] Testar o fluxo visual em http://localhost:3334/academias (lista → detalhe → pedir convite → cair em /solicitacoes). Backend já validado.
+- [ ] **Opcional:** remover os `as any` comentados (`solicitacoes/page.tsx`, `academias/page.tsx`, `[slug]/page.tsx`) agora que os types existem — type-check passa com ou sem.
+- [ ] Commitar tudo (BeforeAfter+TrustStrip, fixes FPS, feature academias inteira). Nada commitado ainda.
+- [ ] (antigas) login Google apex vs www; @ Instagram.
+
+**Como retomar:** feature 100% funcional em prod (migration + types + RPC verificada). Falta só teste visual e commit.
+
+## 2026-06-14 16:30 — Feature "Academias cadastradas" CONSTRUÍDA ✅ (type-check OK, migration NÃO aplicada)
+
+**Tarefa / objetivo:** página pública de academias na navbar da landing. Lista academias (read-only), detalhe mostra CONTAGENS (alunos/personais), e "pedir convite" deixando email/telefone/whatsapp → cai numa caixa de solicitações no dashboard da academia.
+
+**DECISÃO DE PRIVACIDADE (importante):** o usuário pediu "ver os alunos da academia" publicamente. EU ALERTEI que expor nomes de alunos/personais à internet = violação LGPD + contradiz isolamento multi-tenant + o selo "LGPD" da landing. Usuário concordou: **mostrar só CONTAGENS (números), nunca nomes.** Caixa de solicitações = escolhida (vs abrir WhatsApp direto).
+
+**Feito (type-check OK, TUDO no working tree, NÃO commitado):**
+- **Migration `supabase/migrations/075_contact_requests.sql`** — tabela `contact_requests` (academy_id FK cascade, name/email/phone/message/status, CHECK email OR phone) + RLS (SELECT/UPDATE só owner/personal via `get_user_academy_ids()` + `get_user_role_in_academy()`; SEM policy de INSERT — insert só service_role) + função `get_public_academies()` SECURITY DEFINER (retorna id/name/slug/city/state/logo_url + student_count/personal_count agregados; GRANT anon+authenticated). Usa `gen_random_uuid()`.
+- **`app/api/academias/contact/route.ts`** — POST público: rate limit (`RATE_LIMITS.invite`) + `verifyTurnstileToken` + valida (email ou phone obrigatório) + insert via admin client service_role.
+- **`app/academias/page.tsx`** — lista pública (client), chama RPC `get_public_academies` via anon, busca por nome/cidade, cards com contagens. Header próprio + BrandLogo.
+- **`app/academias/[slug]/page.tsx`** — detalhe (client), acha academia pelo slug, mostra contagens + form "Pedir convite" com `<Turnstile>` (ref.getToken()) → POST contact.
+- **`app/page.tsx`** — link "Academias" → `/academias` na nav desktop E mobile.
+- **`app/(dashboard)/solicitacoes/page.tsx`** — caixa: lista contact_requests da academia (filtro Novas/Todas), mailto + wa.me, "marcar resolvida" (UPDATE status). `supabase as any` (tabela não está nos types ainda).
+- **`components/layout/sidebar.tsx`** — import `Inbox` + item "Solicitações" → `/solicitacoes` (roles owner E personal).
+- **`middleware.ts`** — `/academias` em PUBLIC_ROUTES; `/academias/` em PUBLIC_PREFIXES; `/api/academias/contact` em PUBLIC_API_ROUTES.
+
+**Notas técnicas:** `contact_requests` e a RPC `get_public_academies` NÃO estão em `packages/database/src/types.ts` ainda → usei `as any`/cast comentado. Sumirá após db:types.
+
+**Próximos passos (BLOQUEADORES pra funcionar):**
+- [ ] **APLICAR migration 075 em PROD** (`pnpm db:push` aponta pra prod). Usuário precisa autorizar — perguntei, aguardando. Sem ela: lista vazia + form dá 500.
+- [ ] **`pnpm db:types`** após a migration, e remover os `as any` se quiser (opcional).
+- [ ] Testar fluxo ponta a ponta em http://localhost:3334/academias.
+- [ ] Commitar (acumula: BeforeAfter+TrustStrip, fixes FPS, e esta feature inteira).
+
+**Pendências antigas ainda abertas:** login Google apex vs www (Supabase Site URL); @ Instagram placeholder.
+
+**Como retomar:** feature inteira no working tree, type-check passa. O que falta é AÇÃO EXTERNA: aplicar migration 075 em prod + db:types. Avisar/confirmar com o usuário antes do `db:push`.
+
 ## 2026-06-14 15:40 — Fixes de FPS APLICADOS na landing ✅ (type-check OK)
 
 **Tarefa / objetivo:** corrigir o baixo FPS da landing (usuário aprovou com "ok").

@@ -7,7 +7,7 @@ import {
   Dumbbell, LayoutDashboard, Users, ClipboardList, BookOpen,
   Settings, ChevronLeft, ChevronRight, LogOut, ChevronsUpDown,
   Activity, CalendarDays, History, TrendingUp, ShieldCheck, UserCircle, Video,
-  UserCog, BarChart2, BarChart3, Scale, Salad, UtensilsCrossed,
+  UserCog, BarChart2, BarChart3, Scale, Salad, UtensilsCrossed, Inbox,
 } from 'lucide-react'
 
 import { BrandLogo } from '@/components/layout/brand-logo'
@@ -24,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
 
   // ── Owner: foco em administração ──────────────────────────────
   { label: 'Alunos',           href: '/alunos',       icon: Users,           roles: ['owner'] },
+  { label: 'Solicitações',     href: '/solicitacoes', icon: Inbox,           roles: ['owner'] },
   { label: 'Personais',        href: '/personais',    icon: UserCog,         roles: ['owner'] },
   { label: 'Fichas de treino', href: '/treinos',      icon: ClipboardList,   roles: ['owner'] },
   { label: 'Exercícios',       href: '/exercicios',   icon: BookOpen,        roles: ['owner'] },
@@ -35,6 +36,7 @@ const NAV_ITEMS: NavItem[] = [
 
   // ── Personal: foco em treino ──────────────────────────────────
   { label: 'Meus alunos',      href: '/alunos',       icon: Users,           roles: ['personal'] },
+  { label: 'Solicitações',     href: '/solicitacoes', icon: Inbox,           roles: ['personal'] },
   { label: 'Fichas & Treinos', href: '/treinos',      icon: ClipboardList,   roles: ['personal'] },
   { label: 'Exercícios',       href: '/exercicios',   icon: BookOpen,        roles: ['personal'] },
   { label: 'Receitas',         href: '/receitas',     icon: UtensilsCrossed, roles: ['personal'] },

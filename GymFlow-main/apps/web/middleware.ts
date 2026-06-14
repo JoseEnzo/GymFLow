@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
 
-const PUBLIC_ROUTES = ['/', '/login', '/cadastro', '/convite', '/onboarding', '/recuperar-senha', '/redefinir-senha', '/codigo', '/privacidade', '/termos', '/demo']
+const PUBLIC_ROUTES = ['/', '/login', '/cadastro', '/convite', '/onboarding', '/recuperar-senha', '/redefinir-senha', '/codigo', '/privacidade', '/termos', '/demo', '/academias']
 const AUTH_ROUTES = ['/login', '/cadastro', '/recuperar-senha']
 
 // Allowlist explícita de APIs públicas. Qualquer rota /api/* fora desta lista
@@ -13,12 +13,14 @@ const PUBLIC_API_ROUTES = [
   '/api/invites/lookup',   // preview público de convite
   '/api/webhooks/stripe',  // assinatura Stripe verifica autenticidade
   '/api/check-document',   // cadastro: pre-check de CNPJ/CREF já existente
+  '/api/academias/contact',// diretório público: visitante pede convite a uma academia
 ]
 
 const PUBLIC_PREFIXES = [
   '/convite/',       // página de aceite de convite (token na URL)
   '/auth/callback',  // OAuth callback do Supabase
   '/api/cron/',      // Vercel Cron — autoriza via Bearer CRON_SECRET na própria rota
+  '/academias/',     // diretório público: página de detalhe da academia (slug na URL)
 ]
 
 export async function middleware(request: NextRequest) {
