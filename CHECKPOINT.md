@@ -1,5 +1,60 @@
 # Checkpoint
 
+## 2026-06-14 — Aviso de cadastro incompleto (todos os papéis) ✅ type-check OK
+
+**Tarefa:** quando o usuário se cadastra ou faltam dados da conta, mostrar um aviso pra preencher. Vale pros 3 papéis (ex.: telefone do aluno, e-mail da academia, especialidade do personal).
+
+**Feito (working tree, NÃO commitado):**
+- **Novo `apps/web/components/layout/profile-completion-banner.tsx`** — banner âmbar (não bloqueia uso), mesmo padrão do `BillingBanner`. Lê `profile`/`currentAcademy`/`currentRole` do auth-store (sem fetch). Monta a frase "Sua conta está quase pronta! Falta(m) X, Y e Z." + botão "Completar agora". Guard `if (!profile) return null` (profile não é persistido, vem do `use-auth` — evita falso-positivo antes de hidratar). Some em `/perfil` e `/configuracoes`.
+- **Montado em `apps/web/app/(dashboard)/layout.tsx`** logo abaixo do `<BillingBanner />`.
+- `pnpm --filter @gymflow/web type-check` OK.
+
+**Campos verificados por papel + destino do botão (escolhido pela tela onde TODOS os campos são editáveis):**
+- `student` → nome, telefone, data de nascimento → `/perfil`
+- `personal` → nome, telefone, especialidade → `/configuracoes?tab=perfil` (specialty só existe lá, não em /perfil)
+- `owner` → e-mail, telefone, cidade DA ACADEMIA → `/configuracoes?tab=academia`
+
+**Decisões:** NÃO cobro CNPJ/CREF (opcionais por design — personal solo sem CNPJ, CREF opcional no cadastro). Aparece já no 1º acesso pós-cadastro (novo user cai no dashboard).
+
+**Próximos passos:**
+- [ ] Usuário ver em http://localhost:3334/dashboard com conta incompleta.
+- [ ] Possível ajuste: incluir mais campos (gênero/objetivo aluno, bio personal, CEP/estado academia) — perguntei, aguardando.
+- [ ] Commitar se aprovado (2 arquivos: banner novo + layout).
+
+## 2026-06-14 ~15:30 — Logo: linha de progresso travada ✅ (type-check OK, NÃO commitado)
+
+**Tarefa / objetivo:** usuário relatou que ao clicar no logo "MeuTrein" na landing (`www.meutrein.com.br`) aparece uma linha (barra de progresso) que **trava** e parece travar o site. Pediu: clicar no logo deve **voltar pra inicial e atualizar a página**, sem linha travada.
+
+**Causa raiz:** a barra de progresso de navegação dispara em **qualquer** clique de link interno, inclusive pra própria página. Estando em `/` e clicando no logo (href `/`), o `pathname` nunca muda → o `complete()` (que roda no `useEffect` de mudança de pathname) nunca dispara → barra trava em ~85%. **Pegadinha:** existem 2 cópias do componente; a montada de fato é `components/ui/navigation-progress.tsx` (montada em `app/layout.tsx`), que é a que **não** tinha proteção. A de `components/layout/navigation-progress.tsx` tem a proteção certa mas é **código morto** (não importada em lugar nenhum).
+
+**Feito (type-check `pnpm --filter @gymflow/web type-check` OK, working tree, NÃO commitado):**
+- **`apps/web/components/ui/navigation-progress.tsx`** — `handleClick` agora ignora clique pra mesma rota: `if (anchor.pathname === window.location.pathname) return` antes do `start()`. Mata a linha travada pro logo e qualquer link pra própria página.
+- **`apps/web/components/layout/brand-logo.tsx`** — adicionado `usePathname`+`useRouter` e `onClick` no `<Link>`: quando `pathname === href`, faz `e.preventDefault()` + `window.scrollTo({top:0, behavior:'smooth'})` + `router.refresh()`. Dá o "volta pra inicial e atualiza" pedido. Vindo de outra rota, o Link navega normal.
+
+**Próximos passos:**
+- [ ] Verificação visual (opcional) — `run` a app e clicar no logo na home. Lógica é direta; type-check passou.
+- [ ] Commitar (usuário decide).
+
+**Como retomar:** fix completo e type-check OK. Sem migration, só 2 arquivos de UI. Observação: `components/layout/navigation-progress.tsx` é dead code (candidato a remoção futura, fora de escopo agora).
+
+## 2026-06-14 ~17:40 — Aviso de fim de trial (vermelho) no BillingBanner ✅ (type-check OK, NÃO commitado)
+
+**Tarefa / objetivo:** usuário perguntou sobre o pagamento Stripe. Confirmado: assinatura mensal recorrente **só no cartão** (`mode: 'subscription'` + `payment_method_types: ['card']`), Stripe cobra sozinho todo mês; starter/personal têm `trial_period_days: 30`. **Pix descartado** (não dá recorrência automática). Usuário pediu: aviso **vermelho** quando faltam **3 dias** pro fim do teste grátis. (AskUserQuestion → escolheu "Fim do teste grátis".)
+
+**Feito (type-check OK em cada lote, TUDO no working tree, NÃO commitado):**
+- **`apps/web/components/layout/billing-banner.tsx`** — novo estado vermelho: `subscription_status === 'trialing'` && `trial_ends_at` && `daysLeft <= 3` → "Seu período de teste termina em X dias..." (>=1 dia plural; <=0 "termina hoje"). Lê só do store, sem fetch.
+- **CAUSA RAIZ corrigida** (sem isso o banner nunca apareceria): `trial_ends_at` (coluna existe desde migration 001) **nunca era gravada** e o status saía `'active'` fixo mesmo em trial. Corrigi os 2 pontos de gravação:
+  - `apps/web/app/api/webhooks/stripe/route.ts` — `checkout.session.completed` agora faz `subscriptions.retrieve()` e grava status real (`trialing` vs `active`) + `trial_ends_at`; `customer.subscription.updated` passou a persistir `trial_ends_at` também.
+  - `apps/web/app/api/billing/verify-session/route.ts` — mesmo: retrieve + grava status real + `trial_ends_at` (em vez de `'active'` hardcoded).
+  - Bônus: conserta o rótulo "Trial — X dias restantes" da tela `/configuracoes?tab=plano` (que dependia de `status==='trialing'`).
+- **`GymFlow-main/CLAUDE.md`** — atualizada seção "Banner de cobrança pendente" com o estado `trialing` + "Pegadinha do estado de trial".
+
+**Próximos passos:**
+- [ ] **Verificação visual NÃO feita** — banner só aparece com academia em `trialing`; bypass de Stripe em dev não simula trial. Pra testar: setar manualmente numa linha de `academies`: `subscription_status='trialing'` + `trial_ends_at` ~2 dias à frente, abrir dashboard como owner.
+- [ ] Commitar (usuário decide).
+
+**Como retomar:** feature pronta e type-check OK. Falta só seedar uma academia em trial e ver o banner na tela (ou validar em prod no próximo trial real). Nenhuma migration nova — só código.
+
 ## 2026-06-14 16:55 — Migration 075 APLICADA em PROD ✅ + types + smoke test OK
 
 **Feito:**
@@ -9,9 +64,9 @@
 - Comando usado p/ aplicar (caso precise de novo): mover 072 órfão → `npx supabase db push --include-all` → devolver 072. CLI já tem sessão/senha salva (conecta sem pedir).
 
 **Pendências:**
+- [x] **Commitado + mergeado pelo usuário (2026-06-14 ~17h).** Inclui BeforeAfter+TrustStrip, fixes FPS, feature academias inteira + migration 075.
 - [ ] Testar o fluxo visual em http://localhost:3334/academias (lista → detalhe → pedir convite → cair em /solicitacoes). Backend já validado.
 - [ ] **Opcional:** remover os `as any` comentados (`solicitacoes/page.tsx`, `academias/page.tsx`, `[slug]/page.tsx`) agora que os types existem — type-check passa com ou sem.
-- [ ] Commitar tudo (BeforeAfter+TrustStrip, fixes FPS, feature academias inteira). Nada commitado ainda.
 - [ ] (antigas) login Google apex vs www; @ Instagram.
 
 **Como retomar:** feature 100% funcional em prod (migration + types + RPC verificada). Falta só teste visual e commit.
