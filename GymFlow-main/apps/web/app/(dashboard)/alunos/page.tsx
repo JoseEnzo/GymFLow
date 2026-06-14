@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search, UserPlus, Filter, Dumbbell, Flame,
@@ -536,7 +536,10 @@ function InviteCard({
 // ── Página principal ─────────────────────────────────────────
 export default function AlunosPage() {
   const { currentAcademy, currentRole } = useAuthStore()
-  const supabase = createClient()
+  // useMemo: sem isso, createClient() retorna instância nova a cada render e o
+  // useEffect (que tem `supabase` nas deps) re-dispara em loop infinito →
+  // "Maximum update depth exceeded" → a aba trava. Pegadinha conhecida do projeto.
+  const supabase = useMemo(() => createClient(), [])
 
   const [students, setStudents] = useState<Student[]>([])
   const [invites, setInvites] = useState<PendingInvite[]>([])
