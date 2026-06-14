@@ -8,14 +8,14 @@
 @layer base {
   :root {
     /* Core */
-    --background: 240 15% 4%;
-    --foreground: 213 31% 95%;
+    --background: 240 16% 3%;
+    --foreground: 214 32% 96%;
 
-    /* Surfaces */
+    /* Surfaces — degraus de elevação mais nítidos sobre o fundo escuro */
     --surface-50: 240 14% 8%;
     --surface-100: 240 13% 11%;
-    --surface-200: 240 12% 14%;
-    --surface-300: 240 10% 18%;
+    --surface-200: 240 12% 15%;
+    --surface-300: 240 11% 19%;
 
     /* Card */
     --card: 240 14% 8%;
@@ -35,7 +35,7 @@
 
     /* Muted */
     --muted: 240 10% 15%;
-    --muted-foreground: 215 20% 55%;
+    --muted-foreground: 216 18% 63%;
 
     /* Accent — Orange */
     --accent: 25 95% 58%;
@@ -46,8 +46,8 @@
     --destructive-foreground: 0 0% 100%;
 
     /* Borders & Inputs */
-    --border: 240 9% 17%;
-    --input: 240 9% 17%;
+    --border: 240 10% 20%;
+    --input: 240 10% 20%;
     --ring: 239 84% 67%;
 
     /* Radius */
