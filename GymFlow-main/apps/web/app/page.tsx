@@ -7,11 +7,12 @@ import {
   Dumbbell, Users, TrendingUp, Shield, Zap, BarChart2,
   ChevronRight, Check, ArrowRight, Play, Menu, X,
   Smartphone, Clock, Award, Target, Activity, Lock,
-  ChevronDown, Salad, Scale,
+  ChevronDown, Salad, Scale, WifiOff, Instagram, Mail, QrCode,
 } from 'lucide-react'
 
 import { BrandLogo } from '@/components/layout/brand-logo'
 import { InstallButton } from '@/components/pwa/install-button'
+import { WhatsAppFab, WhatsAppIcon, WHATSAPP_HREF } from '@/components/marketing/whatsapp-fab'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -758,6 +759,147 @@ const personas = [
   },
 ]
 
+// ──────────────────────────────────────────────
+// App do aluno (showcase)
+// ──────────────────────────────────────────────
+const appPerks = [
+  { icon: Smartphone, text: 'Ficha completa no celular, sempre à mão' },
+  { icon: Play, text: 'Vídeo demonstrativo em cada exercício' },
+  { icon: Zap, text: 'Registra carga e repetições série a série' },
+  { icon: WifiOff, text: 'Funciona offline — sinal fraco na academia não trava' },
+  { icon: TrendingUp, text: 'Evolução de carga em gráfico, treino após treino' },
+]
+
+function PhoneMockup() {
+  return (
+    <div className="relative mx-auto w-[280px]">
+      {/* moldura do celular */}
+      <div className="relative rounded-[2.5rem] border border-border/60 bg-surface-50/80 p-3 shadow-2xl shadow-brand-500/10 backdrop-blur-xl">
+        <div className="absolute left-1/2 top-3 z-10 h-5 w-24 -translate-x-1/2 rounded-full bg-background/80" />
+        <div className="overflow-hidden rounded-[2rem] bg-background">
+          {/* topo */}
+          <div className="flex items-center justify-between border-b border-border/40 px-4 pb-3 pt-7">
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground">Treino A</p>
+              <p className="text-sm font-semibold">Peito e Tríceps</p>
+            </div>
+            <span className="badge-cyan text-[10px]">Em andamento</span>
+          </div>
+          {/* exercícios */}
+          <div className="space-y-2.5 px-4 py-4">
+            {[
+              { name: 'Supino reto', sets: '4 × 10', done: true },
+              { name: 'Crucifixo', sets: '3 × 12', done: true },
+              { name: 'Tríceps corda', sets: '4 × 15', done: false },
+            ].map((ex) => (
+              <div key={ex.name} className="flex items-center gap-3 rounded-xl border border-border/40 bg-card px-3 py-2.5">
+                <div
+                  className={cn(
+                    'flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full',
+                    ex.done ? 'bg-emerald-500/15 text-emerald-400' : 'bg-brand-500/15 text-brand-400'
+                  )}
+                >
+                  {ex.done ? <Check className="h-3.5 w-3.5" /> : <Play className="h-3 w-3" />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium">{ex.name}</p>
+                  <p className="text-[10px] text-muted-foreground">{ex.sets}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* progresso + ação */}
+          <div className="space-y-3 px-4 pb-5">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-100">
+              <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-brand-500 to-cyan-500" />
+            </div>
+            <button className="btn-primary w-full justify-center text-xs">Finalizar treino</button>
+          </div>
+        </div>
+      </div>
+      {/* badge flutuante de evolução */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ delay: 0.4 }}
+        className="absolute -right-4 top-16 glass rounded-2xl border border-emerald-500/30 px-3 py-2 shadow-xl"
+      >
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-emerald-400" />
+          <div>
+            <p className="text-[9px] uppercase tracking-wide text-muted-foreground">Supino</p>
+            <p className="text-xs font-bold text-emerald-400">+12,4 kg</p>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
+function AppShowcaseSection() {
+  return (
+    <section className="relative py-24 lg:py-32 overflow-hidden">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid items-center gap-14 lg:grid-cols-2">
+          {/* texto */}
+          <motion.div
+            variants={stagger}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true }}
+            className="space-y-7"
+          >
+            <motion.div variants={fadeUp}>
+              <span className="badge-primary text-xs uppercase tracking-widest">No celular do aluno</span>
+            </motion.div>
+            <motion.h2 variants={fadeUp} className="text-4xl lg:text-5xl font-display font-extrabold leading-tight">
+              O treino na
+              <span className="block gradient-text">palma da mão.</span>
+            </motion.h2>
+            <motion.p variants={fadeUp} className="text-lg text-muted-foreground leading-relaxed max-w-md">
+              O aluno abre, executa e registra a série na hora — sem caderninho, sem print no WhatsApp, sem depender de internet boa.
+            </motion.p>
+            <motion.ul variants={fadeUp} className="space-y-3.5">
+              {appPerks.map(({ icon: Icon, text }) => (
+                <li key={text} className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-brand-500/10 text-brand-400">
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <span className="text-sm text-muted-foreground">{text}</span>
+                </li>
+              ))}
+            </motion.ul>
+            <motion.div variants={fadeUp} className="space-y-3 pt-2">
+              <div className="flex flex-wrap items-center gap-3">
+                <Link href="/cadastro" className="btn-primary">
+                  Começar grátis
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <InstallButton />
+              </div>
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <QrCode className="h-4 w-4" />
+                Instala direto do navegador. Sem loja de app.
+              </span>
+            </motion.div>
+          </motion.div>
+
+          {/* mockup */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <PhoneMockup />
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function PersonasSection() {
   const [activeRole, setActiveRole] = useState(0)
   const isAuthenticated = useAuthStore((s) => !!s.profile)
@@ -1306,51 +1448,80 @@ function CTASection() {
 // ──────────────────────────────────────────────
 // Footer
 // ──────────────────────────────────────────────
+// TODO: confirmar handle real do Instagram com o dono (placeholder por ora).
+const SOCIALS = [
+  { label: 'Instagram', href: 'https://instagram.com/meutrein', Icon: Instagram },
+  { label: 'WhatsApp', href: WHATSAPP_HREF, Icon: WhatsAppIcon },
+  { label: 'E-mail', href: 'mailto:contato@meutrein.com.br', Icon: Mail },
+]
+
+const FOOTER_COLS = [
+  {
+    title: 'Produto',
+    links: [
+      { label: 'Funcionalidades', href: '#funcionalidades' },
+      { label: 'Preços', href: '#preco' },
+      { label: 'Segurança', href: '/privacidade' },
+    ],
+  },
+  {
+    title: 'Empresa',
+    links: [
+      { label: 'Sobre', href: '#sobre' },
+      { label: 'Contato', href: 'mailto:contato@meutrein.com.br' },
+      { label: 'WhatsApp', href: WHATSAPP_HREF },
+    ],
+  },
+  {
+    title: 'Legal',
+    links: [
+      { label: 'Privacidade', href: '/privacidade' },
+      { label: 'Termos', href: '/termos' },
+      { label: 'Cookies', href: '/privacidade#cookies' },
+      { label: 'LGPD', href: '/privacidade#lgpd' },
+    ],
+  },
+]
+
 function Footer() {
   return (
-    <footer className="border-t border-border/40 py-12">
+    <footer className="border-t border-border/40 py-14">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
-          <div className="col-span-2 md:col-span-1 space-y-4">
-            <BrandLogo size="md" />
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Feito pra academia pequena.
-            </p>
-          </div>
+        {/* topo: logo centralizada */}
+        <div className="flex flex-col items-center gap-5 pb-10">
+          <BrandLogo size="lg" />
+          <p className="text-sm text-muted-foreground">Feito pra academia pequena.</p>
+        </div>
 
-          {[
-            {
-              title: 'Produto',
-              links: [
-                { label: 'Funcionalidades', href: '#funcionalidades' },
-                { label: 'Preços', href: '#preco' },
-                { label: 'Segurança', href: '/privacidade' },
-              ],
-            },
-            {
-              title: 'Empresa',
-              links: [
-                { label: 'Sobre', href: '#sobre' },
-                { label: 'Contato', href: 'mailto:contato@meutrein.com.br' },
-              ],
-            },
-            {
-              title: 'Legal',
-              links: [
-                { label: 'Privacidade', href: '/privacidade' },
-                { label: 'Termos', href: '/termos' },
-                { label: 'Cookies', href: '/privacidade#cookies' },
-                { label: 'LGPD', href: '/privacidade#lgpd' },
-              ],
-            },
-          ].map((col) => (
+        {/* redes sociais */}
+        <div className="border-t border-border/40 py-8">
+          <p className="mb-5 text-center text-sm font-semibold text-muted-foreground">Siga o MeuTrein</p>
+          <div className="flex items-center justify-center gap-3">
+            {SOCIALS.map(({ label, href, Icon }) => (
+              <a
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={label}
+                className="flex h-11 w-11 items-center justify-center rounded-full border border-border/50 text-muted-foreground transition-all hover:border-brand-500/50 hover:text-brand-400"
+              >
+                <Icon className="h-5 w-5" />
+              </a>
+            ))}
+          </div>
+        </div>
+
+        {/* colunas de links */}
+        <div className="grid grid-cols-2 gap-8 border-t border-border/40 py-10 sm:grid-cols-3 sm:text-center">
+          {FOOTER_COLS.map((col) => (
             <div key={col.title}>
-              <h4 className="font-semibold text-sm mb-4">{col.title}</h4>
+              <h4 className="mb-4 text-sm font-semibold">{col.title}</h4>
               <ul className="space-y-2.5">
                 {col.links.map((link) => {
                   const isExternal = link.href.startsWith('mailto:') || link.href.startsWith('http')
                   const isHashOnly = link.href.startsWith('#')
-                  const className = 'text-sm text-muted-foreground hover:text-foreground transition-colors'
+                  const className = 'text-sm text-muted-foreground transition-colors hover:text-foreground'
                   return (
                     <li key={link.label}>
                       {isExternal || isHashOnly ? (
@@ -1370,13 +1541,12 @@ function Footer() {
           ))}
         </div>
 
-        <div className="divider pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+        {/* bloco legal */}
+        <div className="flex flex-col items-center gap-1 border-t border-border/40 pt-8 text-center">
           <p className="text-xs text-muted-foreground">
             © {new Date().getFullYear()} MeuTrein. Todos os direitos reservados.
           </p>
-          <p className="text-xs text-muted-foreground">
-            Feito no Brasil
-          </p>
+          <p className="text-xs text-muted-foreground/70">Feito no Brasil 🇧🇷</p>
         </div>
       </div>
     </footer>
@@ -1583,6 +1753,7 @@ export default function LandingPage() {
         <Hero />
         <StatsBar />
         <FeaturesSection />
+        <AppShowcaseSection />
         <PersonasSection />
         <SectionTransition />
         <HowItWorksSection />
@@ -1592,6 +1763,7 @@ export default function LandingPage() {
         <CTASection />
       </main>
       <Footer />
+      <WhatsAppFab />
     </div>
   )
 }
