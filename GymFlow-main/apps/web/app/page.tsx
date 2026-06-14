@@ -91,7 +91,10 @@ function FloatingCard({
       transition={{ delay, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
       style={{ animationDelay: `${delay}s` }}
       className={cn(
-        'glass rounded-2xl p-4 shadow-card-hover border border-brand-500/10',
+        // bg opaco em vez de `glass` (backdrop-blur): estes cards animam (animate-float)
+        // continuamente — borrar o fundo a cada frame de animação era caro. bg-card/90
+        // dá a mesma sensação de profundidade sem o custo de re-blur.
+        'bg-card/90 rounded-2xl p-4 shadow-card-hover border border-brand-500/10',
         'animate-float',
         className
       )}
@@ -211,7 +214,7 @@ function Nav() {
       className={cn(
         'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
         scrolled
-          ? 'bg-background/80 backdrop-blur-xl border-b border-border/60 shadow-2xl'
+          ? 'bg-background/90 backdrop-blur-md border-b border-border/60 shadow-2xl'
           : 'bg-transparent'
       )}
     >
@@ -1593,6 +1596,142 @@ function StatsBar() {
 }
 
 // ──────────────────────────────────────────────
+// Before / After Section
+// ──────────────────────────────────────────────
+const beforeItems = [
+  'Ficha de papel que fica no caderno do personal',
+  'Print da planilha mandado no WhatsApp',
+  'Aluno sumiu — você só descobre quando vence o mês',
+  'Registro de carga num papel (quando registra)',
+  'Histórico perdido se o aluno trocar de celular',
+]
+
+const afterItems = [
+  'Ficha atualizada direto no celular do aluno',
+  'Carga e reps registrados série a série, no treino',
+  'Dashboard mostra quem está sumindo antes do cancelamento',
+  'Evolução de carga em gráfico, treino a treino',
+  'Dados na nuvem — mesmo se o aluno trocar de celular',
+]
+
+function BeforeAfterSection() {
+  return (
+    <section className="relative py-24 lg:py-28 overflow-hidden">
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true }}
+          className="text-center mb-14 space-y-4"
+        >
+          <motion.div variants={fadeUp}>
+            <span
+              className="badge text-xs uppercase tracking-widest"
+              style={{ background: 'rgba(239,68,68,0.10)', color: '#f87171', borderColor: 'rgba(239,68,68,0.25)' }}
+            >
+              Chega de gambiarra
+            </span>
+          </motion.div>
+          <motion.h2 variants={fadeUp} className="text-4xl lg:text-5xl font-display font-extrabold">
+            Antes e depois do
+            <span className="block gradient-text">MeuTrein</span>
+          </motion.h2>
+          <motion.p variants={fadeUp} className="text-muted-foreground text-lg max-w-xl mx-auto">
+            Cada academia pequena que conhecemos tinha a mesma rotina. Você provavelmente também.
+          </motion.p>
+        </motion.div>
+
+        <div className="grid md:grid-cols-2 gap-5">
+          {/* Before */}
+          <motion.div
+            initial={{ opacity: 0, x: -24 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            className="glass rounded-3xl p-8 border border-red-500/20"
+          >
+            <div className="flex items-center gap-3 mb-7">
+              <div className="w-9 h-9 rounded-xl bg-red-500/10 flex items-center justify-center border border-red-500/20">
+                <X className="w-4 h-4 text-red-400" />
+              </div>
+              <h3 className="font-display font-bold text-lg">Antes</h3>
+            </div>
+            <ul className="space-y-4">
+              {beforeItems.map((item) => (
+                <li key={item} className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full bg-red-500/10 flex items-center justify-center">
+                    <X className="w-3 h-3 text-red-400" />
+                  </div>
+                  <span className="text-sm text-muted-foreground leading-relaxed line-through decoration-red-500/30">
+                    {item}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+
+          {/* After */}
+          <motion.div
+            initial={{ opacity: 0, x: 24 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+            className="glass rounded-3xl p-8 border border-emerald-500/25"
+            style={{ boxShadow: '0 0 40px rgba(16,185,129,0.06)' }}
+          >
+            <div className="flex items-center gap-3 mb-7">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                <Check className="w-4 h-4 text-emerald-400" />
+              </div>
+              <h3 className="font-display font-bold text-lg text-emerald-400">Com o MeuTrein</h3>
+            </div>
+            <ul className="space-y-4">
+              {afterItems.map((item) => (
+                <li key={item} className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                    <Check className="w-3 h-3 text-emerald-400" />
+                  </div>
+                  <span className="text-sm text-muted-foreground leading-relaxed">{item}</span>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ──────────────────────────────────────────────
+// Trust Strip
+// ──────────────────────────────────────────────
+const TRUST_BADGES = [
+  { icon: Smartphone, label: 'iPhone & Android' },
+  { icon: Shield,     label: 'LGPD — dados no Brasil' },
+  { icon: Lock,       label: 'Pagamento via Stripe' },
+  { icon: WifiOff,    label: 'Funciona sem internet' },
+  { icon: Award,      label: 'Suporte em português' },
+]
+
+function TrustStrip() {
+  return (
+    <div className="relative py-6 overflow-hidden border-y border-border/25">
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-3">
+          {TRUST_BADGES.map(({ icon: Icon, label }) => (
+            <div key={label} className="flex items-center gap-2 text-xs text-muted-foreground/55">
+              <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────
 // FAQ Section
 // ──────────────────────────────────────────────
 const faqs = [
@@ -1728,7 +1867,7 @@ function FAQSection() {
 // ──────────────────────────────────────────────
 export default function LandingPage() {
   return (
-    <div className="relative min-h-screen bg-background bg-mesh bg-fixed">
+    <div className="relative min-h-screen bg-background bg-mesh">
       {/* Grid pattern — absolute, rola junto com a página */}
       <div
         className="absolute inset-0 pointer-events-none z-0 opacity-[0.04]"
@@ -1752,11 +1891,13 @@ export default function LandingPage() {
       <main>
         <Hero />
         <StatsBar />
+        <BeforeAfterSection />
         <FeaturesSection />
         <AppShowcaseSection />
         <PersonasSection />
         <SectionTransition />
         <HowItWorksSection />
+        <TrustStrip />
         <PricingSection />
         <SobreSection />
         <FAQSection />

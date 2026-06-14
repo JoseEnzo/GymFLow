@@ -1,5 +1,131 @@
 # Checkpoint
 
+## 2026-06-14 15:40 — Fixes de FPS APLICADOS na landing ✅ (type-check OK)
+
+**Tarefa / objetivo:** corrigir o baixo FPS da landing (usuário aprovou com "ok").
+
+**Feito (3 diffs cirúrgicos em `app/page.tsx`):**
+1. **Removido `bg-fixed`** da raiz do `LandingPage` (`bg-mesh bg-fixed` → `bg-mesh`). Maior ganho: acaba o repaint do fundo de 8 camadas a cada frame de scroll. Visual ~idêntico (fundo rola junto).
+2. **FloatingCards: `glass` → `bg-card/90`** (mantendo `border-brand-500/10`). Esses cards usam `animate-float` (animam sempre) — `backdrop-blur` re-borrava a cada frame. Comentário explicativo deixado no código.
+3. **Nav (scrolled): `backdrop-blur-xl` → `backdrop-blur-md`** + `bg-background/80` → `/90`. Nav fica fixo durante todo o scroll; raio de blur menor = menos custo de re-blur.
+
+`pnpm --filter @gymflow/web type-check` OK.
+
+**NÃO mexido (culpados menores, atacar só se ainda travar):** glow `box-shadow` animado das partículas (`page.tsx:146`); `Counter` com `setInterval` 16ms (`page.tsx:54-66`); mobile menu `backdrop-blur-xl` (abre só brevemente).
+
+**Próximos passos:**
+- [ ] Usuário rolar http://localhost:3334/ e confirmar se destravou; se ainda travar, dizer ONDE (hero / scroll / seção) pra afinar o resto.
+- [ ] (pendência) Login Google: usuário ainda não disse apex vs www.
+- [ ] (pendência) Commitar tudo: `page.tsx` acumula BeforeAfterSection+TrustStrip + estes 3 fixes de FPS — nada commitado ainda.
+
+**Arquivos tocados:** `GymFlow-main/apps/web/app/page.tsx` — `bg-fixed` removido (raiz), `FloatingCard` sem `glass`, `Nav` blur reduzido.
+
+**Como retomar:** fixes de FPS no working tree, não commitados. Se ainda houver travada, próximos alvos são partículas (reduzir/remover box-shadow animado) e `Counter` (trocar setInterval por requestAnimationFrame ou reduzir frequência).
+
+## 2026-06-14 15:25 — Diagnóstico de baixo FPS na landing (aguardando OK pra corrigir)
+
+**Tarefa / objetivo:** usuário relatou "baixo FPS" em partes da landing. Identificar a causa.
+
+**Diagnóstico (confirmado lendo `page.tsx` + `globals.css`), em ordem de impacto:**
+1. **`bg-fixed` sobre `bg-mesh` pesado — MAIOR culpado.** `page.tsx:1731` (`bg-mesh bg-fixed`). `background-attachment: fixed` repinta o fundo inteiro a cada frame de scroll, e o `bg-mesh` tem 8 camadas (ruído SVG repetido + 7 radial-gradients, `globals.css:314-335`). Trava de scroll clássica.
+2. **`backdrop-blur` (classe `.glass` = `backdrop-blur-md`, `globals.css:142`) em todo lugar.** Re-borra a cada frame. Agravantes: Nav fixo `backdrop-blur-xl` sempre visível; FloatingCards do Hero são `glass` E animam (`animate-float`) ao mesmo tempo.
+3. **Glows `box-shadow` animados nas partículas** (`page.tsx:146`) — menor.
+4. **`Counter` com `setInterval` 16ms** (`page.tsx:54-66`) — ~110 re-renders ×4 contadores; trava curta na entrada da StatsBar.
+
+**Recomendação dada:** começar removendo `bg-fixed` (ganho grande, perda visual ~nula — fundo passa a rolar junto). Depois, opcional, afinar `backdrop-blur` nos elementos animados (muda um pouco a estética).
+
+**Próximos passos:**
+- [ ] **AGUARDANDO OK do usuário** pra: (a) remover `bg-fixed` em `page.tsx:1731`; (b) opcionalmente reduzir blur dos elementos animados (FloatingCards/Nav).
+- [ ] (pendência anterior) Login Google: usuário ainda não disse se site abre em apex vs www.
+
+**Arquivos tocados nesta rodada:** nenhum (só diagnóstico). `page.tsx` segue com BeforeAfterSection+TrustStrip não-commitados.
+
+**Como retomar:** nada editado. Se aprovado, o fix #1 é trocar `bg-mesh bg-fixed` por `bg-mesh` (remover `bg-fixed`) na raiz do `LandingPage`. Os outros fixes têm tradeoff visual — confirmar antes.
+
+## 2026-06-14 15:00 — Diagnóstico: login Google cai em vercel.app (config externa, NÃO bug de código)
+
+**Tarefa / objetivo:** login com Google redireciona pra `meutrein.vercel.app`; usuário quer `meutrein.com.br`.
+
+**Diagnóstico (confirmado lendo o código):**
+- **NÃO é bug de código.** `signInWithProvider` usa `window.location.origin` (`hooks/use-auth.ts:160`) e o callback usa o `origin` da request (`app/auth/callback/route.ts:5`). Nenhum aponta pra vercel.app. Sem `vercel.json`, sem domínio hardcoded.
+- **Causa raiz:** clássico **fallback do Site URL do Supabase**. Se o `redirectTo` (`https://meutrein.com.br/auth/callback`) NÃO estiver na allowlist de Redirect URLs do Supabase, o Supabase ignora e cai no **Site URL**, que está como `meutrein.vercel.app`.
+
+**Correção (externa — Supabase Dashboard, eu NÃO consigo fazer daqui):**
+- Authentication → URL Configuration:
+  - **Site URL** → `https://meutrein.com.br` (ou `www`, ver alerta abaixo)
+  - **Redirect URLs** → adicionar `https://meutrein.com.br/**` + `https://www.meutrein.com.br/**` (manter `https://meutrein.vercel.app/**` pra previews)
+- Google Cloud Console NÃO precisa mexer (redirect URI aponta pro Supabase, não muda com domínio).
+
+**⚠️ Inconsistência apex vs www (DECISÃO PENDENTE do usuário):**
+- CLAUDE.md diz canônico = `www.meutrein.com.br`. Usuário pediu `meutrein.com.br` (apex). Fallbacks de `NEXT_PUBLIC_APP_URL` no código usam TODOS `www.` (`layout.tsx:37`, `sitemap.ts`, `robots.ts`, `opengraph-image`, `api/cron/.../inactivity`).
+- **Perguntei:** alinhar código pra apex sem www (trocar fallbacks + `NEXT_PUBLIC_APP_URL` na Vercel + redirect www→apex), OU ficar com www (CLAUDE.md) e só ajustar Supabase? **Aguardando resposta.**
+
+**Passo a passo ENTREGUE ao usuário (15:10):**
+1. Descobrir qual domínio o site abre: digitar `meutrein.com.br` e ver se a barra fica no apex ou pula pra `www`.
+2. Supabase Dashboard → Authentication → URL Configuration → Site URL = domínio do passo 1; Redirect URLs += `https://meutrein.com.br/**`, `https://www.meutrein.com.br/**`, manter `https://meutrein.vercel.app/**`.
+3. Testar login Google pelo domínio certo.
+
+**Próximos passos:**
+- [ ] **AGUARDANDO usuário responder qual domínio apareceu no passo 1** (apex vs www) — trava o ajuste de código.
+- [ ] Se o site abre no apex (`meutrein.com.br`): editar fallbacks de `www.meutrein.com.br` → `meutrein.com.br` no código (`layout.tsx:37,41`, `sitemap.ts`, `robots.ts`, `opengraph-image.tsx`, `api/cron/.../inactivity:85`) + avisar pra setar `NEXT_PUBLIC_APP_URL` na Vercel. (Mexer em domínio = "só com aprovação explícita" — CLAUDE.md.)
+- [ ] Usuário aplica a config no Supabase Dashboard (resolve o login independente da decisão de código).
+
+**Arquivos tocados nesta rodada:** nenhum (só diagnóstico + entrega de instruções). `page.tsx` da rodada anterior segue modificado não-commitado.
+
+**Como retomar:** nada editado. Esperando o usuário dizer se o site abre em `meutrein.com.br` (apex) ou `www.meutrein.com.br` (www) — isso decide se ajusto os fallbacks de domínio no código. O fix do login em si é 100% no Supabase Dashboard (Site URL + Redirect URLs).
+
+## 2026-06-14 14:30 — BeforeAfterSection + TrustStrip adicionados à landing ✅
+
+**Tarefa / objetivo:** adicionar seção "Antes × Depois" (caderno/Excel/zap → MeuTrein) e selos de confiança à landing, sem depender de imagens externas.
+
+**Feito até agora:**
+- `BeforeAfterSection` adicionada em `app/page.tsx`: dois cards lado a lado (Antes = borda vermelha + itens riscados; Com o MeuTrein = borda esmeralda + glow). Inserida entre `<StatsBar />` e `<FeaturesSection />`. Animação de entrada `x: -24 / +24`.
+- `TrustStrip` adicionada: faixa fina com border-y contendo 5 selos (iPhone & Android, LGPD/Brasil, Stripe, Funciona sem internet, Suporte PT-BR). Inserida entre `<HowItWorksSection />` e `<PricingSection />` — exatamente onde o visitante considera comprar.
+- `pnpm type-check` OK — sem erros de tipo.
+- Git: `CHECKPOINT.md` e `page.tsx` modificados, **não commitados**.
+
+**Próximos passos (do backlog de melhorias visuais):**
+- [ ] **Screenshots REAIS do produto** — maior alavanca, mas **depende do usuário mandar os prints** (Playwright sem binário Ubuntu 26.04, Firefox headless travado). Criar galeria "Veja por dentro" quando tiver as imagens.
+- [ ] **Prova social honesta** — depoimentos reais ou "as primeiras academias já estão usando" (sem claim inventado — regra do CLAUDE.md).
+- [ ] **Polish pricing** — toggle mensal/anual + checkmarks comparando 3 planos lado a lado.
+- [ ] Confirmar **@ real do Instagram** — placeholder `instagram.com/meutrein` em `Footer` (`SOCIALS`).
+- [ ] **Seção 2 (Aulas/Turmas) — NÃO iniciada.** Aguarda 3 decisões (aulas fixas semanais; criar = dono+personal; reserva por ocorrência com lista de espera). Migration nova > 073 em PROD — avisar antes de aplicar.
+- [ ] Avaliar resultado visual em http://localhost:3334/
+- [ ] Commitar `page.tsx` (se usuário aprovar o visual).
+
+**Arquivos tocados:**
+- `GymFlow-main/apps/web/app/page.tsx` — `beforeItems[]`, `afterItems[]`, `BeforeAfterSection()`, `TRUST_BADGES[]`, `TrustStrip()` adicionados; render do `LandingPage` atualizado com `<BeforeAfterSection />` e `<TrustStrip />`.
+
+**Pendências / decisões em aberto:**
+- Usuário ainda não viu o resultado visual — aguarda avaliação.
+- Instagram placeholder.
+- Prints reais do produto (quando disponíveis → galeria "Veja por dentro").
+
+**Como retomar:** as mudanças estão no working tree (`page.tsx` modificado, não commitado). Abrir http://localhost:3334/ para avaliar. Se dev server parou, rodar `doppler run -- pnpm --filter @gymflow/web dev` na raiz `GymFlow-main/`.
+
+## 2026-06-14 13:45 — Backlog de melhorias visuais da landing (ideias dadas, aguardando escolha)
+
+Avaliação: visual já bom (moderno, coeso, dark, motion). Falta **concretude e prova**, não enfeite. Ordem de impacto:
+1. **Screenshots REAIS do produto** (seção "veja por dentro": dashboard dono, montar ficha, app aluno executando, gráfico evolução). Maior alavanca, mas **depende do usuário mandar os prints** (não consigo screenshot neste ambiente — firefox headless travado, playwright sem binário ubuntu 26.04).
+2. **Prova social honesta** (depoimentos reais OU "as primeiras academias já estão usando" — SEM claim inventado, regra do projeto).
+3. **"Antes × Depois"** (caderno/Excel/zap → MeuTrein). ← **recomendei começar por esta: 100% código, sem depender de imagem.**
+
+Polish menor: nav que encolhe ao rolar; pricing com toggle mensal/anual + checkmarks comparando 3 planos; hover-lift/glow nos cards de feature; selos de confiança (iPhone/Android, LGPD/dados no Brasil, Stripe); bloco de 3 objeções curtas no topo; logos de pagamento.
+
+**Pergunta pendente ao usuário:** fazer "Antes × Depois" + selos agora (em paralelo ele manda os prints pra galeria), ou começar por outra?
+
+## 2026-06-14 13:40 — Git SINCRONIZADO com GitHub ✅
+
+**Resolvido.** `git pull --no-rebase` (merge, ort) **sem conflitos** → merge `fb81065` → `git push` OK (`2103f41..fb81065`). `Branch_Jose` agora idêntico a `origin/Branch_Jose` (0 à frente / 0 atrás). Todo o trabalho da sessão (tema escuro 3%, whatsapp-fab.tsx, rodapé Smart Fit, Seção 1) está no GitHub.
+
+**Único pendente de git:** `CHECKPOINT.md` aparece como `M` (modificado, não commitado) — é arquivo de trabalho local, não foi pro repo. Commitar só se o usuário pedir.
+
+**Próximos passos do PRODUTO (inalterados):**
+- [ ] Confirmar @ real do Instagram (placeholder `instagram.com/meutrein` no `Footer` → `SOCIALS`).
+- [ ] **Seção 2 (Aulas/Turmas) — NÃO iniciada.** Aguarda 3 decisões (recom.: aulas fixas semanais; criar = dono+personal; reserva por ocorrência com lista de espera). Migration nova > 073 em PROD — avisar antes de aplicar.
+- [ ] Avaliar tema escuro em http://localhost:3334/ (dev server bg ID `b2o8ngdo8` ainda rodando).
+- [ ] Pendência externa: consent screen Google OAuth (App name "MeuTrein" + links privacidade/termos).
+
 ## 2026-06-14 10:40 — Tema mais escuro/contraste + security review
 
 **Tarefa / objetivo:** (1) escurecer o tema com mais contraste, confortável p/ 12h de uso, sem cansar a vista; (2) rodar `/security-review` na branch.
