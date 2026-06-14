@@ -59,6 +59,9 @@ function NavigationProgressInner() {
       if (!href || href.startsWith('http') || href.startsWith('#') ||
           href.startsWith('mailto:') || href.startsWith('tel:') ||
           anchor.target === '_blank') return
+      // Mesma rota (ex: clicar no logo já estando em "/"): a navegação não muda
+      // o pathname, então complete() nunca rodaria e a barra travaria em ~85%.
+      if (anchor.pathname === window.location.pathname) return
       start()
     }
 

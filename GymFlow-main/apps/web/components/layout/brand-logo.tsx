@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
 import { Dumbbell } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -37,11 +38,25 @@ export function BrandLogo({ size = 'md', showText = true, className }: BrandLogo
   const profile = useAuthStore((s) => s.profile)
   const href = profile ? '/dashboard' : '/'
 
+  const pathname = usePathname()
+  const router = useRouter()
+
+  // Já estamos no destino do logo → o <Link> não navegaria (mesma rota) e
+  // ficaríamos parados onde estamos. Volta pro topo e atualiza a página.
+  const handleClick = (e: React.MouseEvent) => {
+    if (pathname === href) {
+      e.preventDefault()
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      router.refresh()
+    }
+  }
+
   const sz = SIZES[size]
 
   return (
     <Link
       href={href}
+      onClick={handleClick}
       className={cn('inline-flex items-center gap-2 group', className)}
       aria-label="MeuTrein — voltar"
     >

@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
  * - sem subscription + plano pago → checkout abandonado ("finalize o pagamento")
  * - past_due → cartão falhou
  * - canceled → assinatura cancelada
+ * - trialing + faltam ≤3 dias → teste grátis acabando (vermelho)
  *
  * Oculto em /configuracoes (o usuário já está na tela que resolve).
  */
@@ -38,6 +39,18 @@ export function BillingBanner() {
   } else if (status === 'canceled') {
     message = 'Sua assinatura foi cancelada. Reative para continuar usando todos os recursos.'
     tone = 'red'
+  } else if (status === 'trialing' && currentAcademy.trial_ends_at) {
+    // Avisa só na reta final do teste grátis (≤3 dias). trial_ends_at já vem no
+    // objeto da academia (store) — sem fetch extra ao Stripe no banner.
+    const daysLeft = Math.ceil(
+      (new Date(currentAcademy.trial_ends_at).getTime() - Date.now()) / 86_400_000,
+    )
+    if (daysLeft <= 3) {
+      message = daysLeft >= 1
+        ? `Seu período de teste termina em ${daysLeft} dia${daysLeft !== 1 ? 's' : ''}. Confirme seu plano para não perder o acesso.`
+        : 'Seu período de teste termina hoje. Confirme seu plano para não perder o acesso.'
+      tone = 'red'
+    }
   } else if (!status && paidPlan && !currentAcademy.stripe_subscription_id) {
     message = 'Falta concluir o pagamento do seu plano. Finalize para garantir seu acesso.'
     tone = 'amber'

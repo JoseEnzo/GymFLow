@@ -4,6 +4,7 @@ import { Header } from '@/components/layout/header'
 import { BottomNav } from '@/components/layout/bottom-nav'
 import { OfflineSyncProvider } from '@/components/layout/offline-sync-provider'
 import { BillingBanner } from '@/components/layout/billing-banner'
+import { ProfileCompletionBanner } from '@/components/layout/profile-completion-banner'
 export const metadata: Metadata = {
   title: 'Dashboard',
 }
@@ -22,6 +23,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* pb-24 reserva espaço para o BottomNav no mobile */}
           <div className="p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 max-w-[1400px] mx-auto">
             <BillingBanner />
+            <ProfileCompletionBanner />
             {children}
           </div>
         </main>

@@ -50,6 +50,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ ready: false })
   }
 
+  // Status/trial reais do Stripe — starter/personal entram em 'trialing' (30 dias).
+  // Sem isso o banco salvava 'active' + trial_ends_at null, e o aviso de fim de
+  // trial nunca aparecia.
+  let subStatus: 'active' | 'trialing' = 'active'
+  let trialEndsAt: string | null = null
+  if (session.subscription) {
+    const sub = await stripe.subscriptions.retrieve(session.subscription as string)
+    subStatus = sub.status === 'trialing' ? 'trialing' : 'active'
+    trialEndsAt = sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: updated } = await (admin as any)
     .from('academies')
@@ -57,7 +68,8 @@ export async function GET(request: Request) {
       plan,
       stripe_customer_id:     session.customer as string,
       stripe_subscription_id: session.subscription as string,
-      subscription_status:    'active',
+      subscription_status:    subStatus,
+      trial_ends_at:          trialEndsAt,
     })
     .eq('id', academyId)
     .select()

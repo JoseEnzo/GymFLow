@@ -68,11 +68,22 @@ export async function POST(request: Request) {
         const planId    = session.metadata?.['planId']
 
         if (academyId && isAcademyPlan(planId)) {
+          // Lê status/trial reais do Stripe — starter/personal entram em 'trialing'
+          // (30 dias), não 'active'. Sem isso o banco salvava 'active' + trial_ends_at
+          // null, e o aviso de fim de trial nunca disparava.
+          let subStatus: 'active' | 'trialing' = 'active'
+          let trialEndsAt: string | null = null
+          if (session.subscription) {
+            const sub = await stripe.subscriptions.retrieve(session.subscription as string)
+            subStatus = sub.status === 'trialing' ? 'trialing' : 'active'
+            trialEndsAt = sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null
+          }
           const { error: updateErr } = await supabase.from('academies').update({
             plan: planId,
             stripe_customer_id:     session.customer as string,
             stripe_subscription_id: session.subscription as string,
-            subscription_status:    'active',
+            subscription_status:    subStatus,
+            trial_ends_at:          trialEndsAt,
           }).eq('id', academyId)
           if (updateErr) throw updateErr
         }
@@ -86,6 +97,7 @@ export async function POST(request: Request) {
 
         const { error: updateErr } = await supabase.from('academies').update({
           subscription_status: sub.status as 'active' | 'canceled' | 'past_due' | 'trialing',
+          trial_ends_at: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
           ...(plan ? { plan } : {}),
         }).eq('stripe_subscription_id', sub.id)
         if (updateErr) throw updateErr
