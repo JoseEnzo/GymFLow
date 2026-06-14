@@ -407,6 +407,47 @@ export type Database = {
           },
         ]
       }
+      contact_requests: {
+        Row: {
+          academy_id: string
+          created_at: string
+          email: string | null
+          id: string
+          message: string | null
+          name: string | null
+          phone: string | null
+          status: string
+        }
+        Insert: {
+          academy_id: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          message?: string | null
+          name?: string | null
+          phone?: string | null
+          status?: string
+        }
+        Update: {
+          academy_id?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          message?: string | null
+          name?: string | null
+          phone?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_requests_academy_id_fkey"
+            columns: ["academy_id"]
+            isOneToOne: false
+            referencedRelation: "academies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       diet_plan_meals: {
         Row: {
           created_at: string
@@ -1605,6 +1646,19 @@ export type Database = {
           p_week_ago: string
         }
         Returns: Json
+      }
+      get_public_academies: {
+        Args: never
+        Returns: {
+          city: string
+          id: string
+          logo_url: string
+          name: string
+          personal_count: number
+          slug: string
+          state: string
+          student_count: number
+        }[]
       }
       get_student_dashboard: {
         Args: {

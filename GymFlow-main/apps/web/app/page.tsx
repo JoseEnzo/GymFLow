@@ -229,6 +229,7 @@ function Nav() {
             {[
               { label: 'Funcionalidades', href: '#funcionalidades' },
               { label: 'Preços', href: '#preco' },
+              { label: 'Academias', href: '/academias' },
               { label: 'Sobre', href: '#sobre' },
             ].map((item) => (
               <a
@@ -299,6 +300,7 @@ function Nav() {
               {[
                 { label: 'Funcionalidades', href: '#funcionalidades' },
                 { label: 'Preços', href: '#preco' },
+                { label: 'Academias', href: '/academias' },
                 { label: 'Sobre', href: '#sobre' },
               ].map((item) => (
                 <a
