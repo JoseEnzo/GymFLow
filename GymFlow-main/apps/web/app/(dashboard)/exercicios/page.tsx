@@ -283,7 +283,8 @@ function ExerciciosContent() {
   const [selectedMuscle, setSelectedMuscle] = useState<string | null>(null)
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty | null>(null)
   const [view, setView] = useState<'grid' | 'list'>('grid')
-  const [showModal, setShowModal] = useState(false)
+  // Abre direto o modal de criação quando vem do "+ Novo" do header (?novo=1).
+  const [showModal, setShowModal] = useState(searchParams.get('novo') === '1' && isPersonal)
   const [adding, setAdding] = useState<string | null>(null)
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set())
   const [sheetName, setSheetName] = useState('')

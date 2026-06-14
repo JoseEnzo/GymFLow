@@ -1405,7 +1405,7 @@ async function logFreeWorkout() {
                 <div className="glass rounded-2xl p-4 border border-amber-500/20 bg-amber-500/5">
                   <p className="text-xs font-semibold text-amber-300 mb-1">Perfil incompleto</p>
                   <p className="text-[10px] text-muted-foreground mb-2">Adicione seus dados físicos para acompanhar sua evolução.</p>
-                  <Link href="/perfil" className="text-xs text-amber-400 font-semibold flex items-center gap-1 hover:underline">
+                  <Link href="/configuracoes" className="text-xs text-amber-400 font-semibold flex items-center gap-1 hover:underline">
                     Completar perfil <ChevronRight className="w-3 h-3" />
                   </Link>
                 </div>

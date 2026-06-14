@@ -18,7 +18,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { getInitials } from '@/lib/utils'
 import type { NavItem } from '@/types'
 
-const NAV_ITEMS: NavItem[] = [
+export const NAV_ITEMS: NavItem[] = [
   // Todos
   { label: 'Dashboard',        href: '/dashboard',    icon: LayoutDashboard, roles: ['owner', 'personal', 'student'] },
 
