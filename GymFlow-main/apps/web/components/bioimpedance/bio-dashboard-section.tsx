@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Activity, ChevronRight, Scale, Droplets, Users } from 'lucide-react'
@@ -42,7 +42,9 @@ export function BioDashboardSection({ academyId, personalId }: Props) {
   const [recent, setRecent] = useState<RecentAssessment[]>([])
   const [studentsAssessed, setStudentsAssessed] = useState(0)
   const [studentsTotal, setStudentsTotal] = useState(0)
-  const supabase = createClient()
+  // useMemo: createClient() no corpo + `supabase` nas deps do useEffect = loop
+  // infinito de render. (Componente atualmente não montado, mas mantido correto.)
+  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     let cancelled = false

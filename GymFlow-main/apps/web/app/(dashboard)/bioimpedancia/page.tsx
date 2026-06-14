@@ -47,7 +47,9 @@ function formatRelative(dateIso: string | null): string {
 export default function BioimpedanciaPage() {
   const { currentAcademy, currentRole } = useAuthStore()
   const { profile } = useAuth()
-  const supabase = createClient()
+  // useMemo: instância estável. createClient() no corpo + `supabase` nas deps do
+  // useEffect = loop infinito de render ("Maximum update depth") que trava a aba.
+  const supabase = useMemo(() => createClient(), [])
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
