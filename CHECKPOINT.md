@@ -1,5 +1,30 @@
 # Checkpoint
 
+## 2026-06-15 ~14:00 — Fix brand-logo loop + botão Voltar em verificar-email (APLICADO ✅)
+
+**Tarefa:** reaplicar duas correções que haviam sido revertidas pelo linter na sessão anterior: (1) loop infinito ao clicar logo na tela `/verificar-email`; (2) ausência de botão "Voltar para o início" na mesma tela.
+
+**Feito:**
+- **`apps/web/components/layout/brand-logo.tsx` linha 39** — trocado `profile ? '/dashboard'` por `profile?.email_verified_at ? '/dashboard'`. Quebra o loop: sem e-mail verificado, logo aponta pra `/` em vez de `/dashboard` → `/onboarding` → `/verificar-email` → loop.
+- **`apps/web/app/(auth)/verificar-email/page.tsx`** — adicionados:
+  - Import `ArrowLeft` (lucide-react) + `useAuthStore` (`@/stores/auth-store`)
+  - `reset` extraído do store via hook
+  - Função `goHome()`: `supabase.auth.signOut()` + `reset()` + `router.replace('/')`
+  - Botão "Voltar para o início" na UI abaixo do link de reenvio, separado por `border-t`
+
+**Arquivos tocados:**
+- `GymFlow-main/apps/web/components/layout/brand-logo.tsx` (+1/-1)
+- `GymFlow-main/apps/web/app/(auth)/verificar-email/page.tsx` (+20/-1)
+
+**COMMITADO ✅** — commit `9accca3` "Fix loop do logo e adiciona botão Voltar em verificar-email" (3 arquivos: brand-logo + verificar-email + CHECKPOINT.md). Working tree **limpo**. A feature CREF já estava no commit anterior `026410c "Feat correções"` (cadastro/page.tsx, middleware.ts, verify-cref/route.ts, lib/cref.ts — todos tracked, NÃO no working tree).
+
+**Pendências / decisões em aberto:**
+- [ ] `git push` pro origin (branch `Branch_Jose`) — perguntei ao usuário, aguardando. Branch está à frente do origin por 1+ commit.
+- [ ] `pnpm type-check` não rodou (deps não instaladas). Tipos usados (`Profile.email_verified_at`) confirmados no `packages/database/src/types.ts`. CI cobre no PR.
+- [ ] Verificar visualmente o fluxo: cadastro personal → tela verificar-email → clicar logo (deve ir pra `/`) + clicar botão Voltar (deve fazer signOut e ir pra `/`)
+
+**Como retomar:** trabalho commitado em `9accca3`, working tree limpo. Falta só `git push` (se o usuário aprovar) e verificação visual.
+
 ## 2026-06-15 ~11:30 — Verificação REAL do CREF no cadastro do personal (IMPLEMENTADO)
 
 **Tarefa:** cadastro do personal só validava formato do CREF (regex). Usuário quer verificação real do registro, mesmo sendo opcional. Decisão dele (AskUserQuestion): **scraping do conselho** (não upload/manual, não API paga).

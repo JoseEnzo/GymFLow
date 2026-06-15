@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef, Suspense, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Loader2, MailCheck, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Loader2, MailCheck, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { createClient } from '@/lib/supabase/client'
+import { useAuthStore } from '@/stores/auth-store'
 
 function maskEmail(email: string): string {
   const [user, domain] = email.split('@')
@@ -21,6 +22,7 @@ function VerifyContent() {
   const supabase = useMemo(() => createClient(), [])
   const next = searchParams.get('next') || '/onboarding'
 
+  const reset = useAuthStore((s) => s.reset)
   const [email, setEmail] = useState<string | null>(null)
   const [code, setCode] = useState('')
   const [verifying, setVerifying] = useState(false)
@@ -45,6 +47,12 @@ function VerifyContent() {
     const t = setTimeout(() => setCooldown((c) => c - 1), 1000)
     return () => clearTimeout(t)
   }, [cooldown])
+
+  async function goHome() {
+    await supabase.auth.signOut()
+    reset()
+    router.replace('/')
+  }
 
   async function sendCode(silent = false) {
     try {
@@ -141,6 +149,16 @@ function VerifyContent() {
         >
           <RefreshCw className="w-3.5 h-3.5" />
           {cooldown > 0 ? `Reenviar em ${cooldown}s` : 'Não recebeu? Reenviar código'}
+        </button>
+      </div>
+
+      <div className="border-t border-border pt-4 text-center">
+        <button
+          onClick={goHome}
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Voltar para o início
         </button>
       </div>
     </motion.div>
