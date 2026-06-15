@@ -13,6 +13,7 @@ const PUBLIC_API_ROUTES = [
   '/api/invites/lookup',   // preview público de convite
   '/api/webhooks/stripe',  // assinatura Stripe verifica autenticidade
   '/api/check-document',   // cadastro: pre-check de CNPJ/CREF já existente
+  '/api/verify-cref',      // cadastro: verificação real do CREF no conselho regional
   '/api/academias/contact',// diretório público: visitante pede convite a uma academia
 ]
 
