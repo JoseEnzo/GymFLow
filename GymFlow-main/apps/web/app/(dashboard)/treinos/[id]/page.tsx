@@ -14,7 +14,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
 import { useRealtime } from '@/hooks/use-realtime'
-import { cn } from '@/lib/utils'
+import { cn, formatWeekRange } from '@/lib/utils'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 12 },
@@ -50,6 +50,8 @@ interface WorkoutSheet {
   scheduled_days: number[]
   schedule_type: 'daily' | 'weekly' | 'monthly'
   student_id: string
+  week_start: number | null
+  week_end: number | null
   student?: { full_name: string | null } | null
   exercises: SheetExercise[]
 }
@@ -98,6 +100,52 @@ function DayPicker({ days, onChange, saving }: {
           </button>
         )
       })}
+    </div>
+  )
+}
+
+function WeekRangeCard({ start, end, saving, onSave }: {
+  start: number | null
+  end: number | null
+  saving: boolean
+  onSave: (s: number | null, e: number | null) => void
+}) {
+  const [s, setS] = useState(start != null ? String(start) : '')
+  const [e, setE] = useState(end != null ? String(end) : '')
+  const parsedS = s ? parseInt(s, 10) : null
+  const parsedE = e ? parseInt(e, 10) : null
+  const dirty = parsedS !== start || parsedE !== end
+
+  return (
+    <div className="glass rounded-2xl p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <CalendarDays className="w-4 h-4 text-brand-400" />
+          <h3 className="font-display font-bold text-sm">Faixa de semanas</h3>
+        </div>
+        {saving && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+      </div>
+      <p className="text-xs text-muted-foreground mb-3">
+        Periodização (opcional): de qual semana até qual semana esta ficha vale.
+      </p>
+      <div className="flex items-end gap-2">
+        <div className="space-y-1 flex-1">
+          <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Inicial</label>
+          <input type="number" inputMode="numeric" min={1} value={s} onChange={(ev) => setS(ev.target.value)} placeholder="—" className="field text-sm py-2" />
+        </div>
+        <span className="pb-3 text-muted-foreground">–</span>
+        <div className="space-y-1 flex-1">
+          <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Final</label>
+          <input type="number" inputMode="numeric" min={1} value={e} onChange={(ev) => setE(ev.target.value)} placeholder="—" className="field text-sm py-2" />
+        </div>
+        <button
+          onClick={() => onSave(parsedS, parsedE)}
+          disabled={saving || !dirty}
+          className="btn-primary px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-40"
+        >
+          Salvar
+        </button>
+      </div>
     </div>
   )
 }
@@ -258,6 +306,7 @@ export default function WorkoutSheetDetailPage() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [savingDays, setSavingDays] = useState(false)
+  const [savingWeeks, setSavingWeeks] = useState(false)
   const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay())
 
   const load = useCallback(async () => {
@@ -267,7 +316,7 @@ export default function WorkoutSheetDetailPage() {
       const { data, error } = await (supabase as any)
         .from('workout_sheets')
         .select(`
-          id, name, goal, description, is_active, created_at, scheduled_days, schedule_type, student_id,
+          id, name, goal, description, is_active, created_at, scheduled_days, schedule_type, student_id, week_start, week_end,
           sheet_exercises (
             id, sets, reps, rest_seconds, weight_suggestion, notes, order_index, day_index,
             exercise:exercises ( id, name_pt, muscle_groups )
@@ -338,6 +387,21 @@ export default function WorkoutSheetDetailPage() {
     toast.success('Dias atualizados.')
   }
 
+  async function handleWeekRangeSave(ws: number | null, we: number | null) {
+    if (!sheet) return
+    if (ws !== null && we !== null && we < ws) { toast.error('A semana final não pode ser menor que a inicial.'); return }
+    setSavingWeeks(true)
+    setSheet((prev) => prev ? { ...prev, week_start: ws, week_end: we } : prev)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
+      .from('workout_sheets')
+      .update({ week_start: ws, week_end: we })
+      .eq('id', sheet.id)
+    setSavingWeeks(false)
+    if (error) { toast.error('Erro ao salvar faixa de semanas.'); return }
+    toast.success('Faixa de semanas atualizada.')
+  }
+
   async function handleDeleteExercise(exerciseId: string) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (supabase as any).from('sheet_exercises').delete().eq('id', exerciseId)
@@ -401,6 +465,12 @@ export default function WorkoutSheetDetailPage() {
             {sheet.is_active && <span className="badge-success text-[10px]">Ativa</span>}
             {sheet.schedule_type !== 'daily' && (
               <span className="badge text-[10px]">{SCHEDULE_LABELS[sheet.schedule_type]}</span>
+            )}
+            {formatWeekRange(sheet.week_start, sheet.week_end) && (
+              <span className="badge text-[10px] inline-flex items-center gap-1 text-brand-300 border-brand-500/30 bg-brand-500/10">
+                <CalendarDays className="w-2.5 h-2.5" />
+                {formatWeekRange(sheet.week_start, sheet.week_end)}
+              </span>
             )}
           </div>
           <div className="flex items-center gap-3 mt-1 flex-wrap">
@@ -503,6 +573,18 @@ export default function WorkoutSheetDetailPage() {
               Nenhum dia selecionado — este treino não aparecerá na agenda do aluno.
             </p>
           )}
+        </motion.div>
+      )}
+
+      {/* Faixa de semanas — personal only */}
+      {isPersonal && (
+        <motion.div custom={3} variants={fadeUp} initial="hidden" animate="show">
+          <WeekRangeCard
+            start={sheet.week_start}
+            end={sheet.week_end}
+            saving={savingWeeks}
+            onSave={handleWeekRangeSave}
+          />
         </motion.div>
       )}
 

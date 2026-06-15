@@ -94,6 +94,8 @@ function NovaFichaContent() {
 
   const [saving, setSaving] = useState(false)
   const [selectedGoal, setSelectedGoal] = useState('')
+  const [weekStart, setWeekStart] = useState('')
+  const [weekEnd, setWeekEnd] = useState('')
   const [scheduleType, setScheduleType] = useState<'daily' | 'weekly' | 'monthly'>('daily')
   const [splitChoice, setSplitChoice] = useState<SplitChoice>('single')
   // splitDays[i] = dias da semana atribuídos à letra i (0=A, 1=B, ...). Ex: [[1,4],[2,5]]
@@ -190,6 +192,13 @@ function NovaFichaContent() {
       return
     }
 
+    const ws = weekStart ? parseInt(weekStart, 10) : null
+    const we = weekEnd ? parseInt(weekEnd, 10) : null
+    if (ws !== null && we !== null && we < ws) {
+      toast.error('A semana final não pode ser menor que a inicial.')
+      return
+    }
+
     const splitMeta = SPLITS.find((s) => s.id === splitChoice)!
     const isSplit = splitChoice !== 'single'
 
@@ -229,6 +238,8 @@ function NovaFichaContent() {
             description: data.description || null,
             is_active: true,
             schedule_type: scheduleType,
+            week_start: ws,
+            week_end: we,
           })
           .select('id')
           .single()
@@ -270,6 +281,8 @@ function NovaFichaContent() {
         is_active: true,
         schedule_type: 'daily' as const,
         scheduled_days: splitDays[i]!,
+        week_start: ws,
+        week_end: we,
       }))
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -432,6 +445,45 @@ function NovaFichaContent() {
               placeholder="Observações sobre a ficha, foco do treino..."
               className="field resize-none"
             />
+          </div>
+        </motion.div>
+
+        {/* Faixa de semanas — periodização (organização) */}
+        <motion.div custom={2} variants={fadeUp} initial="hidden" animate="show" className="glass rounded-2xl p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-brand-400" />
+            <h3 className="font-display font-bold text-sm">
+              Faixa de semanas <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+            </h3>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Pra organizar a periodização. Ex: uma ficha pra semanas 1–3 e outra pra 4–5.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Semana inicial</label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                value={weekStart}
+                onChange={(e) => setWeekStart(e.target.value)}
+                placeholder="ex: 1"
+                className="field text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Semana final</label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                value={weekEnd}
+                onChange={(e) => setWeekEnd(e.target.value)}
+                placeholder="ex: 3"
+                className="field text-sm"
+              />
+            </div>
           </div>
         </motion.div>
 

@@ -96,6 +96,13 @@ export function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+// Rótulo da faixa de semanas de uma ficha (periodização). null quando não definida.
+export function formatWeekRange(start: number | null | undefined, end: number | null | undefined): string | null {
+  if (start == null) return null
+  if (end == null || end === start) return `Semana ${start}`
+  return `Semana ${start}-${end}`
+}
+
 export const ROLE_LABELS: Record<string, string> = {
   owner: 'Proprietário',
   personal: 'Personal',

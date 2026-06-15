@@ -1524,6 +1524,8 @@ export type Database = {
           student_id: string
           updated_at: string
           valid_until: string | null
+          week_end: number | null
+          week_start: number | null
         }
         Insert: {
           academy_id: string
@@ -1540,6 +1542,8 @@ export type Database = {
           student_id: string
           updated_at?: string
           valid_until?: string | null
+          week_end?: number | null
+          week_start?: number | null
         }
         Update: {
           academy_id?: string
@@ -1556,6 +1560,8 @@ export type Database = {
           student_id?: string
           updated_at?: string
           valid_until?: string | null
+          week_end?: number | null
+          week_start?: number | null
         }
         Relationships: [
           {

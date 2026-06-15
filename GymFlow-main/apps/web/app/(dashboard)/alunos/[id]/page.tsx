@@ -12,7 +12,7 @@ import Link from 'next/link'
 
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
-import { cn } from '@/lib/utils'
+import { cn, formatWeekRange } from '@/lib/utils'
 import { BioimpedanceSection } from '@/components/bioimpedance/bioimpedance-section'
 import { MeasurementsSection } from '@/components/bioimpedance/measurements-section'
 
@@ -42,6 +42,8 @@ interface WorkoutSheetBasic {
   name: string
   goal: string | null
   is_active: boolean
+  week_start: number | null
+  week_end: number | null
 }
 
 interface MealPlanBasic {
@@ -113,7 +115,7 @@ export default function StudentDetailPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: sheetsData, error: sheetsError } = await (supabase as any)
         .from('workout_sheets')
-        .select('id, name, goal, is_active')
+        .select('id, name, goal, is_active, week_start, week_end')
         .eq('academy_id', currentAcademy.id)
         .eq('student_id', id)
         .order('created_at', { ascending: false })
@@ -334,6 +336,11 @@ export default function StudentDetailPage() {
                     {s.goal && <p className="text-xs text-muted-foreground">{s.goal}</p>}
                   </div>
                   <div className="flex items-center gap-2">
+                    {formatWeekRange(s.week_start, s.week_end) && (
+                      <span className="badge text-[9px] text-brand-300 border-brand-500/30 bg-brand-500/10">
+                        {formatWeekRange(s.week_start, s.week_end)}
+                      </span>
+                    )}
                     {s.is_active && <span className="badge-success text-[9px]">Ativa</span>}
                     <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-muted-foreground" />
                   </div>

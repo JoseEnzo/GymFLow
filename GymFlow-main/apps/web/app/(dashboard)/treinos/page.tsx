@@ -9,7 +9,7 @@ import {
 import Link from 'next/link'
 import { toast } from 'sonner'
 
-import { cn } from '@/lib/utils'
+import { cn, formatWeekRange } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/stores/auth-store'
 import { useRealtime } from '@/hooks/use-realtime'
@@ -29,6 +29,8 @@ interface Sheet {
   created_at: string
   schedule_type?: string | null
   scheduled_days?: number[] | null
+  week_start?: number | null
+  week_end?: number | null
   student_name?: string | null
   exercise_count?: number
 }
@@ -86,6 +88,11 @@ function SheetCard({ sheet, isPersonal, isStudent, readOnly, onDelete }: {
               {sheet.is_active && <span className="badge-success text-[10px]">Ativa</span>}
               {sheet.schedule_type && SCHEDULE_BADGE[sheet.schedule_type] && (
                 <span className="badge text-[10px]">{SCHEDULE_BADGE[sheet.schedule_type]}</span>
+              )}
+              {formatWeekRange(sheet.week_start, sheet.week_end) && (
+                <span className="badge text-[10px] text-brand-300 border-brand-500/30 bg-brand-500/10">
+                  {formatWeekRange(sheet.week_start, sheet.week_end)}
+                </span>
               )}
             </div>
             <h3 className="font-display font-bold text-sm leading-snug">{sheet.name}</h3>
@@ -247,7 +254,7 @@ export default function TreinosPage() {
       let query = (supabase as any)
         .from('workout_sheets')
         .select(`
-          id, name, goal, is_active, created_at, student_id, schedule_type, scheduled_days,
+          id, name, goal, is_active, created_at, student_id, schedule_type, scheduled_days, week_start, week_end,
           sheet_exercises ( id )
         `)
         .eq('academy_id', currentAcademy.id)
