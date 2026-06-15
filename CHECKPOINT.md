@@ -1,5 +1,86 @@
 # Checkpoint
 
+## 2026-06-15 ~15:45 — Auditoria de responsividade da landing (sólida; aguardando sintomas por device)
+
+**Tarefa:** usuário mostrou tela de config de ~40 dispositivos (Polypane/Responsively) e pediu pra alinhar a landing em todos. Decisões (AskUserQuestion): foco = **landing** (`app/page.tsx`, 1912 linhas); sintoma = "cada device mostra um problema diferente" (não especificou quais).
+
+**LIMITAÇÃO CRÍTICA:** não consigo renderizar/screenshot devices neste ambiente (Playwright sem binário Ubuntu, Firefox headless trava). Quem vê o render é o usuário na ferramenta dele. Eu só audito/corrijo CSS.
+
+**Os ~40 devices = ~6 breakpoints reais:** 375px (iPhone SE/X/XR), 390-430px (iPhones/Galaxy modernos), 768-834px (iPads), 1024-1440px (iPad Pro/tablets/notebooks), 1920px (Full HD/1080p TV), 3840px (4K TV).
+
+**Auditoria feita (landing está SÓLIDA, sem bugs grosseiros):**
+- Padding lateral correto em toda seção: `px-4 sm:px-6 lg:px-8` (12 containers via grep).
+- Grids colapsam certo (1→2/3/4 colunas) em quase todos.
+- Hero/títulos escalam: `text-4xl sm:text-5xl lg:text-6xl`.
+- Os 3 "pontos de risco" iniciais, vistos de perto, estão OK: (1) `grid-cols-3` linha 491 tem `min-w-0`+`truncate`; (2) `w-[280px]` linha 780 cabe folgado em 375px centralizado; (3) `max-w-7xl` em TV 4K é o único problema real, mas é DECISÃO DE DESIGN (aumentar muda desktop também), não bug.
+
+**NENHUM arquivo alterado** — recusei editar no escuro (risco de quebrar a vitrine sem corrigir nada concreto; linter já reverteu edições antes).
+
+**Próximos passos:**
+- [ ] **BLOQUEADO:** usuário precisa mandar print OU descrição de UM device específico onde vê o defeito ("no iPhone SE o título encosta na borda", etc.). Com exemplo concreto, corrijo a faixa e replico pros vizinhos.
+- [ ] Se ele decidir sobre TV 4K: aumentar `max-w-7xl`→maior em `2xl:` (≥1536px) afeta só monitores grandes — opção contida, mas é escolha dele.
+
+**Estrutura da landing (referência):** Nav(198), Hero(346), FeaturesSection(659), AppShowcaseSection(845), PersonasSection(908), HowItWorksSection(1046), PricingSection(1194), SobreSection(1291), CTASection(1393), Footer(1491), BeforeAfterSection(1619), FAQSection(1774).
+
+**Como retomar:** auditoria pronta, landing responsivamente sã. Aguardando sintoma concreto por device pra corrigir com precisão. Sem isso, não editar (chute = risco).
+
+## 2026-06-15 ~15:20 — E-mail de verificação não chega (causa: Resend sandbox)
+
+**Sintoma:** cadastro pede verificação de e-mail, mas o código não chega.
+
+**Causa (confirmada no código, NÃO é bug):** `apps/web/lib/resend.ts:13` → `FROM_EMAIL = RESEND_FROM_EMAIL ?? 'MeuTrein <onboarding@resend.dev>'`. Sem `RESEND_FROM_EMAIL` no Doppler, usa o sandbox `onboarding@resend.dev`, que **só entrega pro e-mail do dono da conta Resend**. Código de envio está correto (`app/api/auth/send-verification/route.ts:96`).
+
+**IMPORTANTE: usuário NÃO usa Doppler — só Vercel + domínio.** As envs `RESEND_API_KEY`/`RESEND_FROM_EMAIL` são server-side (sem `NEXT_PUBLIC_`) → configurar direto em Vercel → Settings → Environment Variables (Production). Ignorar instruções de Doppler do CLAUDE.md pra esse usuário.
+
+**Soluções dadas:**
+- **Desbloquear teste AGORA (A):** cadastrar com o e-mail dono da conta Resend.
+- **Desbloquear teste AGORA (B):** SQL pra marcar verificado: `update profiles set email_verified_at = now() where id = (select id from auth.users where email = 'EMAIL');`
+- **Definitivo (Vercel, sem Doppler):** (1) Resend → verificar domínio `meutrein.com.br` (ou subdomínio `send.`) + registros SPF/DKIM/DMARC no DNS; (2) Vercel env `RESEND_FROM_EMAIL="MeuTrein <noreply@meutrein.com.br>"` (domínio = o verificado) + confirmar `RESEND_API_KEY`; (3) Redeploy na Vercel (env nova só entra com novo deploy).
+
+**Próximos passos:**
+- [ ] Usuário confirmar se `RESEND_API_KEY` já está na Vercel (se cadastro mostra "Envio de e-mail indisponível" = falta a key).
+- [ ] Escolher: desbloqueio rápido (A/B) ou config definitiva do domínio no Resend + Vercel.
+
+**Como retomar:** diagnóstico entregue, nenhum arquivo alterado. Usuário usa Vercel (não Doppler). Aguardando confirmar se RESEND_API_KEY está na Vercel e escolher o caminho.
+
+## 2026-06-15 ~15:00 — SQL para apagar TODOS os perfis preservando catálogo (ENTREGUE, usuário vai rodar)
+
+**Tarefa:** usuário quer apagar TODOS os perfis/usuários do Supabase (PROD), mas preservar receitas/exercícios/alimentos (da última vez o delete apagou o catálogo junto). Decisões (AskUserQuestion): escopo = **todos, incluindo a conta dele** (reset total); execução = **eu gero o SQL, ele roda no SQL Editor**.
+
+**Mapa de FKs (migrations 001/043/052):**
+- Apagar `auth.users` CASCATEIA: profiles, academy_members, invites, workout_sheets, workout_logs, set_logs, etc.
+- `academies.owner_id` → **ON DELETE RESTRICT** (001:43) → academia tem que ser deletada ANTES do owner.
+- `exercises/recipes/food_items.created_by` → **NO ACTION** (001:131, 043:48, 052:21) → bloqueia delete; **SET NULL preserva** os itens. ESSA é a causa do estrago anterior.
+- `exercises/recipes/food_items.academy_id` → **CASCADE** (001:132, 043:49, 052:22) → itens POR-ACADEMIA caem junto com a academia. Só os GLOBAIS (`is_global=true`/`academy_id null`) sobrevivem.
+
+**SQL entregue (no chat, não em arquivo):**
+- **Passo 1 PREVIEW** (SELECT, não-destrutivo): conta users/profiles/academies + globais "(preserva)" vs por-academia "(CAI)" das 3 tabelas de catálogo.
+- **Passo 2 EXECUÇÃO** (transacional `begin;...commit;`): (1) `UPDATE ... SET created_by = null` nas 3 tabelas; (2) `DELETE FROM academies`; (3) `DELETE FROM auth.users`.
+
+**Próximos passos:**
+- [ ] Usuário roda o PREVIEW e confere as linhas "(CAI)". Se tiver catálogo por-academia que ele quer manter, EU forneço passo extra pra converter em global (`academy_id=null, is_global=true`) antes do delete.
+- [ ] Usuário confirma backup/PITR e roda o Passo 2.
+- [ ] Se o `DELETE FROM auth.users` falhar por alguma FK NO ACTION não prevista → rollback automático → ele me manda o erro pra eu adicionar o SET NULL/delete correspondente.
+
+**Avisos dados:** é PROD e irreversível; rodar preview antes; transação dá rollback se algo bloquear.
+
+**Como retomar:** SQL já entregue. Aguardando o usuário rodar o preview/execução ou pedir o passo de conversão custom→global. Nada foi executado por mim (não tenho credenciais Supabase neste ambiente).
+
+## 2026-06-15 ~14:30 — Diagnóstico: perfil "volta" ao banco após excluir + login (NÃO é bug)
+
+**Pergunta do usuário:** ao excluir perfis no Supabase e logar de novo com o mesmo email, o perfil volta. Precisa `supabase db pull`?
+
+**Resposta:** `db pull` NÃO tem relação (só baixa schema, não toca dados/comportamento).
+
+**Causa raiz (confirmada no código):** o usuário deleta só a LINHA de `profiles` (Table Editor), mas o `auth.users` continua existindo → login funciona. Em `apps/web/hooks/use-auth.ts:34-72`, `loadUserData()` (roda no mount e em todo `SIGNED_IN`) faz `upsert` RECRIANDO o profile a partir do `user_metadata` quando não acha a linha. Foi intencional (trigger `handle_new_user` em `001_initial_schema.sql:282` não era confiável no Supabase remoto — só dispara em INSERT de auth.users, nunca em login).
+
+**Solução entregue (3 formas de excluir DE VERDADE — tem que apagar `auth.users`, profile cai por cascade):**
+1. Supabase Dashboard → Authentication → Users → deletar lá (não no Table Editor).
+2. Botão "Excluir minha conta" no app (`POST /api/account/delete`) — caminho recomendado, ordem de FKs correta, libera email/CNPJ/CREF.
+3. SQL: `delete from auth.users where email = '...'`.
+
+**Nenhum arquivo alterado** — só diagnóstico. Pendência opcional: confirmar FK cascade `profiles.id → auth.users.id ON DELETE CASCADE` numa migration (não verifiquei ainda).
+
 ## 2026-06-15 ~14:00 — Fix brand-logo loop + botão Voltar em verificar-email (APLICADO ✅)
 
 **Tarefa:** reaplicar duas correções que haviam sido revertidas pelo linter na sessão anterior: (1) loop infinito ao clicar logo na tela `/verificar-email`; (2) ausência de botão "Voltar para o início" na mesma tela.
@@ -16,14 +97,20 @@
 - `GymFlow-main/apps/web/components/layout/brand-logo.tsx` (+1/-1)
 - `GymFlow-main/apps/web/app/(auth)/verificar-email/page.tsx` (+20/-1)
 
-**COMMITADO ✅** — commit `9accca3` "Fix loop do logo e adiciona botão Voltar em verificar-email" (3 arquivos: brand-logo + verificar-email + CHECKPOINT.md). Working tree **limpo**. A feature CREF já estava no commit anterior `026410c "Feat correções"` (cadastro/page.tsx, middleware.ts, verify-cref/route.ts, lib/cref.ts — todos tracked, NÃO no working tree).
+**COMMITADO ✅ (2 commits locais, NÃO pushados):**
+- `9accca3` "Fix loop do logo e adiciona botão Voltar em verificar-email" (brand-logo + verificar-email + CHECKPOINT.md)
+- `4b7662c` "Atualiza CHECKPOINT com estado pós-commit"
+A feature CREF já estava no commit anterior `026410c "Feat correções"` (cadastro/page.tsx, middleware.ts, verify-cref/route.ts, lib/cref.ts — todos tracked).
+
+**PUSHADO ✅** — usuário rodou `git push origin Branch_Jose` no terminal integrado do VS Code (o push falha no Bash do Claude por falta de credenciais — `gh` não instalado, socket do helper do VS Code só funciona no terminal integrado). Branch `Branch_Jose` sincronizada com origin (`https://github.com/JoseEnzo/GymFLow.git`).
 
 **Pendências / decisões em aberto:**
-- [ ] `git push` pro origin (branch `Branch_Jose`) — perguntei ao usuário, aguardando. Branch está à frente do origin por 1+ commit.
-- [ ] `pnpm type-check` não rodou (deps não instaladas). Tipos usados (`Profile.email_verified_at`) confirmados no `packages/database/src/types.ts`. CI cobre no PR.
-- [ ] Verificar visualmente o fluxo: cadastro personal → tela verificar-email → clicar logo (deve ir pra `/`) + clicar botão Voltar (deve fazer signOut e ir pra `/`)
+- [ ] `pnpm type-check` não rodou (deps não instaladas). Tipos confirmados no `packages/database/src/types.ts`. CI cobre no PR.
+- [ ] (Opcional) Verificar visualmente: cadastro personal → verificar-email → clicar logo (deve ir pra `/`) + botão Voltar.
 
-**Como retomar:** trabalho commitado em `9accca3`, working tree limpo. Falta só `git push` (se o usuário aprovar) e verificação visual.
+**Lição p/ próximas sessões:** `git push` NÃO funciona no Bash do Claude neste ambiente (credenciais inacessíveis). Sempre pedir pro usuário rodar o push no terminal integrado do VS Code.
+
+**Como retomar:** trabalho 100% entregue e pushado (`9accca3`, `4b7662c`). Resta só verificação visual opcional.
 
 ## 2026-06-15 ~11:30 — Verificação REAL do CREF no cadastro do personal (IMPLEMENTADO)
 
