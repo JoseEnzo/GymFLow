@@ -1,5 +1,36 @@
 # Checkpoint
 
+## 2026-06-15 ~14:00 — Fix brand-logo loop + botão Voltar em verificar-email (APLICADO ✅)
+
+**Tarefa:** reaplicar duas correções que haviam sido revertidas pelo linter na sessão anterior: (1) loop infinito ao clicar logo na tela `/verificar-email`; (2) ausência de botão "Voltar para o início" na mesma tela.
+
+**Feito:**
+- **`apps/web/components/layout/brand-logo.tsx` linha 39** — trocado `profile ? '/dashboard'` por `profile?.email_verified_at ? '/dashboard'`. Quebra o loop: sem e-mail verificado, logo aponta pra `/` em vez de `/dashboard` → `/onboarding` → `/verificar-email` → loop.
+- **`apps/web/app/(auth)/verificar-email/page.tsx`** — adicionados:
+  - Import `ArrowLeft` (lucide-react) + `useAuthStore` (`@/stores/auth-store`)
+  - `reset` extraído do store via hook
+  - Função `goHome()`: `supabase.auth.signOut()` + `reset()` + `router.replace('/')`
+  - Botão "Voltar para o início" na UI abaixo do link de reenvio, separado por `border-t`
+
+**Arquivos tocados:**
+- `GymFlow-main/apps/web/components/layout/brand-logo.tsx` (+1/-1)
+- `GymFlow-main/apps/web/app/(auth)/verificar-email/page.tsx` (+20/-1)
+
+**Pendências / decisões em aberto:**
+- [ ] `pnpm type-check` não rodou (deps não instaladas). Tipos usados (`Profile.email_verified_at`) confirmados no `packages/database/src/types.ts`. CI cobre.
+- [ ] Commitar (estes 2 arquivos + os da feature CREF abaixo)
+- [ ] Verificar visualmente o fluxo: cadastro personal → tela verificar-email → clicar logo (deve ir pra `/`) + clicar botão Voltar (deve fazer signOut e ir pra `/`)
+
+**Working tree completo (tudo não-commitado):**
+- `GymFlow-main/apps/web/app/(auth)/cadastro/page.tsx` — verificação CREF no cadastro
+- `GymFlow-main/apps/web/middleware.ts` — `/api/verify-cref` em PUBLIC_API_ROUTES
+- `GymFlow-main/apps/web/app/api/verify-cref/route.ts` — novo (endpoint CREF)
+- `GymFlow-main/apps/web/lib/cref.ts` — novo (lógica scraping Implanta)
+- `GymFlow-main/apps/web/components/layout/brand-logo.tsx` — fix loop (esta sessão)
+- `GymFlow-main/apps/web/app/(auth)/verificar-email/page.tsx` — botão Voltar (esta sessão)
+
+**Como retomar:** fixes aplicados, working tree limpo exceto pelos 6 arquivos acima. Próximo passo natural: `pnpm type-check` e commitar tudo num único commit ou em dois (CREF + brand fixes).
+
 ## 2026-06-15 ~11:30 — Verificação REAL do CREF no cadastro do personal (IMPLEMENTADO)
 
 **Tarefa:** cadastro do personal só validava formato do CREF (regex). Usuário quer verificação real do registro, mesmo sendo opcional. Decisão dele (AskUserQuestion): **scraping do conselho** (não upload/manual, não API paga).

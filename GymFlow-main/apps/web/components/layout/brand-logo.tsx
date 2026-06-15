@@ -36,7 +36,7 @@ export function BrandLogo({ size = 'md', showText = true, className }: BrandLogo
   // useAuthStore é seguro no client; quando ainda não hidratou, profile é null
   // e o link aponta pra "/", o que é o comportamento certo enquanto carrega.
   const profile = useAuthStore((s) => s.profile)
-  const href = profile ? '/dashboard' : '/'
+  const href = profile?.email_verified_at ? '/dashboard' : '/'
 
   const pathname = usePathname()
   const router = useRouter()
