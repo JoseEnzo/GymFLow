@@ -16,20 +16,14 @@
 - `GymFlow-main/apps/web/components/layout/brand-logo.tsx` (+1/-1)
 - `GymFlow-main/apps/web/app/(auth)/verificar-email/page.tsx` (+20/-1)
 
+**COMMITADO ✅** — commit `9accca3` "Fix loop do logo e adiciona botão Voltar em verificar-email" (3 arquivos: brand-logo + verificar-email + CHECKPOINT.md). Working tree **limpo**. A feature CREF já estava no commit anterior `026410c "Feat correções"` (cadastro/page.tsx, middleware.ts, verify-cref/route.ts, lib/cref.ts — todos tracked, NÃO no working tree).
+
 **Pendências / decisões em aberto:**
-- [ ] `pnpm type-check` não rodou (deps não instaladas). Tipos usados (`Profile.email_verified_at`) confirmados no `packages/database/src/types.ts`. CI cobre.
-- [ ] Commitar (estes 2 arquivos + os da feature CREF abaixo)
+- [ ] `git push` pro origin (branch `Branch_Jose`) — perguntei ao usuário, aguardando. Branch está à frente do origin por 1+ commit.
+- [ ] `pnpm type-check` não rodou (deps não instaladas). Tipos usados (`Profile.email_verified_at`) confirmados no `packages/database/src/types.ts`. CI cobre no PR.
 - [ ] Verificar visualmente o fluxo: cadastro personal → tela verificar-email → clicar logo (deve ir pra `/`) + clicar botão Voltar (deve fazer signOut e ir pra `/`)
 
-**Working tree completo (tudo não-commitado):**
-- `GymFlow-main/apps/web/app/(auth)/cadastro/page.tsx` — verificação CREF no cadastro
-- `GymFlow-main/apps/web/middleware.ts` — `/api/verify-cref` em PUBLIC_API_ROUTES
-- `GymFlow-main/apps/web/app/api/verify-cref/route.ts` — novo (endpoint CREF)
-- `GymFlow-main/apps/web/lib/cref.ts` — novo (lógica scraping Implanta)
-- `GymFlow-main/apps/web/components/layout/brand-logo.tsx` — fix loop (esta sessão)
-- `GymFlow-main/apps/web/app/(auth)/verificar-email/page.tsx` — botão Voltar (esta sessão)
-
-**Como retomar:** fixes aplicados, working tree limpo exceto pelos 6 arquivos acima. Próximo passo natural: `pnpm type-check` e commitar tudo num único commit ou em dois (CREF + brand fixes).
+**Como retomar:** trabalho commitado em `9accca3`, working tree limpo. Falta só `git push` (se o usuário aprovar) e verificação visual.
 
 ## 2026-06-15 ~11:30 — Verificação REAL do CREF no cadastro do personal (IMPLEMENTADO)
 
