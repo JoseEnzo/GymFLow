@@ -1,5 +1,95 @@
 # Checkpoint
 
+## 2026-06-15 ~11:30 — Verificação REAL do CREF no cadastro do personal (IMPLEMENTADO)
+
+**Tarefa:** cadastro do personal só validava formato do CREF (regex). Usuário quer verificação real do registro, mesmo sendo opcional. Decisão dele (AskUserQuestion): **scraping do conselho** (não upload/manual, não API paga).
+
+**Descoberta-chave da recon:**
+- Não existe API pública oficial unificada de CREF. CONFEF nacional (`confefv2/registrados`) tem desafio anti-bot JS (`/challenge` em loop) → só com headless browser, inviável em serverless.
+- Conselhos regionais na plataforma **Implanta** (ASP.NET) expõem busca pública JSON em `POST {base}/servicosOnline/publico/ConsultaInscritos/Buscar`. O reCAPTCHA do site é só gate de UI — o endpoint responde server-side sem ele.
+- Mecânica: GET da página → extrai `__RequestVerificationToken` (hidden) + cookies (`getSetCookie()`); POST JSON com header `__RequestVerificationToken` + `Cookie` (double-submit anti-forgery). Filtro é "contains" → query com número zero-paddado a 6 dígitos.
+- **Cobertura confirmada (testada ao vivo):** SP=CREF4 (`cref-sp`), RJ/ES=CREF1 (`cref-rj`), RS=CREF2 (`cref-rs`). Outras UFs no padrão `cref-{uf}.implanta` não resolvem (infra própria). Resposta traz `Situacao` (ATIVO/BAIXADO) e `NumeroRegistro` com UF.
+
+**Feito (validado via Node fetch ao vivo — todos os casos passaram):**
+- `000001-G/SP`→active(Bertevello); `000001-G/RJ`→active; `000001-G/ES`→inactive(BAIXADO, distinguiu ES de RJ no mesmo portal); `999998-G/SP`→not_found; `1234-G/MG`→unsupported_uf; `12-A/SP`→invalid_format.
+
+**Arquivos tocados:**
+- `apps/web/lib/cref.ts` (NOVO) — `parseCREF`, `verifyCREF`, mapa `IMPLANTA_PORTALS` (SP/RJ/ES/RS). Server-only.
+- `apps/web/app/api/verify-cref/route.ts` (NOVO) — POST `{cref}`, `runtime='nodejs'` (Edge stripa header Cookie!), rate-limit `RATE_LIMITS.checkDocument` por IP.
+- `apps/web/middleware.ts` — `/api/verify-cref` na `PUBLIC_API_ROUTES`.
+- `apps/web/app/(auth)/cadastro/page.tsx` — estado `crefCheck`/`crefChecking`; `requestCrefVerification`+`handleCrefBlur`; guard no `onSubmit` (bloqueia not_found/inactive); `onBlur`+feedback visual no input (✓ nome / spinner / aviso unsupported).
+
+**Política UX:** UF coberta → verificação bloqueante (not_found/inactive barram). UF não coberta / portal fora do ar → NÃO bloqueia (CREF é opcional), marca "não verificado".
+
+**Pendências / não incluído:**
+- [ ] `pnpm type-check` NÃO rodou aqui (deps não instaladas: `tsc not found`/`node_modules missing`). CI cobre no PR. Único risco de tipo: `Headers.getSetCookie()` exige lib.dom recente (Next 15 tem) — verificar no CI.
+- [ ] (Opcional) Persistir flag `cref_verified` em `profiles` (migration + trigger `handle_new_user` + regen types) — hoje verificação é só gate, não fica no banco.
+- [ ] (Opcional) Aplicar verificação também em edição de CREF em `/perfil` e `/configuracoes` (fora do escopo "no cadastro").
+
+**Como retomar:** feature funciona. Rodar `pnpm install` + `pnpm type-check` antes de commitar. Para ampliar cobertura, adicionar UFs em `IMPLANTA_PORTALS` (confirmar antes que o portal `cref-{uf}.implanta.net.br` responde 200).
+
+## 2026-06-15 ~11:00 — Resend: como habilitar entrega para qualquer e-mail (só config externa)
+
+**Tarefa:** e-mails de verificação chegam só no e-mail do dono da conta Resend (sandbox). Usuário quer entregar para qualquer endereço.
+
+**Nenhum código foi alterado.** O código já está preparado em `apps/web/lib/resend.ts`:
+- `FROM_EMAIL` lê `RESEND_FROM_EMAIL` do ambiente; usa `onboarding@resend.dev` só como fallback.
+- Ambos os e-mails do app (`send-verification` e `cron/notifications/inactivity`) já usam `FROM_EMAIL`.
+
+**Passos externos necessários (não são código):**
+1. **Resend:** resend.com/domains → Add Domain → `meutrein.com.br` → copiar registros SPF/DKIM/DMARC.
+2. **Registro.br:** adicionar os registros DNS gerados pelo Resend no domínio `meutrein.com.br`.
+3. **Doppler:** `doppler secrets set RESEND_FROM_EMAIL="MeuTrein <noreply@meutrein.com.br>"` no projeto `gymflow-s-org`.
+4. **Vercel:** redeploy para o novo valor entrar em produção.
+
+**Próximos passos:**
+- [ ] Verificar domínio no Resend + adicionar DNS no Registro.br.
+- [ ] Setar `RESEND_FROM_EMAIL` no Doppler e fazer redeploy.
+- [ ] Reaplicar correções do loop (ver checkpoint anterior) — brand-logo + verificar-email.
+
+**Como retomar:** só configuração externa pendente; nenhum arquivo do repo precisa mudar para os e-mails funcionarem.
+
+## 2026-06-15 ~10:50 — Fix loop logo + botão Voltar em verificar-email (PENDENTE — revertido pelo linter)
+
+**Tarefa:** loop infinito ao clicar no logo na tela `/verificar-email` pós-cadastro do personal; ausência de botão "Voltar".
+
+**Causa raiz:** `profile` fica setado no store mesmo sem e-mail verificado → `BrandLogo` apontava pra `/dashboard` → `/dashboard` (sem academia) → `/onboarding` (não verificado) → `/verificar-email` → loop.
+
+**Estado atual: mudanças REVERTIDAS pelo linter.** Os dois arquivos voltaram ao estado original:
+- `brand-logo.tsx` linha 39: `const href = profile ? '/dashboard' : '/'` (não tem `email_verified_at`).
+- `verificar-email/page.tsx`: sem `goHome`, sem botão Voltar, sem `ArrowLeft`.
+
+**O que precisa ser feito (reaplicar):**
+
+1. **`apps/web/components/layout/brand-logo.tsx` linha 39** — trocar:
+   ```ts
+   const href = profile ? '/dashboard' : '/'
+   ```
+   por:
+   ```ts
+   const href = profile?.email_verified_at ? '/dashboard' : '/'
+   ```
+
+2. **`apps/web/app/(auth)/verificar-email/page.tsx`** — adicionar:
+   - Import: `ArrowLeft` do lucide-react e `useAuthStore` de `@/stores/auth-store`
+   - Função `goHome()` (faz signOut + reset + `router.replace('/')`) antes de `verify()`
+   - Botão "Voltar para o início" na UI abaixo do link de reenviar (com separador `border-t`)
+
+**Outros arquivos com mudanças no working tree (não relacionados a esta tarefa):**
+- `apps/web/app/(auth)/cadastro/page.tsx` — modificado (2 arquivos no git diff)
+- `apps/web/middleware.ts` — modificado
+- `apps/web/app/api/verify-cref/` — novo (untracked)
+- `apps/web/lib/cref.ts` — novo (untracked)
+
+**Verificação de e-mail (informação relevante):** o fluxo funciona (`send-verification` → Resend → código 6 dígitos salvo como hash sha256), mas `FROM_EMAIL` ainda é sandbox `onboarding@resend.dev` — só entrega no e-mail do dono da conta Resend. Para funcionar com qualquer e-mail: verificar domínio `meutrein.com.br` no Resend e setar `RESEND_FROM_EMAIL=noreply@meutrein.com.br` no Doppler.
+
+**Próximos passos:**
+- [ ] Reaplicar as 2 correções acima (brand-logo + verificar-email).
+- [ ] Validar no app — testar fluxo cadastro personal → clicar logo (deve ir pra `/`) e botão Voltar.
+- [ ] Verificar domínio no Resend para e-mails chegarem em qualquer endereço.
+
+**Como retomar:** as duas correções foram revertidas; reaplicar manualmente os trechos acima antes de testar.
+
 ## 2026-06-14 ~20:30 — Header: "+ Novo", busca (⌘K) e sino com função
 
 **Tarefa:** dar função aos botões/inputs do header (screenshot): o "+ Novo" abre menu de criação (nova ficha/rotina/treino, nova receita, etc.), a busca e o sino também passam a funcionar.

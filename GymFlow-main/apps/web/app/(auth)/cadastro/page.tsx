@@ -109,6 +109,16 @@ function CadastroInner() {
   const [document, setDocument] = useState('')
   const [documentError, setDocumentError] = useState<string | null>(null)
   const [termsAccepted, setTermsAccepted] = useState(false)
+  // Verificação real do CREF no conselho regional (só personal). `value` guarda
+  // o CREF verificado pra evitar reconsultar o mesmo valor no submit.
+  const [crefCheck, setCrefCheck] = useState<{
+    value: string
+    status: string
+    nome?: string
+    situacao?: string
+    conselho?: string
+  } | null>(null)
+  const [crefChecking, setCrefChecking] = useState(false)
 
   useEffect(() => {
     if (!inviteToken) return
@@ -133,6 +143,37 @@ function CadastroInner() {
   const password = watch('password', '')
   const strength = passwordStrength(password)
 
+  type CrefResult = { value: string; status: string; nome?: string; situacao?: string; conselho?: string }
+
+  async function requestCrefVerification(cref: string): Promise<CrefResult> {
+    const res = await fetch('/api/verify-cref', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cref }),
+    })
+    const json = (await res.json()) as { status?: string; nome?: string; situacao?: string; conselho?: string }
+    return { value: cref, status: json.status ?? 'unverifiable', nome: json.nome, situacao: json.situacao, conselho: json.conselho }
+  }
+
+  // Verificação real ao sair do campo: confirma o registro no conselho regional
+  // antes do submit. Não consulta de novo o mesmo valor já checado.
+  async function handleCrefBlur() {
+    if (accountType !== 'personal') return
+    const val = document.trim()
+    if (!val || !validateCREF(val) || crefCheck?.value === val) return
+    setCrefChecking(true)
+    try {
+      const result = await requestCrefVerification(val)
+      setCrefCheck(result)
+      if (result.status === 'not_found') setDocumentError('CREF não localizado no conselho. Confira o número e a UF.')
+      else if (result.status === 'inactive') setDocumentError(`CREF não está ativo no conselho (situação: ${result.situacao ?? 'irregular'}).`)
+    } catch {
+      setCrefCheck({ value: val, status: 'unverifiable' })
+    } finally {
+      setCrefChecking(false)
+    }
+  }
+
   async function onSubmit(data: FormData) {
     setDocumentError(null)
     if (accountType === 'owner') {
@@ -148,6 +189,25 @@ function CadastroInner() {
     setIsLoading(true)
     setServerError(null)
     try {
+      // Verificação real do CREF no conselho regional (só personal, quando
+      // preenchido). Bloqueia registro inexistente ou inativo nas UFs cobertas;
+      // UF sem consulta online / portal fora do ar não bloqueia (CREF é opcional).
+      if (accountType === 'personal' && document.trim().length > 0) {
+        const val = document.trim()
+        const v = crefCheck?.value === val ? crefCheck : await requestCrefVerification(val)
+        setCrefCheck(v)
+        if (v.status === 'not_found') {
+          setDocumentError('CREF não localizado no conselho. Confira o número e a UF.')
+          setIsLoading(false)
+          return
+        }
+        if (v.status === 'inactive') {
+          setDocumentError(`CREF não está ativo no conselho (situação: ${v.situacao ?? 'irregular'}).`)
+          setIsLoading(false)
+          return
+        }
+      }
+
       // Pre-check: CNPJ/CREF já em uso? Evita criar auth.user órfão.
       // CPF (student) pula esse check — student loga com email, não CPF.
       // CREF vazio (opcional) também pula — não há o que checar.
@@ -398,11 +458,30 @@ function CadastroInner() {
                   autoComplete="off"
                   onChange={(e) => {
                     setDocumentError(null)
+                    setCrefCheck(null)
                     setDocument(accountType === 'owner' ? maskCNPJ(e.target.value) : accountType === 'personal' ? maskCREF(e.target.value) : maskCPF(e.target.value))
                   }}
+                  onBlur={handleCrefBlur}
                   className={cn('field', documentError && 'border-destructive/60 focus:ring-destructive/40')}
                 />
                 {documentError && <p className="text-xs text-red-400">{documentError}</p>}
+                {accountType === 'personal' && !documentError && crefChecking && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Verificando no conselho…
+                  </p>
+                )}
+                {accountType === 'personal' && !documentError && !crefChecking && crefCheck?.status === 'active' && (
+                  <p className="text-xs text-emerald-400 flex items-center gap-1.5">
+                    <Check className="w-3 h-3" /> CREF confirmado{crefCheck.nome ? `: ${crefCheck.nome}` : ''}{crefCheck.conselho ? ` (${crefCheck.conselho})` : ''}
+                  </p>
+                )}
+                {accountType === 'personal' && !documentError && !crefChecking && (crefCheck?.status === 'unsupported_uf' || crefCheck?.status === 'unverifiable') && (
+                  <p className="text-xs text-muted-foreground">
+                    {crefCheck.status === 'unsupported_uf'
+                      ? 'O conselho desta UF não oferece consulta online — não foi possível verificar automaticamente.'
+                      : 'Não foi possível verificar o CREF agora. Você pode continuar.'}
+                  </p>
+                )}
               </motion.div>
 
               {/* Email */}
